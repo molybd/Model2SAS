@@ -10,12 +10,18 @@ from multiprocessing import Pool
 class model2sas:
     'class to read 3D model from file and generate PDB file and SAS curve'
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, multiproc=False, procNum=1, *args, **kwargs):
         self.modelname = ''
         self.meshgrid = np.array([])
         self.pointsInModel = np.array([])
         self.stlModelMesh = None
         self.sasCurve = np.array([])
+        self.multiproc = multiproc
+        self.procNum = 1
+        if self.multiproc:
+            self.procNum = procNum
+        else:
+            self.procNum = 1
 
     def generateMeshgrid(self, xmin, xmax, ymin, ymax, zmin, zmax, interval=1):
         xscale = np.linspace(xmin, xmax, num=int((xmax-xmin)/interval+1))
@@ -84,7 +90,8 @@ class model2sas:
         return ptsInModelList
 
     # to generate a 3D model from stl file
-    def build_from_STLfile(self, stlfile, interval=1, modelname='', procNum=8):
+    def build_from_STLfile(self, stlfile, interval=1, modelname=''):
+        
         if modelname == '':
             if '/' in stlfile:
                 self.modelname = stlfile.split('/')[-1].split('.')[-2]
@@ -105,9 +112,9 @@ class model2sas:
         # use multiprocessing to accelerate
         pointsInModelList = []
         multip_result_list = []
-        length = len(self.meshgrid)//procNum + 1
-        pool = Pool(procNum)
-        for i in range(procNum):
+        length = len(self.meshgrid)//self.procNum + 1
+        pool = Pool(self.procNum)
+        for i in range(self.procNum):
             pts = self.meshgrid[i*length: (i+1)*length]
             multip_result_list.append(pool.apply_async(self.ptsInSTLModel, args=(pts,)))
         pool.close()
@@ -205,6 +212,6 @@ class model2sas:
         pyplot.show()
 
 if __name__ == '__main__':
-    torus1 = model2sas()
-    torus1.build_from_STLfile('torus.stl', procNum=16)
+    torus1 = model2sas(multiproc=True, procNum=8)
+    torus1.build_from_STLfile('torus.stl')
     torus1.plotPointsInModel()
