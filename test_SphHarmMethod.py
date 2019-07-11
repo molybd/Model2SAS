@@ -9,16 +9,21 @@ def xyz2sph(point):
     phi = np.arctan(point[1] / (point[0]+epsilon))
     return np.array([r, theta, phi]) # theta: 0~pi ; phi: 0~2pi
 
-def func(q, point, lmax=20):
-    p_sph = xyz2sph(point)
-    r, theta, phi = p_sph[0], p_sph[1], p_sph[2]
+def Alm(q, points, l, m):
+    A = 0
+    for p in points:
+        p_sph = xyz2sph(p)
+        r, theta, phi = p_sph[0], p_sph[1], p_sph[2]
+        A += spherical_jn(l, q*r) * sph_harm(m, l, theta, phi)
+        # A += (jv(1.5, q*R)/(q*R)**1.5) * spherical_jn(l, q*r) * sph_harm(m, l, theta, phi)
+    return 4 * np.pi * complex(0,1)**l * A
 
+
+def Iq(q, points, lmax=20):
     I = 0
     for l in range(lmax+1):
         for m in range(-l, l+1):
-            I += spherical_jn(l, q*r) * sph_harm(m, l, theta, phi)
-            # I += (jv(1.5, q*R)/np.power((q*R),1.5)) * spherical_jn(l, q*r) * sph_harm(m, l, theta, phi)
-    I = 4 * np.pi() * np.power(complex(0,1), l) * I
+            I += abs(Alm(q, points, l, m))**2
     return I
 
 
@@ -29,10 +34,7 @@ qlst = np.linspace(0.01, 1, num=50)
 points = np.loadtxt('shell_pointcloud_numpy.txt')
 Ilst = []
 for q in qlst:
-    Iq = 0
-    for p in points:
-        Iq += func(q, p)**2
-    Ilst.append(Iq)
+    Ilst.append(Iq(q, points))
 '''
 for q in qlst:
     Iq = 0
@@ -41,6 +43,10 @@ for q in qlst:
             Iq += func2(q, p1, p2, lmax=5)
     Ilst.append(Iq)
 '''
+
+Ilst = np.array(Ilst)
+qIarray = np.vstack((qlst, Ilst)).T
+np.savetxt('qI_sphharm.dat', qIarray)
 
 ax = pyplot.subplot(111)
 ax.set_xscale("log", nonposx='clip')
