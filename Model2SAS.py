@@ -4,6 +4,7 @@ import numpy as np
 from stl import mesh
 from mpl_toolkits import mplot3d
 from matplotlib import pyplot
+from scipy.special import sph_harm, spherical_jn, jv
 import os
 from multiprocessing import Pool
 
@@ -91,7 +92,7 @@ class model2sas:
 
     # to generate a 3D model from stl file
     def build_from_STLfile(self, stlfile, interval=1, modelname=''):
-        
+        self.interval = interval
         if modelname == '':
             if '/' in stlfile:
                 self.modelname = stlfile.split('/')[-1].split('.')[-2]
@@ -142,6 +143,46 @@ class model2sas:
         self.pointsInModel = np.array(pointsInModelList)
         return self.pointsInModel
 
+    def build_from_PointsFile(self, filename, interval=1, modelname=''):
+        self.interval = interval
+        if modelname == '':
+            if '/' in filename:
+                self.modelname = filename.split('/')[-1].split('.')[-2]
+            elif '\\' in filename:
+                self.modelname = filename.split('\\')[-1].split('.')[-2]
+            else:
+                self.modelname = filename.split('.')[-2]
+        else:
+            self.modelname = modelname
+        self.pointsInModel = np.loadtxt(filename)
+        return self.pointsInModel
+
+    def build_from_XYZfile(self, filename, interval=1, modelname=''):
+        self.interval = interval
+        if modelname == '':
+            if '/' in filename:
+                self.modelname = filename.split('/')[-1].split('.')[-2]
+            elif '\\' in filename:
+                self.modelname = filename.split('\\')[-1].split('.')[-2]
+            else:
+                self.modelname = filename.split('.')[-2]
+        else:
+            self.modelname = modelname
+        
+        lst = []
+        with open(filename, 'r') as f:
+            for line in f.readlines():
+                if line[0] != '#':
+                    point = [float(i) for i in line.split()[1:4]]
+                    lst.append(point)
+        self.pointsInModel = np.array(lst)
+        return self.pointsInModel
+
+
+    def writePointsInModel(self):
+        filename = '{}_interval={}.txt'.format(self.modelname, self.interval)
+        np.savetxt(filename, self.pointsInModel)
+
     def writeXYZfile(self, filename='', head='created by limu', atom='CA'):
         if filename == '':
             filename = self.modelname + '.xyz'
@@ -187,13 +228,48 @@ class model2sas:
         # Show the plot to the screen
         pyplot.show()
 
-    def genSasCurve(self, qmax=1, qNum=256):
+    def genSasCurve_Crysol(self, qmax=1, qNum=256):
         pdbfile = self.modelname + '.pdb'
         self.writePDBfile(pdbfile)
         os.system('crysol {} -lm 50 -fb 18 -sm {} -ns {} -un 1'.format(pdbfile, qmax, qNum))
         intfile = self.modelname + '00.int'
         crysolOutput = np.loadtxt(intfile, skiprows=1)
         self.sasCurve = crysolOutput[:, :2]
+        return self.sasCurve
+
+    def xyz2sph(self, point):
+        epsilon=1e-100
+        r = np.linalg.norm(point)
+        theta = np.arccos(point[2] / (r+epsilon))
+        phi = np.arctan(point[1] / (point[0]+epsilon))
+        return np.array([r, theta, phi]) # theta: 0~pi ; phi: 0~2pi
+
+    def Alm(self, q, points, l, m, unitFormFactor=True):
+        A = 0
+        if unitFormFactor == True:
+            R = self.interval / 2
+            for p in points:
+                p_sph = self.xyz2sph(p) # p_sph: array[r, theta, phi]; theta: 0~pi, phi: 0~2pi
+                r, theta, phi = p_sph[0], p_sph[1], p_sph[2] # theta: 0~pi ; phi: 0~2pi
+                A += (jv(1.5, q*R)/(q*R)**1.5) * spherical_jn(l, q*r) * sph_harm(m, l, phi, theta)
+        else:
+            for p in points:
+                p_sph = self.xyz2sph(p) # p_sph: array[r, theta, phi]; theta: 0~pi, phi: 0~2pi
+                r, theta, phi = p_sph[0], p_sph[1], p_sph[2] # theta: 0~pi ; phi: 0~2pi
+                A += spherical_jn(l, q*r) * sph_harm(m, l, phi, theta)
+        return 4 * np.pi * complex(0,1)**l * A
+
+    def Iq(self, q, points, lmax=5, unitFormFactor=True):
+        I = 0
+        for l in range(lmax+1):
+            for m in range(-l, l+1):
+                I += abs(self.Alm(q, points, l, m, unitFormFactor=True))**2
+        return I
+
+    def genSasCurve(self, qmin=0.01, qmax=1, qnum=50, lmax=10, unitFormFactor=True):
+        q = np.linspace(qmin, qmax, num=qnum)
+        I = self.Iq(q, self.pointsInModel, lmax=lmax, unitFormFactor=unitFormFactor)
+        self.sasCurve = np.vstack((q, I)).T
         return self.sasCurve
 
     def saveSasCurve(self):
