@@ -147,13 +147,13 @@ class model2sas:
             self.interval = interval
             return self.pointsInModel
 
-    
+
     # to generate a 3D model from a mathematical description
-    # for example: a hollow sphere is "x**2+y**2+z**2 >= R1**2 and x**2+y**2+z**2 <= R2**2
-    # this description must be a python boolean expression !
-    # the coordinate of point must be x,y,z
+    # math description is in seperated file module.py
+    # function in module.py return True or False if a point is in the model
     # boundaryList is [xmin, xmax, ymin, ymax, zmin, zmax]
-    def buildFromMath(self, modelname, description, boundaryList, interval=None):
+    # coord is 'xyz' or 'sph'(r, theta, phi)|theta: 0~pi ; phi: 0~2pi
+    def buildFromMath(self, modelname, module, function, boundaryList, coord='xyz', interval=None):
         self.modelname = modelname
         xmin, xmax, ymin, ymax, zmin, zmax = boundaryList[0], boundaryList[1], boundaryList[2], boundaryList[3], boundaryList[4], boundaryList[5]
         if interval == None:
@@ -162,10 +162,17 @@ class model2sas:
             self.interval = interval
         self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
         pointsInModelList = []
-        for point in self.meshgrid:
-            x, y, z = point[0], point[1], point[2]
-            if eval(description):
-                pointsInModelList.append(point)
+        if coord == 'xyz':
+            points = self.meshgrid
+        elif coord == 'sph':
+            points = self.xyz2sph(self.meshgrid)
+
+        MathDescription = __import__(module)
+        for i in range(len(self.meshgrid)):
+            p = points[i,:]
+            conditional_statement = 'MathDescription.{}(p)'.format(function)
+            if eval(conditional_statement):
+                pointsInModelList.append(self.meshgrid[i,:])
         self.pointsInModel = np.array(pointsInModelList)
         return self.pointsInModel
 
@@ -296,6 +303,7 @@ class model2sas:
         pyplot.show()
 
 if __name__ == '__main__':
+    '''
     model = model2sas(procNum=12)
     model.buildFromFile('shell_12_large_hole.xyz')
     #model.savePDBFile()
@@ -303,3 +311,8 @@ if __name__ == '__main__':
     model.genSasCurve()
     #model.plotSasCurve()
     model.saveSasCurve()
+    '''
+    model = model2sas(procNum=12)
+    boundaryList = [-15, 15, -15, 15, -15, 15]
+    model.buildFromMath('ring', 'MathDescription', 'ring', boundaryList, coord='sph', interval=0.5)
+    model.plotPointsInModel()
