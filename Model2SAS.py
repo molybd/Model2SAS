@@ -102,6 +102,7 @@ class model2sas:
         self.__determineModelName(modelname, filename)
 
         filetype = filename.split('.')[-1].lower() # file extension in lower cases
+        
         if filetype == 'stl':
             self.stlModelMesh = mesh.Mesh.from_file(filename)
             vectors = self.stlModelMesh.vectors
@@ -230,7 +231,7 @@ class model2sas:
     # transfer points coordinates from cartesian coordinate to spherical coordinate
     # points_xyz must be array([[x0,y0,z0], [x1,y1,z1], [x1,y1,z1], ...])
     # returned points_sph is array([[r0, theta0, phi0], [r1, theta1, phi1], [r1, theta1, phi1], ...])
-    def __xyz2sph(self, points_xyz):
+    def xyz2sph(self, points_xyz):
         epsilon=1e-100
         r = np.linalg.norm(points_xyz, axis=1)
         theta = np.arccos(points_xyz[:,2] / (r+epsilon))
@@ -249,24 +250,40 @@ class model2sas:
         return 4 * np.pi * complex(0,1)**l * A
 
     # used in func genSasCurve()
-    def __Iq(self, q, points_xyz, lmax):
+    # points in spherical coordinates
+    def Iq(self, q, points_sph, lmax):
         I = 0
-        points_sph = self.__xyz2sph(points_xyz)
         for l in range(lmax+1):
             for m in range(-l, l+1):
                 I += abs(self.__Alm(q, points_sph, l, m))**2
         return I
 
-    def genSasCurve(self, qmin=0.01, qmax=1, qnum=100, lmax=10):
+    def genSasCurve(self, qmin=0.01, qmax=1, qnum=100, lmax=50):
+        self.lmax = lmax
+        points_sph = self.xyz2sph(self.pointsInModel)
         q = np.linspace(qmin, qmax, num=qnum)
-        I = self.__Iq(q, self.pointsInModel, lmax)
+        
+        # this calculation need several minutes in single process mode
+        # so use multiprocessing to accelerate
+        pool = Pool(self.procNum)
+        multip_result_list = []
+        length = qnum//self.procNum + 1
+        for i in range(self.procNum):
+            qslice = q[i*length: (i+1)*length]
+            multip_result_list.append(pool.apply_async(self.Iq, args=(qslice, points_sph, lmax,)))
+        pool.close()
+        pool.join()
+        Ilst = []
+        for item in multip_result_list:
+            Ilst.append(item.get())
+        I = np.hstack(Ilst)
         self.sasCurve = np.vstack((q, I)).T
         return self.sasCurve
 
     def saveSasCurve(self):
         filename = self.modelname + '_saxs.dat'
-        header = 'theoretical SAXS curve of {} model\n'.format(self.modelname)
-        header += 'q\tI'
+        header = 'theoretical SAXS curve of {} model\ninterval between points = {}\nl_max in spherical harmonics = {}\n'.format(self.modelname, self.interval, self.lmax)
+        header += '\nq\tI'
         np.savetxt(filename, self.sasCurve, header=header)
 
     def plotSasCurve(self):
@@ -280,8 +297,9 @@ class model2sas:
 
 if __name__ == '__main__':
     model = model2sas(procNum=12)
-    model.buildFromFile('shell_12_large_hole.STL')
-    model.plotPointsInModel()
+    model.buildFromFile('shell_12_large_hole.xyz')
+    #model.savePDBFile()
+    #model.plotPointsInModel()
     model.genSasCurve()
-    model.plotSasCurve()
+    #model.plotSasCurve()
     model.saveSasCurve()
