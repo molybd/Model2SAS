@@ -8,6 +8,8 @@ from scipy.special import sph_harm, spherical_jn, jv
 import os
 from multiprocessing import Pool
 
+# attention: in this program, spherical coordinates are (r, theta, phi) |theta: 0~pi ; phi: 0~2pi
+
 class model2sas:
     'class to read 3D model from file and generate PDB file and SAS curve'
 
