@@ -11,23 +11,29 @@ from multiprocessing import Pool
 class model2sas:
     'class to read 3D model from file and generate PDB file and SAS curve'
 
-    def __init__(self, multiproc=False, procNum=1, *args, **kwargs):
+    def __init__(self, procNum=1, *args, **kwargs):
         self.modelname = ''
         self.meshgrid = np.array([])
         self.pointsInModel = np.array([])
         self.stlModelMesh = None
         self.sasCurve = np.array([])
-        self.multiproc = multiproc
-        self.procNum = 1
-        if self.multiproc:
-            self.procNum = procNum
-        else:
-            self.procNum = 1
+        self.procNum = procNum
 
-    def generateMeshgrid(self, xmin, xmax, ymin, ymax, zmin, zmax, interval=1):
-        xscale = np.linspace(xmin, xmax, num=int((xmax-xmin)/interval+1))
-        yscale = np.linspace(ymin, ymax, num=int((ymax-ymin)/interval+1))
-        zscale = np.linspace(zmin, zmax, num=int((zmax-zmin)/interval+1))
+    def __determineModelName(self, modelname, filename):
+        if modelname == None:
+            if '/' in filename:
+                self.modelname = filename.split('/')[-1].split('.')[-2]
+            elif '\\' in filename:
+                self.modelname = filename.split('\\')[-1].split('.')[-2]
+            else:
+                self.modelname = filename.split('.')[-2]
+        else:
+            self.modelname = modelname
+
+    def generateMeshgrid(self, xmin, xmax, ymin, ymax, zmin, zmax):
+        xscale = np.linspace(xmin, xmax, num=int((xmax-xmin)/self.interval+1))
+        yscale = np.linspace(ymin, ymax, num=int((ymax-ymin)/self.interval+1))
+        zscale = np.linspace(zmin, zmax, num=int((zmax-zmin)/self.interval+1))
         x, y, z = np.meshgrid(xscale, yscale, zscale)
         x, y, z = x.reshape(x.size,1), y.reshape(y.size,1), z.reshape(z.size,1)
         self.meshgrid = np.hstack((x, y, z))
@@ -82,7 +88,7 @@ class model2sas:
             isInModel = True
         return isInModel, np.array(noOverlapPointList)
 
-    # for the usage of multiprocessing
+    # for the usage of multiprocessing only
     def ptsInSTLModel(self, pts):
         ptsInModelList = []
         for pt in pts:
@@ -90,51 +96,70 @@ class model2sas:
                 ptsInModelList.append(pt)
         return ptsInModelList
 
-    # to generate a 3D model from stl file
-    def build_from_STLfile(self, stlfile, interval=1, modelname=''):
-        self.interval = interval
-        if modelname == '':
-            if '/' in stlfile:
-                self.modelname = stlfile.split('/')[-1].split('.')[-2]
-            elif '\\' in stlfile:
-                self.modelname = stlfile.split('\\')[-1].split('.')[-2]
+    # build points model from file
+    # supported file type: .stl, .xyz, .txt(points array from np.savetxt() )
+    def buildFromFile(self, filename, interval=None, modelname=None):
+        self.__determineModelName(modelname, filename)
+
+        filetype = filename.split('.')[-1].lower() # file extension in lower cases
+        if filetype == 'stl':
+            self.stlModelMesh = mesh.Mesh.from_file(filename)
+            vectors = self.stlModelMesh.vectors
+            xmin, xmax, ymin, ymax, zmin, zmax = np.min(vectors[:,:,0]), np.max(vectors[:,:,0]), np.min(vectors[:,:,1]), np.max(vectors[:,:,1]), np.min(vectors[:,:,2]), np.max(vectors[:,:,2])
+            if interval == None:
+                self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
             else:
-                self.modelname = stlfile.split('.')[-2]
-        else:
-            self.modelname = modelname
-            
-        self.stlModelMesh = mesh.Mesh.from_file(stlfile)
-        vectors = self.stlModelMesh.vectors
-        xmin, xmax, ymin, ymax, zmin, zmax = np.min(vectors[:,:,0]), np.max(vectors[:,:,0]), np.min(vectors[:,:,1]), np.max(vectors[:,:,1]), np.min(vectors[:,:,2]), np.max(vectors[:,:,2])
-        self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax, interval=interval)
+                self.interval = interval
+            self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
 
-        # this must be the slowest process in the whole program !
-        # must be a way to accelerate, still working on it...
-        # use multiprocessing to accelerate
-        pointsInModelList = []
-        multip_result_list = []
-        length = len(self.meshgrid)//self.procNum + 1
-        pool = Pool(self.procNum)
-        for i in range(self.procNum):
-            pts = self.meshgrid[i*length: (i+1)*length]
-            multip_result_list.append(pool.apply_async(self.ptsInSTLModel, args=(pts,)))
-        pool.close()
-        pool.join()
-        for item in multip_result_list:
-            pointsInModelList += item.get()
+            # this must be the slowest process in the whole program !
+            # must be a way to accelerate, still working on it...
+            # use multiprocessing to accelerate
+            pointsInModelList = []
+            multip_result_list = []
+            length = len(self.meshgrid)//self.procNum + 1
+            pool = Pool(self.procNum)
+            for i in range(self.procNum):
+                pts = self.meshgrid[i*length: (i+1)*length]
+                multip_result_list.append(pool.apply_async(self.ptsInSTLModel, args=(pts,)))
+            pool.close()
+            pool.join()
+            for item in multip_result_list:
+                pointsInModelList += item.get()
 
-        self.pointsInModel = np.array(pointsInModelList)
-        return self.pointsInModel
+            self.pointsInModel = np.array(pointsInModelList)
+            return self.pointsInModel
+
+        elif filetype == 'xyz':
+            lst = []
+            with open(filename, 'r') as f:
+                for line in f.readlines():
+                    if line[0] != '#':
+                        point = [float(i) for i in line.split()[1:4]]
+                        lst.append(point)
+            self.pointsInModel = np.array(lst)
+            self.interval = interval
+            return self.pointsInModel
+
+        elif filetype == 'txt':
+            self.pointsInModel = np.loadtxt(filename)
+            self.interval = interval
+            return self.pointsInModel
+
     
     # to generate a 3D model from a mathematical description
     # for example: a hollow sphere is "x**2+y**2+z**2 >= R1**2 and x**2+y**2+z**2 <= R2**2
     # this description must be a python boolean expression !
     # the coordinate of point must be x,y,z
     # boundaryList is [xmin, xmax, ymin, ymax, zmin, zmax]
-    def build_from_MathDescription(self, modelname, description, boundaryList, interval=1):
+    def buildFromMath(self, modelname, description, boundaryList, interval=None):
         self.modelname = modelname
         xmin, xmax, ymin, ymax, zmin, zmax = boundaryList[0], boundaryList[1], boundaryList[2], boundaryList[3], boundaryList[4], boundaryList[5]
-        self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax, interval=interval)
+        if interval == None:
+            self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
+        else:
+            self.interval = interval
+        self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
         pointsInModelList = []
         for point in self.meshgrid:
             x, y, z = point[0], point[1], point[2]
@@ -143,47 +168,12 @@ class model2sas:
         self.pointsInModel = np.array(pointsInModelList)
         return self.pointsInModel
 
-    def build_from_PointsFile(self, filename, interval=1, modelname=''):
-        self.interval = interval
-        if modelname == '':
-            if '/' in filename:
-                self.modelname = filename.split('/')[-1].split('.')[-2]
-            elif '\\' in filename:
-                self.modelname = filename.split('\\')[-1].split('.')[-2]
-            else:
-                self.modelname = filename.split('.')[-2]
-        else:
-            self.modelname = modelname
-        self.pointsInModel = np.loadtxt(filename)
-        return self.pointsInModel
 
-    def build_from_XYZfile(self, filename, interval=1, modelname=''):
-        self.interval = interval
-        if modelname == '':
-            if '/' in filename:
-                self.modelname = filename.split('/')[-1].split('.')[-2]
-            elif '\\' in filename:
-                self.modelname = filename.split('\\')[-1].split('.')[-2]
-            else:
-                self.modelname = filename.split('.')[-2]
-        else:
-            self.modelname = modelname
-        
-        lst = []
-        with open(filename, 'r') as f:
-            for line in f.readlines():
-                if line[0] != '#':
-                    point = [float(i) for i in line.split()[1:4]]
-                    lst.append(point)
-        self.pointsInModel = np.array(lst)
-        return self.pointsInModel
-
-
-    def writePointsInModel(self):
+    def savePointsInModel(self):
         filename = '{}_interval={}.txt'.format(self.modelname, self.interval)
         np.savetxt(filename, self.pointsInModel)
 
-    def writeXYZfile(self, filename='', head='created by limu', atom='CA'):
+    def saveXYZFile(self, filename='', head='created by limu', atom='CA'):
         if filename == '':
             filename = self.modelname + '.xyz'
         with open(filename, 'w') as f:
@@ -192,7 +182,7 @@ class model2sas:
                 s += '{}\t{}\t{}\t{}\n'.format(atom, point[0], point[1], point[2])
             f.write(s)
 
-    def writePDBfile(self, filename='', atom='CA', occupancy=1.0, tempFactor=20.0):
+    def savePDBFile(self, filename='', atom='CA', occupancy=1.0, tempFactor=20.0):
         if filename == '':
             filename = self.modelname + '.pdb'
         with open(filename, 'w') as f:
@@ -230,45 +220,46 @@ class model2sas:
 
     def genSasCurve_Crysol(self, qmax=1, qNum=256):
         pdbfile = self.modelname + '.pdb'
-        self.writePDBfile(pdbfile)
+        self.savePDBFile(pdbfile)
         os.system('crysol {} -lm 50 -fb 18 -sm {} -ns {} -un 1'.format(pdbfile, qmax, qNum))
         intfile = self.modelname + '00.int'
         crysolOutput = np.loadtxt(intfile, skiprows=1)
         self.sasCurve = crysolOutput[:, :2]
         return self.sasCurve
 
-    def xyz2sph(self, point):
+    # transfer points coordinates from cartesian coordinate to spherical coordinate
+    # points_xyz must be array([[x0,y0,z0], [x1,y1,z1], [x1,y1,z1], ...])
+    # returned points_sph is array([[r0, theta0, phi0], [r1, theta1, phi1], [r1, theta1, phi1], ...])
+    def __xyz2sph(self, points_xyz):
         epsilon=1e-100
-        r = np.linalg.norm(point)
-        theta = np.arccos(point[2] / (r+epsilon))
-        phi = np.arctan(point[1] / (point[0]+epsilon))
-        return np.array([r, theta, phi]) # theta: 0~pi ; phi: 0~2pi
+        r = np.linalg.norm(points_xyz, axis=1)
+        theta = np.arccos(points_xyz[:,2] / (r+epsilon))
+        phi = np.arctan(points_xyz[:,1] / (points_xyz[:,0]+epsilon))
+        points_sph = np.vstack((r, theta, phi)).T
+        return points_sph  # theta: 0~pi ; phi: 0~2pi
 
-    def Alm(self, q, points, l, m, unitFormFactor=True):
+    # unit sphere form factor actually results in wrong outcomes
+    # so I delete it ...
+    def __Alm(self, q, points_sph, l, m):
         A = 0
-        if unitFormFactor == True:
-            R = self.interval / 2
-            for p in points:
-                p_sph = self.xyz2sph(p) # p_sph: array[r, theta, phi]; theta: 0~pi, phi: 0~2pi
-                r, theta, phi = p_sph[0], p_sph[1], p_sph[2] # theta: 0~pi ; phi: 0~2pi
-                A += (jv(1.5, q*R)/(q*R)**1.5) * spherical_jn(l, q*r) * sph_harm(m, l, phi, theta)
-        else:
-            for p in points:
-                p_sph = self.xyz2sph(p) # p_sph: array[r, theta, phi]; theta: 0~pi, phi: 0~2pi
-                r, theta, phi = p_sph[0], p_sph[1], p_sph[2] # theta: 0~pi ; phi: 0~2pi
-                A += spherical_jn(l, q*r) * sph_harm(m, l, phi, theta)
+        for p_sph in points_sph:
+            # p_sph: array[r, theta, phi]; theta: 0~pi, phi: 0~2pi
+            r, theta, phi = p_sph[0], p_sph[1], p_sph[2] # theta: 0~pi ; phi: 0~2pi
+            A += spherical_jn(l, q*r) * sph_harm(m, l, phi, theta)
         return 4 * np.pi * complex(0,1)**l * A
 
-    def Iq(self, q, points, lmax=5, unitFormFactor=True):
+    # used in func genSasCurve()
+    def __Iq(self, q, points_xyz, lmax):
         I = 0
+        points_sph = self.__xyz2sph(points_xyz)
         for l in range(lmax+1):
             for m in range(-l, l+1):
-                I += abs(self.Alm(q, points, l, m, unitFormFactor=True))**2
+                I += abs(self.__Alm(q, points_sph, l, m))**2
         return I
 
-    def genSasCurve(self, qmin=0.01, qmax=1, qnum=50, lmax=10, unitFormFactor=True):
+    def genSasCurve(self, qmin=0.01, qmax=1, qnum=100, lmax=10):
         q = np.linspace(qmin, qmax, num=qnum)
-        I = self.Iq(q, self.pointsInModel, lmax=lmax, unitFormFactor=unitFormFactor)
+        I = self.__Iq(q, self.pointsInModel, lmax)
         self.sasCurve = np.vstack((q, I)).T
         return self.sasCurve
 
@@ -288,6 +279,9 @@ class model2sas:
         pyplot.show()
 
 if __name__ == '__main__':
-    torus1 = model2sas(multiproc=True, procNum=8)
-    torus1.build_from_STLfile('torus.stl')
-    torus1.plotPointsInModel()
+    model = model2sas(procNum=12)
+    model.buildFromFile('shell_12_large_hole.STL')
+    model.plotPointsInModel()
+    model.genSasCurve()
+    model.plotSasCurve()
+    model.saveSasCurve()

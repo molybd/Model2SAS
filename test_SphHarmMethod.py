@@ -27,13 +27,13 @@ def Iq(q, points, lmax=20):
 
 if __name__ == "__main__":
 
-    R = 0.5
+    #R = 0.5
 
-    qlst = np.linspace(0.01, 1, num=50)
-    points = np.loadtxt('shell_pointcloud_numpy.txt')
+    qlst = np.linspace(0.01, 1, num=200)
+    points = np.loadtxt('sphere_phi100_interval=5.txt')
 
     #这里可以直接带入数组进行计算
-    Ilst = Iq(qlst, points, lmax=5)
+    Ilst = Iq(qlst, points, lmax=10)
     '''
     for q in qlst:
         Iq = 0
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     ax.set_xscale("log", nonposx='clip')
     ax.set_yscale("log", nonposy='clip')
     pyplot.plot(qlst, Ilst)
-    pyplot.show()
+    #pyplot.show()
 
     '''
     # 以下是画球的散射函数
