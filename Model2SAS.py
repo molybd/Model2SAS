@@ -339,7 +339,7 @@ if __name__ == '__main__':
     '''
     model = model2sas(procNum=12)
     boundaryList = [-52, 52, -52, 52, -52, 52]
-    model.buildFromMath('cylinder', 'MathDescription', 'cylinder', boundaryList, interval=2)
+    model.buildFromMath('porous_shell', 'MathDescription', 'porous_shell', boundaryList, interval=1)
     model.plotPointsInModel()
     #model.savePointsInModel()
     model.genSasCurve(qnum=200)
