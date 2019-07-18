@@ -161,7 +161,7 @@ class model2sas:
     # function in module.py return True or False if a point is in the model
     # boundaryList is [xmin, xmax, ymin, ymax, zmin, zmax]
     # coord is 'xyz' or 'sph'(r, theta, phi)|theta: 0~pi ; phi: 0~2pi
-    def buildFromMath(self, modelname, module, function, boundaryList, coord='xyz', interval=None):
+    def buildFromMath(self, modelname, module, function, boundaryList, params='', interval=None):
         self.modelname = modelname
         xmin, xmax, ymin, ymax, zmin, zmax = boundaryList[0], boundaryList[1], boundaryList[2], boundaryList[3], boundaryList[4], boundaryList[5]
         if interval == None:
@@ -183,9 +183,9 @@ class model2sas:
         elif coord == 'cyl':
             points = self.xyz2cyl(self.meshgrid)
 
+        conditional_statement = 'MathDescription.{}(p, {})'.format(function, params)
         for i in range(len(self.meshgrid)):
             p = points[i,:]
-            conditional_statement = 'MathDescription.{}(p)'.format(function)
             if eval(conditional_statement):
                 pointsInModelList.append(self.meshgrid[i,:])
         self.pointsInModel = np.array(pointsInModelList)
@@ -339,7 +339,14 @@ if __name__ == '__main__':
     '''
     model = model2sas(procNum=12)
     boundaryList = [-52, 52, -52, 52, -52, 52]
-    model.buildFromMath('porous_shell', 'MathDescription', 'porous_shell', boundaryList, interval=1)
+    model.buildFromMath(
+        'porous_shell',
+        'MathDescription',
+        'porous_shell',
+        boundaryList,
+        interval=5,
+        params='R1=30, R2=35, R_hole=10'
+        )
     model.plotPointsInModel()
     #model.savePointsInModel()
     model.genSasCurve(qnum=200)
