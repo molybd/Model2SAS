@@ -7,8 +7,15 @@ from matplotlib import pyplot
 from scipy.special import sph_harm, spherical_jn, jv
 import os
 from multiprocessing import Pool
+import inspect
 
 # attention: in this program, spherical coordinates are (r, theta, phi) |theta: 0~pi ; phi: 0~2pi
+#
+# unsolved problem:
+# Q1. SAS curve is wrong when there are points coordinates less than zero
+#     have add some solution, but don't know the reason behind
+# A1. the problem should result from the func xyz2sph, where the range of arctan is not 2pi, is [-pi/2, pi/2]
+#     solution: use np.arctan2() method instead of np.arctan()
 
 class model2sas:
     'class to read 3D model from file and generate PDB file and SAS curve'
@@ -131,7 +138,6 @@ class model2sas:
                 pointsInModelList += item.get()
 
             self.pointsInModel = np.array(pointsInModelList)
-            return self.pointsInModel
 
         elif filetype == 'xyz':
             lst = []
@@ -142,12 +148,12 @@ class model2sas:
                         lst.append(point)
             self.pointsInModel = np.array(lst)
             self.interval = interval
-            return self.pointsInModel
-
+            
         elif filetype == 'txt':
             self.pointsInModel = np.loadtxt(filename)
             self.interval = interval
-            return self.pointsInModel
+        
+        return self.pointsInModel
 
 
     # to generate a 3D model from a mathematical description
@@ -164,12 +170,19 @@ class model2sas:
             self.interval = interval
         self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
         pointsInModelList = []
+
+        # read coordinates from math function
+        MathDescription = __import__(module)
+        args = inspect.getargspec(eval('MathDescription.{}'.format(function)))
+        coord = args.defaults[-1]
+
         if coord == 'xyz':
             points = self.meshgrid
         elif coord == 'sph':
             points = self.xyz2sph(self.meshgrid)
+        elif coord == 'cyl':
+            points = self.xyz2cyl(self.meshgrid)
 
-        MathDescription = __import__(module)
         for i in range(len(self.meshgrid)):
             p = points[i,:]
             conditional_statement = 'MathDescription.{}(p)'.format(function)
@@ -237,6 +250,16 @@ class model2sas:
         self.sasCurve = crysolOutput[:, :2]
         return self.sasCurve
 
+    # transfer points coordinates from cartesian coordinate to cylindrical coordinate
+    # points_xyz must be array([[x0,y0,z0], [x1,y1,z1], [x1,y1,z1], ...])
+    # returned points_sph is array([[r0, phi0, z0], [r1, phi1, z1], [r2, phi2, z2], ...])
+    def xyz2cyl(self, points_xyz):
+        r = np.linalg.norm(points_xyz[:,:2], axis=1)
+        phi = np.arctan2(points_xyz[:,1], points_xyz[:,0])
+        z = points_xyz[:,2]
+        points_cyl = np.vstack((r, phi, z)).T
+        return points_cyl
+
     # transfer points coordinates from cartesian coordinate to spherical coordinate
     # points_xyz must be array([[x0,y0,z0], [x1,y1,z1], [x1,y1,z1], ...])
     # returned points_sph is array([[r0, theta0, phi0], [r1, theta1, phi1], [r1, theta1, phi1], ...])
@@ -244,7 +267,7 @@ class model2sas:
         epsilon=1e-100
         r = np.linalg.norm(points_xyz, axis=1)
         theta = np.arccos(points_xyz[:,2] / (r+epsilon))
-        phi = np.arctan(points_xyz[:,1] / (points_xyz[:,0]+epsilon))
+        phi = np.arctan2(points_xyz[:,1], points_xyz[:,0]) + np.pi # change from [-pi, pi] to [0, 2pi]
         points_sph = np.vstack((r, theta, phi)).T
         return points_sph  # theta: 0~pi ; phi: 0~2pi
 
@@ -315,6 +338,9 @@ if __name__ == '__main__':
     model.saveSasCurve()
     '''
     model = model2sas(procNum=12)
-    boundaryList = [-15, 15, -15, 15, -15, 15]
-    model.buildFromMath('ring', 'MathDescription', 'ring', boundaryList, coord='sph', interval=0.5)
+    boundaryList = [-52, 52, -52, 52, -52, 52]
+    model.buildFromMath('cylinder', 'MathDescription', 'cylinder', boundaryList, interval=2)
     model.plotPointsInModel()
+    #model.savePointsInModel()
+    model.genSasCurve(qnum=200)
+    model.plotSasCurve()
