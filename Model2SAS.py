@@ -31,11 +31,11 @@ class model2sas:
     def __determineModelName(self, modelname, filename):
         if modelname == None:
             if '/' in filename:
-                self.modelname = filename.split('/')[-1].split('.')[-2]
+                self.modelname = '.'.join(filename.split('/')[-1].split('.')[:-1])
             elif '\\' in filename:
-                self.modelname = filename.split('\\')[-1].split('.')[-2]
+                self.modelname = '.'.join(filename.split('\\')[-1].split('.')[:-1])
             else:
-                self.modelname = filename.split('.')[-2]
+                self.modelname = '.'.join(filename.split('.')[:-1])
         else:
             self.modelname = modelname
 
@@ -290,7 +290,7 @@ class model2sas:
                 I += abs(self.__Alm(q, points_sph, l, m))**2
         return I
 
-    def genSasCurve(self, qmin=0.01, qmax=1, qnum=100, lmax=50):
+    def genSasCurve(self, qmin=0.01, qmax=1, qnum=200, lmax=50):
         self.lmax = lmax
         points_sph = self.xyz2sph(self.pointsInModel)
         q = np.linspace(qmin, qmax, num=qnum)
