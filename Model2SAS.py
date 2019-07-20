@@ -48,6 +48,32 @@ class model2sas:
         self.meshgrid = np.hstack((x, y, z))
         return self.meshgrid
 
+    # new method, about 1000 times faster than old one...
+    # make full use of numpy
+    # calculate all the points intersect with 1 reiangle using multi-D array
+    def isIntersect(self, origins, ray, triangle):
+        O = origins
+        D = ray
+        V0 = triangle[0]
+        V1 = triangle[1]
+        V2 = triangle[2]
+        E1 = V1 - V0
+        E2 = V2 - V0
+        T = O - V0
+        P = np.cross(D, E2)
+        Q = np.cross(T, E1)
+        det = np.dot(P, E1)
+        if abs(det) >= np.finfo(np.float32).eps: #因为三角形里使用的是float32，所以在float32下判断是否等于0
+            tuv = (1/det) * np.vstack((np.dot(Q,E2), np.dot(T,P), np.dot(Q,D))).T
+            ispositive = np.sign(tuv) + 1  #大于等于零的数会变成正数（1或2），小于零的数会变成 0，结果和原数组形状完全相同，一一对应
+            isallpositive =  ispositive[:,0]*ispositive[:,1]*ispositive[:,2] #只要tuv三个中有一个数小于零那么这一行结果就是0
+            uplusv = -1*np.sign(tuv[:,1] + tuv[:,2] - 1) + 1 #判断u+v是否小于1，小于1的那一行变成正数，大于1的那一行结果是0
+            return np.sign(isallpositive * uplusv) #最终输出的结果是对应着输入每一个点的一维数组，如果与三角形有交集那么该点对应的值为1，否则为0
+        else:
+            return np.zeros(origins.shape[0])
+        
+    # below is old method... very slow...
+    '''
     def isIntersect(self, origin, ray, triangle):
         intersec = False
         O = origin
@@ -104,6 +130,7 @@ class model2sas:
             if self.isPointInSTLModel(pt, self.stlModelMesh)[0]:
                 ptsInModelList.append(pt)
         return ptsInModelList
+    '''
 
     # build points model from file
     # supported file type: .stl, .xyz, .txt(points array from np.savetxt() )
@@ -122,20 +149,22 @@ class model2sas:
                 self.interval = interval
             self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
 
-            # this must be the slowest process in the whole program !
-            # must be a way to accelerate, still working on it...
-            # use multiprocessing to accelerate
+            # (solved) this must be the slowest process in the whole program ! 
+            # (solved) must be a way to accelerate, still working on it...
+            # (solved) no need to use multiprocessing
+            # 
+            # accelerated * 1
+            # about 1000 times faster
+            ray = np.random.rand(3) + 0.01
+            intersect_count = np.zeros(model.meshgrid.shape[0])
+            for triangle in vectors:
+                intersect_count += self.isIntersect(self.meshgrid, ray, triangle)
+            intersect_count = intersect_count % 2
+
             pointsInModelList = []
-            multip_result_list = []
-            length = len(self.meshgrid)//self.procNum + 1
-            pool = Pool(self.procNum)
-            for i in range(self.procNum):
-                pts = self.meshgrid[i*length: (i+1)*length]
-                multip_result_list.append(pool.apply_async(self.ptsInSTLModel, args=(pts,)))
-            pool.close()
-            pool.join()
-            for item in multip_result_list:
-                pointsInModelList += item.get()
+            for i in range(len(intersect_count)):
+                if intersect_count[i] > 0:
+                    pointsInModelList.append(model.meshgrid[i])
 
             self.pointsInModel = np.array(pointsInModelList)
 
@@ -328,26 +357,6 @@ class model2sas:
         pyplot.show()
 
 if __name__ == '__main__':
-    '''
-    model = model2sas(procNum=12)
-    model.buildFromFile('shell_12_large_hole.xyz')
-    #model.savePDBFile()
-    #model.plotPointsInModel()
-    model.genSasCurve()
-    #model.plotSasCurve()
-    model.saveSasCurve()
-    '''
-    model = model2sas(procNum=12)
-    boundaryList = [-52, 52, -52, 52, -52, 52]
-    model.buildFromMath(
-        'porous_shell',
-        'MathDescription',
-        'porous_shell',
-        boundaryList,
-        interval=5,
-        params='R1=30, R2=35, R_hole=10'
-        )
+    model = model2sas()
+    model.buildFromFile('torus.stl')
     model.plotPointsInModel()
-    #model.savePointsInModel()
-    model.genSasCurve(qnum=200)
-    model.plotSasCurve()
