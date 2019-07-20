@@ -156,7 +156,7 @@ class model2sas:
             # accelerated * 1
             # about 1000 times faster
             ray = np.random.rand(3) + 0.01
-            intersect_count = np.zeros(model.meshgrid.shape[0])
+            intersect_count = np.zeros(self.meshgrid.shape[0])
             for triangle in vectors:
                 intersect_count += self.isIntersect(self.meshgrid, ray, triangle)
             intersect_count = intersect_count % 2
@@ -164,7 +164,7 @@ class model2sas:
             pointsInModelList = []
             for i in range(len(intersect_count)):
                 if intersect_count[i] > 0:
-                    pointsInModelList.append(model.meshgrid[i])
+                    pointsInModelList.append(self.meshgrid[i])
 
             self.pointsInModel = np.array(pointsInModelList)
 
@@ -302,6 +302,19 @@ class model2sas:
 
     # unit sphere form factor actually results in wrong outcomes
     # so I delete it ...
+    #
+    # new method using matrix calculation to accelerate
+    #
+    def __Alm_new_test(self, q, points_sph, l, m):
+        A = 0
+        # p_sph: array[r, theta, phi]; theta: 0~pi, phi: 0~2pi
+        r, theta, phi = points_sph[:, 0], points_sph[:, 1], points_sph[:, 2] # theta: 0~pi ; phi: 0~2pi
+        A = spherical_jn(l, q*r) * sph_harm(m, l, phi, theta)
+        return 4 * np.pi * complex(0,1)**l * A
+
+
+    # unit sphere form factor actually results in wrong outcomes
+    # so I delete it ...
     def __Alm(self, q, points_sph, l, m):
         A = 0
         for p_sph in points_sph:
@@ -359,4 +372,5 @@ class model2sas:
 if __name__ == '__main__':
     model = model2sas()
     model.buildFromFile('torus.stl')
+    print(model.interval)
     model.plotPointsInModel()
