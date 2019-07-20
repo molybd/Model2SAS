@@ -300,27 +300,21 @@ class model2sas:
         points_sph = np.vstack((r, theta, phi)).T
         return points_sph  # theta: 0~pi ; phi: 0~2pi
 
+
     # unit sphere form factor actually results in wrong outcomes
     # so I delete it ...
     #
     # new method using matrix calculation to accelerate
+    # it actually only becomes a little bit faster (about 10%)... 
     #
-    def __Alm_new_test(self, q, points_sph, l, m):
+    def Alm(self, q, points_sph, l, m):
         A = 0
         # p_sph: array[r, theta, phi]; theta: 0~pi, phi: 0~2pi
         r, theta, phi = points_sph[:, 0], points_sph[:, 1], points_sph[:, 2] # theta: 0~pi ; phi: 0~2pi
+        q = q.reshape(q.shape[0], 1)
+        r = r.reshape(1, r.shape[0])
         A = spherical_jn(l, q*r) * sph_harm(m, l, phi, theta)
-        return 4 * np.pi * complex(0,1)**l * A
-
-
-    # unit sphere form factor actually results in wrong outcomes
-    # so I delete it ...
-    def __Alm(self, q, points_sph, l, m):
-        A = 0
-        for p_sph in points_sph:
-            # p_sph: array[r, theta, phi]; theta: 0~pi, phi: 0~2pi
-            r, theta, phi = p_sph[0], p_sph[1], p_sph[2] # theta: 0~pi ; phi: 0~2pi
-            A += spherical_jn(l, q*r) * sph_harm(m, l, phi, theta)
+        A = A.sum(axis=1)
         return 4 * np.pi * complex(0,1)**l * A
 
     # used in func genSasCurve()
@@ -329,7 +323,7 @@ class model2sas:
         I = 0
         for l in range(lmax+1):
             for m in range(-l, l+1):
-                I += abs(self.__Alm(q, points_sph, l, m))**2
+                I += abs(self.Alm(q, points_sph, l, m))**2
         return I
 
     def genSasCurve(self, qmin=0.01, qmax=1, qnum=200, lmax=50):
