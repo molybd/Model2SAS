@@ -6,7 +6,7 @@ from mpl_toolkits import mplot3d
 from matplotlib import pyplot
 from scipy.special import sph_harm, spherical_jn, jv
 import os
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 import inspect
 
 # attention: in this program, spherical coordinates are (r, theta, phi) |theta: 0~pi ; phi: 0~2pi
@@ -20,13 +20,17 @@ import inspect
 class model2sas:
     'class to read 3D model from file and generate PDB file and SAS curve'
 
-    def __init__(self, procNum=1, *args, **kwargs):
+    def __init__(self, procNum=None, *args, **kwargs):
         self.modelname = ''
         self.meshgrid = np.array([])
         self.pointsInModel = np.array([])
         self.stlModelMesh = None
         self.sasCurve = np.array([])
-        self.procNum = procNum
+        # use 80% CPU maximum
+        if procNum == None:
+            self.procNum = min(round(0.8*cpu_count()), cpu_count()-1)
+        else:
+            self.procNum = procNum
 
     def __determineModelName(self, modelname, filename):
         if modelname == None:
@@ -307,7 +311,8 @@ class model2sas:
     # new method using matrix calculation to accelerate
     # it actually only becomes a little bit faster (about 10%)... 
     #
-    def Alm(self, q, points_sph, l, m):
+    def Alm(self, args):
+        q, points_sph, l, m = args
         A = 0
         # p_sph: array[r, theta, phi]; theta: 0~pi, phi: 0~2pi
         r, theta, phi = points_sph[:, 0], points_sph[:, 1], points_sph[:, 2] # theta: 0~pi ; phi: 0~2pi
@@ -320,31 +325,25 @@ class model2sas:
     # used in func genSasCurve()
     # points in spherical coordinates
     def Iq(self, q, points_sph, lmax):
-        I = 0
-        for l in range(lmax+1):
-            for m in range(-l, l+1):
-                I += abs(self.Alm(q, points_sph, l, m))**2
+        def gen_args(lmax):
+            for l in range(lmax+1):
+                for m in range(-l, l+1):
+                    yield (q, points_sph, l, m)
+        # use mult-processing to accelarate
+        # use map_async() instead of apply_async()
+        pool = Pool(self.procNum)
+        result = pool.map_async(self.Alm, gen_args(lmax))
+        pool.close()
+        pool.join()
+        I = abs(np.array(result.get()))**2
+        I = I.sum(axis=0)
         return I
 
     def genSasCurve(self, qmin=0.01, qmax=1, qnum=200, lmax=50):
         self.lmax = lmax
         points_sph = self.xyz2sph(self.pointsInModel)
         q = np.linspace(qmin, qmax, num=qnum)
-        
-        # this calculation need several minutes in single process mode
-        # so use multiprocessing to accelerate
-        pool = Pool(self.procNum)
-        multip_result_list = []
-        length = qnum//self.procNum + 1
-        for i in range(self.procNum):
-            qslice = q[i*length: (i+1)*length]
-            multip_result_list.append(pool.apply_async(self.Iq, args=(qslice, points_sph, lmax,)))
-        pool.close()
-        pool.join()
-        Ilst = []
-        for item in multip_result_list:
-            Ilst.append(item.get())
-        I = np.hstack(Ilst)
+        I = self.Iq(q, points_sph, lmax)
         self.sasCurve = np.vstack((q, I)).T
         return self.sasCurve
 
@@ -365,6 +364,8 @@ class model2sas:
 
 if __name__ == '__main__':
     model = model2sas()
-    model.buildFromFile('torus.stl')
-    print(model.interval)
+    model.buildFromFile('sphere_phi100.STL')
+    print(model.procNum)
     model.plotPointsInModel()
+    model.genSasCurve()
+    model.plotSasCurve()
