@@ -3,7 +3,7 @@
 import numpy as np
 from stl import mesh
 from mpl_toolkits import mplot3d
-from matplotlib import pyplot
+import matplotlib.pyplot as plt
 from scipy.special import sph_harm, spherical_jn, jv
 import os
 from multiprocessing import Pool, cpu_count
@@ -20,28 +20,38 @@ import inspect
 class model2sas:
     'class to read 3D model from file and generate PDB file and SAS curve'
 
-    def __init__(self, procNum=None, *args, **kwargs):
-        self.modelname = ''
-        self.meshgrid = np.array([])
-        self.pointsInModel = np.array([])
-        self.stlModelMesh = None
-        self.sasCurve = np.array([])
-        # use 80% CPU maximum
+    def __init__(self, filename, procNum=None, modelName=None, *args, **kwargs):
+        self.inputFileName = filename.replace('/', '\\')
+        self.inputFileDir = os.path.dirname(self.inputFileName)
+        self.inputFileType = filename.split('.')[-1].lower()            # file type extension, e.g. stl, py etc.
+        self.modelname = self.__determineModelName(modelName, filename) # determine model name, without extention
+        self.meshgrid = np.array([])                                    # the initial meshgrid
+        self.pointsInModel = np.array([])                               # points coordinates inside the model
+        self.stlModelMesh = None                                        # 
+        self.sasCurve = np.array([])                                    # SAS curve calculated
+        
+        # process number in paralell computing, default is using 60% CPU maximum
         if procNum == None:
-            self.procNum = min(round(0.8*cpu_count()), cpu_count()-1)
+            self.procNum = min(round(0.6*cpu_count()), cpu_count()-1)
         else:
             self.procNum = procNum
+        
+        if self.inputFileType != 'py':
+            self.buildFromFile()
+        else:
+            self.buildFromMath()
 
     def __determineModelName(self, modelname, filename):
         if modelname == None:
             if '/' in filename:
-                self.modelname = '.'.join(filename.split('/')[-1].split('.')[:-1])
+                modelname = '.'.join(filename.split('/')[-1].split('.')[:-1])
             elif '\\' in filename:
-                self.modelname = '.'.join(filename.split('\\')[-1].split('.')[:-1])
+                modelname = '.'.join(filename.split('\\')[-1].split('.')[:-1])
             else:
-                self.modelname = '.'.join(filename.split('.')[:-1])
+                modelname = '.'.join(filename.split('.')[:-1])
         else:
-            self.modelname = modelname
+            modelname = modelname
+        return modelname
 
     def generateMeshgrid(self, xmin, xmax, ymin, ymax, zmin, zmax):
         xscale = np.linspace(xmin, xmax, num=int((xmax-xmin)/self.interval+1))
@@ -76,72 +86,13 @@ class model2sas:
         else:
             return np.zeros(origins.shape[0])
         
-    # below is old method... very slow...
-    '''
-    def isIntersect(self, origin, ray, triangle):
-        intersec = False
-        O = origin
-        D = ray
-        V0 = triangle[0]
-        V1 = triangle[1]
-        V2 = triangle[2]
-        E1 = V1 - V0
-        E2 = V2 - V0
-        T = O - V0
-        P = np.cross(D, E2)
-        Q = np.cross(T, E1)
-        det = np.dot(P, E1)
-        if det != 0:
-            intersectPoint = (1/det) * np.hstack((np.dot(Q, E2), np.dot(P, T), np.dot(Q, D)))
-        else:
-            intersec = False
-            intersectPoint = np.array([np.nan, np.nan, np.nan])
-        t, u, v = intersectPoint[0], intersectPoint[1], intersectPoint[2]
-        if t >= 0 and u >= 0 and v >= 0 and (u+v) <= 1:
-            intersec = True
-        else:
-            intersec = False
-        return intersec, intersectPoint
-
-    def isPointInSTLModel(self, point, stlModelMesh, ray=np.array([1,1,1]), eps=0.001):
-        intersectPointList = []
-        for triangle in stlModelMesh.vectors:
-            intersect, intersectPoint = self.isIntersect(point, ray, triangle)
-            if intersect:
-                intersectPointList.append(intersectPoint)
-        noOverlapPointList = []
-        if len(intersectPointList) > 1:
-            for i in range(len(intersectPointList)):
-                overlap = False
-                for j in range(i+1, len(intersectPointList)):
-                    if np.sqrt(np.sum(np.square(intersectPointList[i]-intersectPointList[j]))) <= eps:
-                        overlap = True
-                        break
-                if not overlap:
-                    noOverlapPointList.append(intersectPointList[i])
-        else:
-            noOverlapPointList = intersectPointList
-        if len(noOverlapPointList)%2 == 0:
-            isInModel = False
-        else:
-            isInModel = True
-        return isInModel, np.array(noOverlapPointList)
-
-    # for the usage of multiprocessing only
-    def ptsInSTLModel(self, pts):
-        ptsInModelList = []
-        for pt in pts:
-            if self.isPointInSTLModel(pt, self.stlModelMesh)[0]:
-                ptsInModelList.append(pt)
-        return ptsInModelList
-    '''
 
     # build points model from file
     # supported file type: .stl, .xyz, .txt(points array from np.savetxt() )
-    def buildFromFile(self, filename, interval=None, modelname=None):
-        self.__determineModelName(modelname, filename)
+    def buildFromFile(self, interval=None, modelname=None):
 
-        filetype = filename.split('.')[-1].lower() # file extension in lower cases
+        filename = self.inputFileName
+        filetype = self.inputFileType # file extension in lower cases
         
         if filetype == 'stl':
             self.stlModelMesh = mesh.Mesh.from_file(filename)
@@ -159,18 +110,20 @@ class model2sas:
             # 
             # accelerated * 1
             # about 1000 times faster
-            ray = np.random.rand(3) + 0.01
-            intersect_count = np.zeros(self.meshgrid.shape[0])
+            ray = np.random.rand(3) + 0.01     # in case that all coordinates are 0, which is almost impossible
+            intersect_count = np.zeros(self.meshgrid.shape[0])  # same number as the points in initial meshgrid
+            # For each triangle in model mesh, determine that every points
+            # in initial meshgrid intersect with this triangle or not.
             for triangle in vectors:
                 intersect_count += self.isIntersect(self.meshgrid, ray, triangle)
-            intersect_count = intersect_count % 2
+            indexInOrOut = intersect_count % 2   # index to judge a point is in or out of the model, 1 is in, 0 is out
 
             pointsInModelList = []
-            for i in range(len(intersect_count)):
-                if intersect_count[i] > 0:
+            for i in range(len(indexInOrOut)):
+                if indexInOrOut[i] > 0:
                     pointsInModelList.append(self.meshgrid[i])
 
-            self.pointsInModel = np.array(pointsInModelList)
+            self.pointsInModel = np.array(pointsInModelList)  # shape = (points number, 3)
 
         elif filetype == 'xyz':
             lst = []
@@ -225,11 +178,29 @@ class model2sas:
         return self.pointsInModel
 
 
-    def savePointsInModel(self):
-        filename = '{}_interval={}.txt'.format(self.modelname, self.interval)
-        np.savetxt(filename, self.pointsInModel)
+    # save points in model in a file
+    # you must provide at least file type or filename
+    # otherwise by default it will save a pdb file
+    def savePointsInModel(self, filetype='pdb', filename=None):
+        if filename == None:
+            filename = '{}_interval={}.{}'.format(
+                self.modelname,
+                str(int(round(self.interval))),
+                filetype
+            )
+            # if no filename is assigned, output file will be saved in the same dir as input file
+            filename = os.path.join(self.inputFileDir, filename)
+        else:
+            filetype = filename.split('.')[-1]
 
-    def saveXYZFile(self, filename='', head='created by limu', atom='CA'):
+        if filetype == 'txt':
+            np.savetxt(filename, self.pointsInModel)
+        elif filetype == 'pdb':
+            self.savePDBFile(filename=filename)
+        elif filetype == 'xyz':
+            self.saveXYZFile(filename=filename)
+
+    def saveXYZFile(self, filename='', head='created by program Model2SAS', atom='CA'):
         if filename == '':
             filename = self.modelname + '.xyz'
         with open(filename, 'w') as f:
@@ -241,6 +212,7 @@ class model2sas:
     def savePDBFile(self, filename='', atom='CA', occupancy=1.0, tempFactor=20.0):
         if filename == '':
             filename = self.modelname + '.pdb'
+        self.PDBfilename = os.path.basename(filename)
         with open(filename, 'w') as f:
             s = 'REMARK 265 EXPERIMENT TYPE: THEORETICAL MODELLING\n'
             for i in range(len(self.pointsInModel)):
@@ -252,7 +224,7 @@ class model2sas:
 
     def plotSTLMeshModel(self):
         # Create a new plot
-        figure = pyplot.figure()
+        figure = plt.figure()
         axes = mplot3d.Axes3D(figure)
 
         # Load the STL files and add the vectors to the plot
@@ -263,22 +235,32 @@ class model2sas:
         axes.auto_scale_xyz(scale, scale, scale)
 
         # Show the plot to the screen
-        pyplot.show()
+        plt.show()
 
     def plotPointsInModel(self):
         # Create a new plot
-        figure = pyplot.figure()
+        figure = plt.figure()
         axes = mplot3d.Axes3D(figure)
 
         axes.scatter(self.pointsInModel[:,0], self.pointsInModel[:,1], self.pointsInModel[:,2], color='k')
         # Show the plot to the screen
-        pyplot.show()
+        plt.show()
 
     def genSasCurve_Crysol(self, qmax=1, qNum=256):
-        pdbfile = self.modelname + '.pdb'
-        self.savePDBFile(pdbfile)
-        os.system('crysol {} -lm 50 -fb 18 -sm {} -ns {} -un 1'.format(pdbfile, qmax, qNum))
-        intfile = self.modelname + '00.int'
+        self.savePointsInModel(filetype='pdb')
+        
+        # first delete all files genetated by crysol before
+        checkFilename = self.PDBfilename[:-4]
+        filelist = list(os.listdir(self.inputFileDir))
+        for i in range(len(filelist)):
+            if checkFilename in filelist[i] and filelist[i].split('.')[-1] in ['abs', 'alm', 'int', 'log']:
+                os.remove(
+                    os.path.join(self.inputFileDir, filelist[i])
+                )
+
+        os.chdir(self.inputFileDir)
+        os.system('crysol {} -lm 50 -fb 18 -sm {} -ns {} -un 1'.format(self.PDBfilename, qmax, qNum))
+        intfile = self.PDBfilename[:-4] + '00.int'
         crysolOutput = np.loadtxt(intfile, skiprows=1)
         self.sasCurve = crysolOutput[:, :2]
         return self.sasCurve
@@ -349,23 +331,38 @@ class model2sas:
 
     def saveSasCurve(self):
         filename = self.modelname + '_saxs.dat'
-        header = 'theoretical SAXS curve of {} model\ninterval between points = {}\nl_max in spherical harmonics = {}\n'.format(self.modelname, self.interval, self.lmax)
+        header = 'theoretical SAXS curve of {} model\ninterval between points = {}\nl_max in spherical harmonics = {}\nmodel generated by program Model2SAS\n'.format(self.modelname, self.interval, self.lmax)
         header += '\nq\tI'
         np.savetxt(filename, self.sasCurve, header=header)
 
-    def plotSasCurve(self):
-        figure = pyplot.figure()
-        ax = pyplot.subplot(111)
-        ax.set_xscale("log", nonposx='clip')
-        ax.set_yscale("log", nonposy='clip')
-        pyplot.plot(self.sasCurve[:,0], self.sasCurve[:,1], label=self.modelname)
-        pyplot.legend()
-        pyplot.show()
+    def plotSasCurve(self, show=True, save=False, figsize=None, dpi=None, figname=None):
+        q = self.sasCurve[:, 0]
+        I = self.sasCurve[:, 1]
+
+        if save:
+            fig = plt.figure(figsize=figsize, dpi=dpi, facecolor='white')
+        else:
+            fig = plt.figure()
+        ax1 = fig.add_subplot(111)
+
+        ax1.plot(q, I, '-', label=self.modelname)
+
+        ax1.set_xscale('log')
+        ax1.set_yscale('log')
+
+        ax1.set_xlabel(r'Q $(\AA^{-1})$', fontsize=13)
+        ax1.set_ylabel(r'Intensity (a.u.)', fontsize=13)
+
+        ax1.legend(fontsize=11, frameon=False)
+
+        if show:
+            plt.show()
+        if save:
+            fig.savefig(figname)
 
 if __name__ == '__main__':
-    model = model2sas()
-    model.buildFromFile('sphere_phi100.STL')
-    print(model.procNum)
-    model.plotPointsInModel()
-    model.genSasCurve()
+    model = model2sas('test/sphere_phi100.STL') # this will generate points model automatically
+    #model.plotPointsInModel()
+    model.savePointsInModel(filetype='pdb')
+    model.genSasCurve_Crysol()
     model.plotSasCurve()
