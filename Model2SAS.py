@@ -20,7 +20,7 @@ import inspect
 class model2sas:
     'class to read 3D model from file and generate PDB file and SAS curve'
 
-    def __init__(self, filename, procNum=None, modelName=None, *args, **kwargs):
+    def __init__(self, filename, interval=None, procNum=None, modelName=None, autoGenPoints=True, *args, **kwargs):
         self.inputFileName = filename.replace('/', '\\')
         self.inputFileDir = os.path.dirname(self.inputFileName)
         self.inputFileType = filename.split('.')[-1].lower()            # file type extension, e.g. stl, py etc.
@@ -36,10 +36,11 @@ class model2sas:
         else:
             self.procNum = procNum
         
-        if self.inputFileType != 'py':
-            self.buildFromFile()
-        else:
-            self.buildFromMath()
+        if autoGenPoints:
+            if self.inputFileType != 'py':
+                self.buildFromFile(interval=interval)
+            else:
+                self.buildFromMath()
 
     def __determineModelName(self, modelname, filename):
         if modelname == None:
@@ -222,31 +223,35 @@ class model2sas:
                 s += 'ATOM  {:5d} {:<4} ASP A{:4d}    {:>8}{:>8}{:>8}{:>6}{:>6} 0 2 201\n'.format(int(i), atom, i%10, x, y, z, str(occupancy), str(tempFactor))
             f.write(s)
 
-    def plotSTLMeshModel(self):
+    def plotSTLMeshModel(self, plot=True):
         # Create a new plot
-        figure = plt.figure()
-        axes = mplot3d.Axes3D(figure)
+        fig = plt.figure()
+        axes = mplot3d.Axes3D(fig)
 
         # Load the STL files and add the vectors to the plot
         axes.add_collection3d(mplot3d.art3d.Poly3DCollection(self.stlModelMesh.vectors))
     
         # Auto scale to the mesh size
-        scale = self.stlModelMesh.points.flatten(-1)
+        scale = self.stlModelMesh.points.flatten()
         axes.auto_scale_xyz(scale, scale, scale)
 
         # Show the plot to the screen
-        plt.show()
+        if plot:
+            plt.show()
+        return fig
 
-    def plotPointsInModel(self):
+    def plotPointsInModel(self, plot=True):
         # Create a new plot
-        figure = plt.figure()
-        axes = mplot3d.Axes3D(figure)
+        fig = plt.figure()
+        axes = mplot3d.Axes3D(fig)
 
         axes.scatter(self.pointsInModel[:,0], self.pointsInModel[:,1], self.pointsInModel[:,2], color='k')
         # Show the plot to the screen
-        plt.show()
+        if plot:
+            plt.show()
+        return fig
 
-    def genSasCurve_Crysol(self, qmax=1, qNum=256):
+    def genSasCurve_Crysol(self, qmax=1, qNum=256, crysolPath=None):
         self.savePointsInModel(filetype='pdb')
         
         # first delete all files genetated by crysol before
@@ -259,7 +264,10 @@ class model2sas:
                 )
 
         os.chdir(self.inputFileDir)
-        os.system('crysol {} -lm 50 -fb 18 -sm {} -ns {} -un 1'.format(self.PDBfilename, qmax, qNum))
+        if crysolPath == None:
+            os.system('crysol {} -lm 50 -fb 18 -sm {} -ns {} -un 1'.format(self.PDBfilename, qmax, qNum))
+        else:
+            os.system('\"{}\" {} -lm 50 -fb 18 -sm {} -ns {} -un 1'.format(crysolPath, self.PDBfilename, qmax, qNum))
         intfile = self.PDBfilename[:-4] + '00.int'
         crysolOutput = np.loadtxt(intfile, skiprows=1)
         self.sasCurve = crysolOutput[:, :2]
@@ -359,6 +367,8 @@ class model2sas:
             plt.show()
         if save:
             fig.savefig(figname)
+
+        return fig
 
 if __name__ == '__main__':
     model = model2sas('test/sphere_phi100.STL') # this will generate points model automatically
