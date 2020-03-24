@@ -145,38 +145,106 @@ class model2sas:
     # math description is in seperated file module.py
     # function in module.py return True or False if a point is in the model
     # boundaryList is [xmin, xmax, ymin, ymax, zmin, zmax]
-    # coord is 'xyz' or 'sph'(r, theta, phi)|theta: 0~pi ; phi: 0~2pi
-    def buildFromMath(self, interval=None):
+    # coord is 'xyz' 
+    # or 'sph'(r, theta, phi)|theta: 0~pi ; phi: 0~2pi
+    # or 'cyl'(rho, phi, z)
+    def buildFromMath(self, interval=None, useDefault=True, **kwargs):
         os.chdir(self.inputFileDir)
 
         sys.path.append(self.inputFileDir)   # add dir to sys.path, then we can directly import the py file
         modelModule = '.'.join(self.inputFileName.split('.')[:-1])
         mathModel = __import__(modelModule)
-        boundaryList = mathModel.boundaryList
-        [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
-        if interval == None:
-            self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
-        else:
-            self.interval = interval
-        self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
-        pointsInModelList = []
 
-        # read coordinates from math function
+        # read function arguments
         args = inspect.getargspec(mathModel.model)
-        coord = args.defaults[-1]
-        if coord == 'xyz':
-            points = self.meshgrid
-        elif coord == 'sph':
-            points = self.xyz2sph(self.meshgrid)
-        elif coord == 'cyl':
-            points = self.xyz2cyl(self.meshgrid)
 
-        inModelIndex = mathModel.model(points)
-        for i in range(len(inModelIndex)):
-            if inModelIndex[i] > 0:
-                pointsInModelList.append(self.meshgrid[i,:])
+        # read coordinates from math model file
+        for s in ['xyz', 'sph', 'cyl']:
+            try:
+                i = args.defaults.index(s)
+                coord = args.defaults[i]
+                break
+            except:
+                continue
 
-        self.pointsInModel = np.array(pointsInModelList)
+        # means use default value in model file
+        if useDefault:
+            
+            # read boundaryList from math model file
+            i = args.args.index('boundary_xyz') - len(args.args)
+            boundaryList = args.defaults[i]
+            [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
+
+            # set interval
+            if interval == None:
+                self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
+            else:
+                self.interval = interval
+            self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
+
+            # convert coordinates
+            if coord == 'xyz':
+                points = self.meshgrid
+            elif coord == 'sph':
+                points = self.xyz2sph(self.meshgrid)
+            elif coord == 'cyl':
+                points = self.xyz2cyl(self.meshgrid)
+
+            pointsInModelList = []
+            inModelIndex = mathModel.model(points)
+            for i in range(len(inModelIndex)):
+                if inModelIndex[i] > 0:
+                    pointsInModelList.append(self.meshgrid[i,:])
+            self.pointsInModel = np.array(pointsInModelList)
+
+        else:
+            
+            if 'boundary_xyz' in kwargs.keys():
+                # read boundaryList from custom input
+                boundaryList = kwargs['boundary_xyz']
+            else:
+                # read default boundaryList
+                i = args.args.index('boundary_xyz') - len(args.args)
+                boundaryList = args.defaults[i]
+            [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
+
+            # set interval
+            if interval == None:
+                self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
+            else:
+                self.interval = interval
+            self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
+
+            # convert coordinates
+            if coord == 'xyz':
+                points = self.meshgrid
+            elif coord == 'sph':
+                points = self.xyz2sph(self.meshgrid)
+            elif coord == 'cyl':
+                points = self.xyz2cyl(self.meshgrid)
+
+            # generate custom args string
+            arg_string_list = []
+            for item in kwargs.items():
+                arg_string_list.append('{}={}'.format(item[0], item[1]))
+            arg_string = ','.join(arg_string_list)
+
+            pointsInModelList = []
+
+            # 这里是 exec() 使用的的一个坑，要弄清楚变量命名空间以及exec()作用方式等问题
+            g, l = globals().copy(), locals().copy()
+            exec(
+                'inModelIndex = mathModel.model(points, {})'.format(arg_string),
+                g,
+                l
+            )
+            inModelIndex = l['inModelIndex']
+            for i in range(len(inModelIndex)):
+                if inModelIndex[i] > 0:
+                    pointsInModelList.append(self.meshgrid[i,:])
+            self.pointsInModel = np.array(pointsInModelList)
+
+
         os.chdir(self.workingDir)
         return self.pointsInModel
 
@@ -402,7 +470,8 @@ if __name__ == '__main__':
         model.genSasCurve_Crysol()
         model.plotSasCurve()
     elif modelType == 'math':
-        model = model2sas('models\\ellipsoid_model.py', interval=5)
+        model = model2sas('models\\ellipsoid_model.py', autoGenPoints=False)
+        model.buildFromMath(interval=2, useDefault=False, a=20, b=20, c=20, boundary_xyz=[-20, 20, -20, 20, -20, 20])
         model.plotPointsInModel()
         model.genSasCurve_Crysol()
         model.plotSasCurve()
