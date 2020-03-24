@@ -5,7 +5,7 @@ from stl import mesh
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 from scipy.special import sph_harm, spherical_jn, jv
-import os
+import os, sys
 from multiprocessing import Pool, cpu_count
 import inspect
 
@@ -21,14 +21,16 @@ class model2sas:
     'class to read 3D model from file and generate PDB file and SAS curve'
 
     def __init__(self, filename, interval=None, procNum=None, modelName=None, autoGenPoints=True, *args, **kwargs):
-        self.inputFileName = filename.replace('/', '\\')
-        self.inputFileDir = os.path.dirname(self.inputFileName)
-        self.inputFileType = filename.split('.')[-1].lower()            # file type extension, e.g. stl, py etc.
-        self.modelname = self.__determineModelName(modelName, filename) # determine model name, without extention
-        self.meshgrid = np.array([])                                    # the initial meshgrid
-        self.pointsInModel = np.array([])                               # points coordinates inside the model
-        self.stlModelMesh = None                                        # 
-        self.sasCurve = np.array([])                                    # SAS curve calculated
+        self.file_abspath = os.path.abspath(filename)                               # first convert to abs path
+        self.inputFileDir = os.path.dirname(self.file_abspath)                      # only file name, without dir info
+        self.inputFileName = os.path.basename(self.file_abspath)                    # only absolute dir of the file
+        self.inputFileType = self.inputFileName.split('.')[-1].lower()              # file type extension, e.g. stl, py etc.
+        self.modelname = self.__determineModelName(modelName, self.inputFileName)   # determine model name, without extention
+        self.stlModelMesh = None                                                    # initial mesh of stl file
+        self.meshgrid = np.array([])                                                # the initial meshgrid
+        self.pointsInModel = np.array([])                                           # points coordinates inside the model
+        self.sasCurve = np.array([])                                                # SAS curve calculated
+        self.workingDir = os.getcwd()                                               # cwd
         
         # process number in paralell computing, default is using 60% CPU maximum
         if procNum == None:
@@ -40,16 +42,11 @@ class model2sas:
             if self.inputFileType != 'py':
                 self.buildFromFile(interval=interval)
             else:
-                self.buildFromMath()
+                self.buildFromMath(interval=interval)
 
     def __determineModelName(self, modelname, filename):
         if modelname == None:
-            if '/' in filename:
-                modelname = '.'.join(filename.split('/')[-1].split('.')[:-1])
-            elif '\\' in filename:
-                modelname = '.'.join(filename.split('\\')[-1].split('.')[:-1])
-            else:
-                modelname = '.'.join(filename.split('.')[:-1])
+            modelname = '.'.join(filename.split('.')[:-1])
         else:
             modelname = modelname
         return modelname
@@ -91,7 +88,7 @@ class model2sas:
     # build points model from file
     # supported file type: .stl, .xyz, .txt(points array from np.savetxt() )
     def buildFromFile(self, interval=None, modelname=None):
-
+        os.chdir(self.inputFileDir)
         filename = self.inputFileName
         filetype = self.inputFileType # file extension in lower cases
         
@@ -140,6 +137,7 @@ class model2sas:
             self.pointsInModel = np.loadtxt(filename)
             self.interval = interval
         
+        os.chdir(self.workingDir)
         return self.pointsInModel
 
 
@@ -148,9 +146,14 @@ class model2sas:
     # function in module.py return True or False if a point is in the model
     # boundaryList is [xmin, xmax, ymin, ymax, zmin, zmax]
     # coord is 'xyz' or 'sph'(r, theta, phi)|theta: 0~pi ; phi: 0~2pi
-    def buildFromMath(self, modelname, module, function, boundaryList, params='', interval=None):
-        self.modelname = modelname
-        xmin, xmax, ymin, ymax, zmin, zmax = boundaryList[0], boundaryList[1], boundaryList[2], boundaryList[3], boundaryList[4], boundaryList[5]
+    def buildFromMath(self, interval=None):
+        os.chdir(self.inputFileDir)
+
+        sys.path.append(self.inputFileDir)   # add dir to sys.path, then we can directly import the py file
+        modelModule = '.'.join(self.inputFileName.split('.')[:-1])
+        mathModel = __import__(modelModule)
+        boundaryList = mathModel.boundaryList
+        [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
         if interval == None:
             self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
         else:
@@ -159,10 +162,8 @@ class model2sas:
         pointsInModelList = []
 
         # read coordinates from math function
-        MathDescription = __import__(module)
-        args = inspect.getargspec(eval('MathDescription.{}'.format(function)))
+        args = inspect.getargspec(mathModel.model)
         coord = args.defaults[-1]
-
         if coord == 'xyz':
             points = self.meshgrid
         elif coord == 'sph':
@@ -170,12 +171,13 @@ class model2sas:
         elif coord == 'cyl':
             points = self.xyz2cyl(self.meshgrid)
 
-        conditional_statement = 'MathDescription.{}(p, {})'.format(function, params)
-        for i in range(len(self.meshgrid)):
-            p = points[i,:]
-            if eval(conditional_statement):
+        inModelIndex = mathModel.model(points)
+        for i in range(len(inModelIndex)):
+            if inModelIndex[i] > 0:
                 pointsInModelList.append(self.meshgrid[i,:])
+
         self.pointsInModel = np.array(pointsInModelList)
+        os.chdir(self.workingDir)
         return self.pointsInModel
 
 
@@ -183,6 +185,8 @@ class model2sas:
     # you must provide at least file type or filename
     # otherwise by default it will save a pdb file
     def savePointsInModel(self, filetype='pdb', filename=None):
+        os.chdir(self.inputFileDir)
+
         if filename == None:
             filename = '{}_interval={}.{}'.format(
                 self.modelname,
@@ -200,6 +204,8 @@ class model2sas:
             self.savePDBFile(filename=filename)
         elif filetype == 'xyz':
             self.saveXYZFile(filename=filename)
+        
+        os.chdir(self.workingDir)
 
     def saveXYZFile(self, filename='', head='created by program Model2SAS', atom='CA'):
         if filename == '':
@@ -210,8 +216,8 @@ class model2sas:
                 s += '{}\t{}\t{}\t{}\n'.format(atom, point[0], point[1], point[2])
             f.write(s)
 
-    def savePDBFile(self, filename='', atom='CA', occupancy=1.0, tempFactor=20.0):
-        if filename == '':
+    def savePDBFile(self, filename=None, atom='CA', occupancy=1.0, tempFactor=20.0):
+        if filename == None:
             filename = self.modelname + '.pdb'
         self.PDBfilename = os.path.basename(filename)
         with open(filename, 'w') as f:
@@ -251,9 +257,10 @@ class model2sas:
             plt.show()
         return fig
 
-    def genSasCurve_Crysol(self, qmax=1, qNum=256, crysolPath=None):
+    def genSasCurve_Crysol(self, qmax=1, qNum=256, lmax=50, crysolPath=None):
+        self.lmax = lmax
         self.savePointsInModel(filetype='pdb')
-        
+        os.chdir(self.inputFileDir)
         # first delete all files genetated by crysol before
         checkFilename = self.PDBfilename[:-4]
         filelist = list(os.listdir(self.inputFileDir))
@@ -263,14 +270,14 @@ class model2sas:
                     os.path.join(self.inputFileDir, filelist[i])
                 )
 
-        os.chdir(self.inputFileDir)
         if crysolPath == None:
-            os.system('crysol {} -lm 50 -fb 18 -sm {} -ns {} -un 1'.format(self.PDBfilename, qmax, qNum))
+            os.system('crysol {} -lm {} -fb 18 -sm {} -ns {} -un 1'.format(self.PDBfilename, lmax, qmax, qNum))
         else:
-            os.system('\"{}\" {} -lm 50 -fb 18 -sm {} -ns {} -un 1'.format(crysolPath, self.PDBfilename, qmax, qNum))
+            os.system('\"{}\" {} -lm {} -fb 18 -sm {} -ns {} -un 1'.format(crysolPath, self.PDBfilename, lmax, qmax, qNum))
         intfile = self.PDBfilename[:-4] + '00.int'
         crysolOutput = np.loadtxt(intfile, skiprows=1)
         self.sasCurve = crysolOutput[:, :2]
+        os.chdir(self.workingDir)
         return self.sasCurve
 
     # transfer points coordinates from cartesian coordinate to cylindrical coordinate
@@ -290,9 +297,18 @@ class model2sas:
         epsilon=1e-100
         r = np.linalg.norm(points_xyz, axis=1)
         theta = np.arccos(points_xyz[:,2] / (r+epsilon))
-        phi = np.arctan2(points_xyz[:,1], points_xyz[:,0]) + np.pi # change from [-pi, pi] to [0, 2pi]
+        phi = np.arctan2(points_xyz[:,1], points_xyz[:,0]) # range [-pi, pi]
+        phi = phi + np.sign((np.sign(-1*phi) + 1))*2*np.pi # convert range to [0, 2pi]
         points_sph = np.vstack((r, theta, phi)).T
         return points_sph  # theta: 0~pi ; phi: 0~2pi
+
+    def sph2xyz(self, points_sph):
+        r, theta, phi = points_sph[:,0], points_sph[:,1], points_sph[:,2]
+        x = r * np.sin(theta) * np.cos(phi)
+        y = r * np.sin(theta) * np.sin(phi)
+        z = r * np.cos(theta)
+        points_xyz = np.vstack((x, y, z)).T
+        return points_xyz
 
 
     # unit sphere form factor actually results in wrong outcomes
@@ -338,10 +354,12 @@ class model2sas:
         return self.sasCurve
 
     def saveSasCurve(self):
+        os.chdir(self.inputFileDir)
         filename = self.modelname + '_saxs.dat'
         header = 'theoretical SAXS curve of {} model\ninterval between points = {}\nl_max in spherical harmonics = {}\nmodel generated by program Model2SAS\n'.format(self.modelname, self.interval, self.lmax)
         header += '\nq\tI'
         np.savetxt(filename, self.sasCurve, header=header)
+        os.chdir(self.workingDir)
 
     def plotSasCurve(self, show=True, save=False, figsize=None, dpi=None, figname=None):
         q = self.sasCurve[:, 0]
@@ -366,13 +384,26 @@ class model2sas:
         if show:
             plt.show()
         if save:
+            cwd = os.getcwd()
+            os.chdir(self.inputFileDir)
             fig.savefig(figname)
+            os.chdir(cwd)
 
         return fig
 
 if __name__ == '__main__':
-    model = model2sas('test/sphere_phi100.STL') # this will generate points model automatically
-    #model.plotPointsInModel()
-    model.savePointsInModel(filetype='pdb')
-    model.genSasCurve_Crysol()
-    model.plotSasCurve()
+
+    modelType = 'math'
+
+    if modelType == 'stlfile':
+        model = model2sas('mdoels/sphere_phi100.STL') # this will generate points model automatically
+        #model.plotPointsInModel()
+        model.savePointsInModel(filetype='pdb')
+        model.genSasCurve_Crysol()
+        model.plotSasCurve()
+    elif modelType == 'math':
+        model = model2sas('models\\ellipsoid_model.py', interval=5)
+        model.plotPointsInModel()
+        model.genSasCurve_Crysol()
+        model.plotSasCurve()
+        

@@ -3,7 +3,7 @@
 import sys, os
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import QFileDialog, QApplication, QMainWindow
+from PyQt5.QtWidgets import QFileDialog, QApplication, QMainWindow, QMessageBox
 
 import matplotlib
 matplotlib.use("Qt5Agg")  # 声明使用QT5
@@ -44,14 +44,22 @@ class function:
         # save points model
         self.ui.pushButton_savePointsFile.clicked.connect(self.savePointsFile)
 
+        self.ui.checkBox_useCrysol.setChecked(True)
+
         # choose crysol.exe path
-        self.ui.pushButton_chooseCrysolPath.clicked.connect(self.chooseCrysolPath)
-        # for convinient now
-        self.ui.label_crysolPath.setText('C:/Program Files (x86)/ATSAS 3.0.0/bin/crysol.exe')
-        self.crysolPath = 'C:/Program Files (x86)/ATSAS 3.0.0/bin/crysol.exe'
+        self.ui.pushButton_chooseCrysolPath.clicked.connect(self.chooseCrysolPath)        
+        with open('./CrysolPath.txt', 'r') as f:
+            self.crysolPath = f.read()
+        self.ui.label_crysolPath.setText(self.crysolPath)
 
         # generate SAXS curve
         self.ui.pushButton_calcSaxs.clicked.connect(self.genSaxsCurve)
+
+        # save SAXS data
+        self.ui.pushButton_saveSaxsData.clicked.connect(self.saveSaxsData)
+
+        # save SAXS plot
+        self.ui.pushButton_saveSaxsPlot.clicked.connect(self.saveSaxsPlot)
 
 
     def browseStlFile(self):
@@ -97,8 +105,14 @@ class function:
         # here, seperator in file is "/"
         self.crysolPath = file
         self.ui.label_crysolPath.setText(self.crysolPath)
+        with open('./CrysolPath.txt', 'w') as f:
+            f.write(self.crysolPath)
 
     def genSaxsCurve(self):
+        # incase that pointsInModel haven't been generated
+        if len(self.model.pointsInModel) == 0:
+            self.genPointsModel()
+        
         useCrysol = self.ui.checkBox_useCrysol.isChecked()
         if useCrysol:
             self.model.genSasCurve_Crysol(crysolPath=self.crysolPath)
@@ -141,12 +155,14 @@ class function:
 
     def plotSasCurve(self, show=True, save=False):
         saxsPlot = Figure_Canvas(width=7.5, height=5, dpi=100)
+        self.saxsPlotFig = saxsPlot.fig
         saxsPlotAxes = saxsPlot.fig.add_subplot(111)
 
         saxsPlotAxes.plot(
             self.model.sasCurve[:,0],
             self.model.sasCurve[:,1],
-            '-', label=self.model.modelname)
+            '-', label=self.model.modelname
+            )
 
         saxsPlotAxes.set_xscale('log')
         saxsPlotAxes.set_yscale('log')
@@ -162,6 +178,41 @@ class function:
         saxsGraphicscene.addWidget(saxsPlot)
         self.ui.graphicsView_saxsPlot.setScene(saxsGraphicscene)
         self.ui.graphicsView_saxsPlot.show()
+
+    def saveSaxsData(self):
+        try:
+            self.model.saveSasCurve()
+            QMessageBox.information(self.ui,
+                "Save successful",
+                "SAXS data saved !",
+                QMessageBox.Yes
+                )
+        except:
+            print('No SAXS data yet !')
+            QMessageBox.warning(self.ui,
+                "Save failed",
+                "No SAXS data yet !",
+                QMessageBox.Yes
+                )
+
+    def saveSaxsPlot(self):
+        try:
+            os.chdir(self.model.inputFileDir)
+            filename = self.model.modelname + '_SAXS_Plot.png'
+            self.saxsPlotFig.savefig(filename)
+            os.chdir(self.model.workingDir)
+            QMessageBox.information(self.ui,
+                "Save successful",
+                "SAXS plot saved !",
+                QMessageBox.Yes
+                )
+        except:
+            print('No SAXS plot yet !')
+            QMessageBox.warning(self.ui,
+                "Save failed",
+                "No SAXS plot yet !",
+                QMessageBox.Yes
+                )
 
 
 

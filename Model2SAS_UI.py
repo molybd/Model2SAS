@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'Model2SAS_UI.ui'
+# Form implementation generated from reading ui file '.\Model2SAS_UI.ui'
 #
 # Created by: PyQt5 UI code generator 5.13.0
 #
@@ -43,11 +43,17 @@ class Ui_mainWindow(QWidget):
         self.gridLayout.addWidget(self.groupBox_stlView, 2, 0, 1, 1)
         self.groupBox_saxsPlot = QtWidgets.QGroupBox(self.tab)
         self.groupBox_saxsPlot.setObjectName("groupBox_saxsPlot")
-        self.verticalLayout_4 = QtWidgets.QVBoxLayout(self.groupBox_saxsPlot)
-        self.verticalLayout_4.setObjectName("verticalLayout_4")
+        self.gridLayout_3 = QtWidgets.QGridLayout(self.groupBox_saxsPlot)
+        self.gridLayout_3.setObjectName("gridLayout_3")
+        self.pushButton_saveSaxsPlot = QtWidgets.QPushButton(self.groupBox_saxsPlot)
+        self.pushButton_saveSaxsPlot.setObjectName("pushButton_saveSaxsPlot")
+        self.gridLayout_3.addWidget(self.pushButton_saveSaxsPlot, 1, 0, 1, 1)
+        self.pushButton_saveSaxsData = QtWidgets.QPushButton(self.groupBox_saxsPlot)
+        self.pushButton_saveSaxsData.setObjectName("pushButton_saveSaxsData")
+        self.gridLayout_3.addWidget(self.pushButton_saveSaxsData, 1, 1, 1, 1)
         self.graphicsView_saxsPlot = QtWidgets.QGraphicsView(self.groupBox_saxsPlot)
         self.graphicsView_saxsPlot.setObjectName("graphicsView_saxsPlot")
-        self.verticalLayout_4.addWidget(self.graphicsView_saxsPlot)
+        self.gridLayout_3.addWidget(self.graphicsView_saxsPlot, 0, 0, 1, 2)
         self.gridLayout.addWidget(self.groupBox_saxsPlot, 2, 1, 1, 1)
         self.groupBox_control = QtWidgets.QGroupBox(self.tab)
         self.groupBox_control.setObjectName("groupBox_control")
@@ -75,9 +81,6 @@ class Ui_mainWindow(QWidget):
         self.label_2 = QtWidgets.QLabel(self.groupBox_control)
         self.label_2.setObjectName("label_2")
         self.gridLayout_2.addWidget(self.label_2, 0, 0, 1, 1)
-        self.pushButton_saveSaxsData = QtWidgets.QPushButton(self.groupBox_control)
-        self.pushButton_saveSaxsData.setObjectName("pushButton_saveSaxsData")
-        self.gridLayout_2.addWidget(self.pushButton_saveSaxsData, 4, 1, 1, 1)
         self.lineEdit_stlFile = QtWidgets.QLineEdit(self.groupBox_control)
         self.lineEdit_stlFile.setObjectName("lineEdit_stlFile")
         self.gridLayout_2.addWidget(self.lineEdit_stlFile, 0, 1, 1, 1)
@@ -87,9 +90,6 @@ class Ui_mainWindow(QWidget):
         self.label_3 = QtWidgets.QLabel(self.groupBox_control)
         self.label_3.setObjectName("label_3")
         self.gridLayout_2.addWidget(self.label_3, 1, 0, 1, 1)
-        self.pushButton_saveSaxsPlot = QtWidgets.QPushButton(self.groupBox_control)
-        self.pushButton_saveSaxsPlot.setObjectName("pushButton_saveSaxsPlot")
-        self.gridLayout_2.addWidget(self.pushButton_saveSaxsPlot, 4, 2, 1, 1)
         self.label_4 = QtWidgets.QLabel(self.groupBox_control)
         self.label_4.setObjectName("label_4")
         self.gridLayout_2.addWidget(self.label_4, 2, 0, 1, 1)
@@ -122,6 +122,8 @@ class Ui_mainWindow(QWidget):
         self.groupBox_pointsView.setTitle(_translate("mainWindow", "points model view"))
         self.groupBox_stlView.setTitle(_translate("mainWindow", "stl model view"))
         self.groupBox_saxsPlot.setTitle(_translate("mainWindow", "SAXS plot"))
+        self.pushButton_saveSaxsPlot.setText(_translate("mainWindow", "Save SAXS plot"))
+        self.pushButton_saveSaxsData.setText(_translate("mainWindow", "Save SAXS data file"))
         self.groupBox_control.setTitle(_translate("mainWindow", "Control"))
         self.pushButton_genPointsInModel.setText(_translate("mainWindow", "Generate points model"))
         self.pushButton_calcSaxs.setText(_translate("mainWindow", "Calculate SAXS curve"))
@@ -129,10 +131,8 @@ class Ui_mainWindow(QWidget):
         self.pushButton_chooseCrysolPath.setText(_translate("mainWindow", "Choose crysol.exe"))
         self.pushButton_browseStlFile.setText(_translate("mainWindow", "Browse"))
         self.label_2.setText(_translate("mainWindow", "Choose .stl file"))
-        self.pushButton_saveSaxsData.setText(_translate("mainWindow", "Save SAXS data file"))
         self.label_crysolPath.setText(_translate("mainWindow", "choose Crysol path"))
         self.label_3.setText(_translate("mainWindow", "points interval = "))
-        self.pushButton_saveSaxsPlot.setText(_translate("mainWindow", "Save SAXS plot"))
         self.label_4.setText(_translate("mainWindow", "save points model"))
         self.pushButton_savePointsFile.setText(_translate("mainWindow", "Ssave"))
         self.comboBox_choosePointsFileType.setItemText(0, _translate("mainWindow", "PDB file"))
