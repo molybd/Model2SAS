@@ -2,8 +2,8 @@
 
 import sys, os
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import QFileDialog, QApplication, QMainWindow, QMessageBox
+from PyQt5.QtGui import QColor, QStandardItemModel, QStandardItem
+from PyQt5.QtWidgets import QFileDialog, QApplication, QMainWindow, QMessageBox, QHeaderView
 
 import matplotlib
 matplotlib.use("Qt5Agg")  # 声明使用QT5
@@ -13,6 +13,7 @@ from mpl_toolkits import mplot3d
 
 import Model2SAS_UI, Model2SAS
 from stl import mesh
+import inspect
 
 # 在.ui文件生成的.py文件中，需要把 Ui_MainWindow 类改为 PyQt5.QtWidgets.QWidget 的子类
 # 这样才能使用 FileDialog
@@ -34,9 +35,16 @@ class function:
     def __init__(self, ui):
         self.ui = ui
 
+        ########### stl file ##############
         # input stl file
         self.ui.pushButton_browseStlFile.clicked.connect(self.browseStlFile)
-        
+        ###################################
+
+        ############ py file ##############
+        # input py file
+        self.ui.pushButton_browsePyFile_math.clicked.connect(self.browsePyFile)
+        ###################################
+
         # set interval and generate points in model
         self.ui.lineEdit_interval.setText('default')
         self.ui.pushButton_genPointsInModel.clicked.connect(self.genPointsModel)
@@ -77,20 +85,101 @@ class function:
 
             self.plotStlModel()
 
+    def browsePyFile(self):
+        #options = QFileDialog.Options()
+        #options |= QFileDialog.DontUseNativeDialog
+        file, _ = QFileDialog.getOpenFileName(self.ui, "select py file", "","All Files (*);;stl Files (*.py)")
+        # here, seperator in file is "/"
+        if file:
+            self.pyFile = file
+            print(file)
+            self.ui.lineEdit_pyFile_math.setText(self.pyFile)
+            self.model = Model2SAS.model2sas(self.pyFile, autoGenPoints=False)
+
+            self.showParamsTable()
+            self.showPyFileCode()
+    
+    def showParamsTable(self):
+        sys.path.append(self.model.inputFileDir)   # add dir to sys.path, then we can directly import the py file
+        modelModule = '.'.join(self.model.inputFileName.split('.')[:-1])
+        mathModel = __import__(modelModule)
+        # read function arguments
+        # inspect.getargspec() is deprecated since Python 3.0
+        # args = inspect.getargspec(mathModel.model) 
+        sig = inspect.signature(mathModel.model)
+        params = sig.parameters
+        self.mathParams = params
+
+        rowNum = len(params) - 2
+        self.rowNum = rowNum
+        colNum = 2
+        self.tableModel = QStandardItemModel(rowNum, colNum)
+        self.tableModel.setHorizontalHeaderLabels(['parameter', 'value'])
+
+        keys = list(params.keys())
+        for row in range(rowNum):
+            paramName = keys[row+1]
+            paramValue = params[paramName].default
+            i1 = QStandardItem(str(paramName))
+            self.tableModel.setItem(row, 0, i1)
+            i2 = QStandardItem(str(paramValue))
+            self.tableModel.setItem(row, 1, i2)
+        self.ui.tableView_params_math.setModel(self.tableModel)
+        # 设置行列填满窗口
+        self.ui.tableView_params_math.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.ui.tableView_params_math.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+    # get params table content
+    # to deal with the case that params values need to be modiied
+    def readParamsTable(self):
+        paramsDict = {}
+        for row in range(self.rowNum):
+            paramName = self.ui.tableView_params_math.model().index(row, 0).data()
+            paramValue = self.ui.tableView_params_math.model().index(row, 1).data()
+            paramsDict[paramName] = paramValue
+        print(paramsDict)
+        self.paramsDict = paramsDict
+        return paramsDict
+
+    def showPyFileCode(self):
+        self.ui.textBrowser_pyFileContent.clear()
+        
+        with open(self.pyFile, 'r') as f:
+            pyFileContentList = f.readlines() 
+
+        for line in pyFileContentList:
+            self.ui.textBrowser_pyFileContent.append(line)
+        self.ui.textBrowser_pyFileContent.moveCursor(self.ui.textBrowser_pyFileContent.textCursor().End)
+
+
     def genPointsModel(self):
-        # 处理非法输入
+        # 处理interval的非法输入
         try:
             intervalText = self.ui.lineEdit_interval.text()
             if intervalText == 'default':
                 interval = None
             else:
                 interval = float(intervalText)
-            self.model.buildFromFile(interval=interval)
-            #self.model.plotPointsInModel()
-
-            self.plotPointsModel()
         except:
             self.ui.lineEdit_interval.setText('default')
+            interval = None
+        self.model.interval = interval
+        
+        if self.model.inputFileType == 'stl':
+            self.model.buildFromFile(interval=self.model.interval)
+
+        elif self.model.inputFileType == 'py':
+            self.readParamsTable()
+
+            # generate custom args string
+            arg_string_list = []
+            for item in self.paramsDict.items():
+                arg_string_list.append('{}={}'.format(item[0], item[1]))
+            arg_string = ','.join(arg_string_list)
+            exec('self.model.buildFromMath(interval=self.model.interval, useDefault=False, {})'.format(arg_string))
+            #self.model.buildFromMath(interval=self.model.interval, useDefault=True)
+
+        self.plotPointsModel()
 
     def savePointsFile(self):
         filetypeText = self.ui.comboBox_choosePointsFileType.currentText()
@@ -214,13 +303,52 @@ class function:
                 QMessageBox.Yes
                 )
 
+    
+class function_math(function):
+    
+    def __init__(self, ui):
+        self.ui = ui
+
+        # input py file
+        self.ui.pushButton_browsePyFile_math.clicked.connect(self.browsePyFile)
+        
+        # set interval and generate points in model
+        self.ui.lineEdit_interval_math.setText('default')
+        self.ui.pushButton_genPointsInModel_math.clicked.connect(self.genPointsModel_math)
+
+        # save points model
+        self.ui.pushButton_savePointsFile.clicked.connect(self.savePointsFile)
+
+        self.ui.checkBox_useCrysol.setChecked(True)
+
+        # choose crysol.exe path
+        self.ui.pushButton_chooseCrysolPath.clicked.connect(self.chooseCrysolPath)        
+        with open('./CrysolPath.txt', 'r') as f:
+            self.crysolPath = f.read()
+        self.ui.label_crysolPath.setText(self.crysolPath)
+
+        # generate SAXS curve
+        self.ui.pushButton_calcSaxs.clicked.connect(self.genSaxsCurve)
+
+        # save SAXS data
+        self.ui.pushButton_saveSaxsData.clicked.connect(self.saveSaxsData)
+
+        # save SAXS plot
+        self.ui.pushButton_saveSaxsPlot.clicked.connect(self.saveSaxsPlot)
+
+    def browsePyFile(self):
+        pass
+
+    def genPointsModel_math(self):
+        pass
+
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     MainWindow = QMainWindow()
     
-    ui = Model2SAS_UI.Ui_mainWindow()
+    ui = Model2SAS_UI.Ui_MainWindow()
     ui.setupUi(MainWindow)
     func = function(ui)
     MainWindow.show()

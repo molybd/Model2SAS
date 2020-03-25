@@ -156,28 +156,24 @@ class model2sas:
         mathModel = __import__(modelModule)
 
         # read function arguments
-        args = inspect.getargspec(mathModel.model)
+        # inspect.getargspec() is deprecated since Python 3.0
+        # args = inspect.getargspec(mathModel.model) 
+        sig = inspect.signature(mathModel.model)
+        params = sig.parameters
 
         # read coordinates from math model file
-        for s in ['xyz', 'sph', 'cyl']:
-            try:
-                i = args.defaults.index(s)
-                coord = args.defaults[i]
-                break
-            except:
-                continue
+        coord = params['coord'].default
 
         # means use default value in model file
         if useDefault:
             
             # read boundaryList from math model file
-            i = args.args.index('boundary_xyz') - len(args.args)
-            boundaryList = args.defaults[i]
+            boundaryList = params['boundary_xyz'].default
             [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
 
             # set interval
             if interval == None:
-                self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
+                self.interval = min(np.abs([xmax-xmin, ymax-ymin, zmax-zmin])) / 20
             else:
                 self.interval = interval
             self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
@@ -203,9 +199,8 @@ class model2sas:
                 # read boundaryList from custom input
                 boundaryList = kwargs['boundary_xyz']
             else:
-                # read default boundaryList
-                i = args.args.index('boundary_xyz') - len(args.args)
-                boundaryList = args.defaults[i]
+                # read boundaryList from math model file
+                boundaryList = params['boundary_xyz'].default
             [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
 
             # set interval
