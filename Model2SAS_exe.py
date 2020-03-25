@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import sys, os
+import sys, os, time
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtGui import QColor, QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import QFileDialog, QApplication, QMainWindow, QMessageBox, QHeaderView
@@ -12,8 +12,10 @@ from matplotlib.figure import Figure
 from mpl_toolkits import mplot3d
 
 import Model2SAS_UI, Model2SAS
+import numpy as np
 from stl import mesh
 import inspect
+from multiprocessing import Process
 
 # 在.ui文件生成的.py文件中，需要把 Ui_MainWindow 类改为 PyQt5.QtWidgets.QWidget 的子类
 # 这样才能使用 FileDialog
@@ -207,7 +209,7 @@ class function:
             self.model.genSasCurve_Crysol(crysolPath=self.crysolPath)
         else:
             self.model.genSasCurve()
-        #self.model.plotSasCurve()
+
         self.plotSasCurve()
 
     def plotStlModel(self):
@@ -234,6 +236,11 @@ class function:
             self.model.pointsInModel[:,1], 
             self.model.pointsInModel[:,2], 
             color='k')
+        min_all = self.model.meshgrid.min()
+        max_all = self.model.meshgrid.max()
+        pointsPlotAxes.set_xlim3d(min_all, max_all)
+        pointsPlotAxes.set_ylim3d(min_all, max_all)
+        pointsPlotAxes.set_zlim3d(min_all, max_all)
 
         # 创建一个QGraphicsScene，因为加载的图形（FigureCanvas）不能直接放到graphicview控件中，必须先放到graphicScene，然后再把graphicscene放到graphicview中
         pointsGraphicscene = QtWidgets.QGraphicsScene()
@@ -322,9 +329,12 @@ class function_math(function):
         self.ui.checkBox_useCrysol.setChecked(True)
 
         # choose crysol.exe path
-        self.ui.pushButton_chooseCrysolPath.clicked.connect(self.chooseCrysolPath)        
-        with open('./CrysolPath.txt', 'r') as f:
-            self.crysolPath = f.read()
+        self.ui.pushButton_chooseCrysolPath.clicked.connect(self.chooseCrysolPath)
+        try:        
+            with open('./CrysolPath.txt', 'r') as f:
+                self.crysolPath = f.read()
+        except:
+            pass
         self.ui.label_crysolPath.setText(self.crysolPath)
 
         # generate SAXS curve

@@ -98,6 +98,8 @@ class model2sas:
             xmin, xmax, ymin, ymax, zmin, zmax = np.min(vectors[:,:,0]), np.max(vectors[:,:,0]), np.min(vectors[:,:,1]), np.max(vectors[:,:,1]), np.min(vectors[:,:,2]), np.max(vectors[:,:,2])
             if interval == None:
                 self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
+                if self.interval < 0.5:
+                    self.interval = 0.5
             else:
                 self.interval = interval
             self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
@@ -174,6 +176,8 @@ class model2sas:
             # set interval
             if interval == None:
                 self.interval = min(np.abs([xmax-xmin, ymax-ymin, zmax-zmin])) / 20
+                if self.interval < 0.5:
+                    self.interval = 0.5
             else:
                 self.interval = interval
             self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
