@@ -94,7 +94,7 @@ class function:
             self.model.stlModelMesh = mesh.Mesh.from_file(self.stlFile)
 
             self.plotStlModel()
-            
+
             self.ui.lineEdit_interval.setText('default')
 
     def browsePyFile(self):
@@ -231,10 +231,54 @@ class function:
         stlPlot = Figure_Canvas()
         stlPlotAxes = mplot3d.Axes3D(stlPlot.fig)
         # Load the STL files and add the vectors to the plot
-        stlPlotAxes.add_collection3d(mplot3d.art3d.Poly3DCollection(self.model.stlModelMesh.vectors))
+
+        # plot model face
+        '''
+        Poly3DCollection = mplot3d.art3d.Poly3DCollection(
+            self.model.stlModelMesh.vectors, 
+            facecolors='w',
+            #linewidths=1, 
+            alpha=0
+            )
+        stlPlotAxes.add_collection3d(Poly3DCollection)
+        '''
+        # plot model frame mesh
+        Line3DCollection = mplot3d.art3d.Line3DCollection(
+            self.model.stlModelMesh.vectors, 
+            colors='k', 
+            linewidths=0.5, 
+            #linestyles=':'
+            )
+        stlPlotAxes.add_collection3d(Line3DCollection)
+        '''
         # Auto scale to the mesh size
         scale = self.model.stlModelMesh.points.flatten()
         stlPlotAxes.auto_scale_xyz(scale, scale, scale)
+        '''
+        # scale the 3 axis, make them the same range
+        xmin, xmax = self.model.stlModelMesh.vectors[:,:,0].min(), self.model.stlModelMesh.vectors[:,:,0].max()
+        ymin, ymax = self.model.stlModelMesh.vectors[:,:,1].min(), self.model.stlModelMesh.vectors[:,:,1].max()
+        zmin, zmax = self.model.stlModelMesh.vectors[:,:,2].min(), self.model.stlModelMesh.vectors[:,:,2].max()
+        dmax = max([xmax - xmin, ymax - ymin, zmax - zmin])
+        xmid, ymid, zmid = (xmin + xmax)/2, (ymin + ymax)/2, (zmin + zmax)/2
+        xmin, xmax = xmid - 0.6*dmax, xmid + 0.6*dmax
+        ymin, ymax = ymid - 0.6*dmax, ymid + 0.6*dmax
+        zmin, zmax = zmid - 0.6*dmax, zmid + 0.6*dmax
+        stlPlotAxes.set_xlim3d(xmin, xmax)
+        stlPlotAxes.set_ylim3d(ymin, ymax)
+        stlPlotAxes.set_zlim3d(zmin, zmax)
+        
+        '''
+        # frame plot
+        # too slow ...
+        for triangle in self.model.stlModelMesh.vectors:
+            x, y, z = triangle[:,0], triangle[:,1], triangle[:,2]
+            x = np.hstack((x, x[0]))
+            y = np.hstack((y, y[0]))
+            z = np.hstack((z, z[0]))
+            stlPlotAxes.plot(x, y, z, color='b')
+        '''
+
 
         # 创建一个QGraphicsScene，因为加载的图形（FigureCanvas）不能直接放到graphicview控件中，必须先放到graphicScene，然后再把graphicscene放到graphicview中
         stlGraphicscene = QtWidgets.QGraphicsScene()
@@ -251,11 +295,19 @@ class function:
             self.model.pointsInModel[:,1], 
             self.model.pointsInModel[:,2], 
             color='k')
-        min_all = self.model.meshgrid.min()
-        max_all = self.model.meshgrid.max()
-        pointsPlotAxes.set_xlim3d(min_all, max_all)
-        pointsPlotAxes.set_ylim3d(min_all, max_all)
-        pointsPlotAxes.set_zlim3d(min_all, max_all)
+        
+        # set the scale of plot, all axes have the same range
+        xmin, xmax = self.model.pointsInModel[:,0].min(), self.model.pointsInModel[:,0].max()
+        ymin, ymax = self.model.pointsInModel[:,1].min(), self.model.pointsInModel[:,1].max()
+        zmin, zmax = self.model.pointsInModel[:,2].min(), self.model.pointsInModel[:,2].max()
+        dmax = max([xmax - xmin, ymax - ymin, zmax - zmin])
+        xmid, ymid, zmid = (xmin + xmax)/2, (ymin + ymax)/2, (zmin + zmax)/2
+        xmin, xmax = xmid - 0.6*dmax, xmid + 0.6*dmax
+        ymin, ymax = ymid - 0.6*dmax, ymid + 0.6*dmax
+        zmin, zmax = zmid - 0.6*dmax, zmid + 0.6*dmax
+        pointsPlotAxes.set_xlim3d(xmin, xmax)
+        pointsPlotAxes.set_ylim3d(ymin, ymax)
+        pointsPlotAxes.set_zlim3d(zmin, zmax)
 
         # 创建一个QGraphicsScene，因为加载的图形（FigureCanvas）不能直接放到graphicview控件中，必须先放到graphicScene，然后再把graphicscene放到graphicview中
         pointsGraphicscene = QtWidgets.QGraphicsScene()
