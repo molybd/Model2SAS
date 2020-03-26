@@ -51,15 +51,24 @@ class function:
         self.ui.lineEdit_interval.setText('default')
         self.ui.pushButton_genPointsInModel.clicked.connect(self.genPointsModel)
 
+        # set default values of qmax and lmax
+        self.ui.lineEdit_Qmax.setText('1')
+        self.ui.lineEdit_lmax.setText('20')
+
         # save points model
         self.ui.pushButton_savePointsFile.clicked.connect(self.savePointsFile)
 
         self.ui.checkBox_useCrysol.setChecked(True)
 
         # choose crysol.exe path
-        self.ui.pushButton_chooseCrysolPath.clicked.connect(self.chooseCrysolPath)        
-        with open('./CrysolPath.txt', 'r') as f:
-            self.crysolPath = f.read()
+        self.ui.pushButton_chooseCrysolPath.clicked.connect(self.chooseCrysolPath)  
+        try:      
+            with open('./CrysolPath.txt', 'r') as f:
+                self.crysolPath = f.read()
+        except:
+            with open('./CrysolPath.txt', 'w') as f:
+                f.write('')
+            self.crysolPath = 'Please choose crysol path'
         self.ui.label_crysolPath.setText(self.crysolPath)
 
         # generate SAXS curve
@@ -83,9 +92,10 @@ class function:
             self.ui.lineEdit_stlFile.setText(self.stlFile)
             self.model = Model2SAS.model2sas(self.stlFile, autoGenPoints=False)
             self.model.stlModelMesh = mesh.Mesh.from_file(self.stlFile)
-            #self.model.plotSTLMeshModel(plot=True)
 
             self.plotStlModel()
+            
+            self.ui.lineEdit_interval.setText('default')
 
     def browsePyFile(self):
         #options = QFileDialog.Options()
@@ -100,6 +110,8 @@ class function:
 
             self.showParamsTable()
             self.showPyFileCode()
+
+            self.ui.lineEdit_interval.setText('default')
     
     def showParamsTable(self):
         sys.path.append(self.model.inputFileDir)   # add dir to sys.path, then we can directly import the py file
@@ -181,15 +193,16 @@ class function:
             exec('self.model.buildFromMath(interval=self.model.interval, useDefault=False, {})'.format(arg_string))
             #self.model.buildFromMath(interval=self.model.interval, useDefault=True)
 
+        self.ui.lineEdit_interval.setText('{:.1f}'.format(self.model.interval))
+        pointsNum = self.model.pointsInModel.shape[0]
+        self.ui.label_pointsNum.setText('{} points'.format(pointsNum))
+
         self.plotPointsModel()
 
     def savePointsFile(self):
-        filetypeText = self.ui.comboBox_choosePointsFileType.currentText()
-        filetypeText = filetypeText.lower()
-        if 'pdb' in filetypeText:
-            self.model.savePointsInModel(filetype='pdb')
-        elif 'xyz' in filetypeText:
-            self.model.savePointsInModel(filetype='xyz')
+        basename = self.model.modelname + '.pdb'
+        file, _ = QFileDialog.getSaveFileName(self.ui, 'save PDB file', basename)
+        self.model.savePointsInModel(filetype='pdb', filename=file)
 
     def chooseCrysolPath(self):
         file, _ = QFileDialog.getOpenFileName(self.ui, "select crysol.exe file", "","All Files (*);;exe Files (*.exe)")
@@ -206,9 +219,11 @@ class function:
         
         useCrysol = self.ui.checkBox_useCrysol.isChecked()
         if useCrysol:
-            self.model.genSasCurve_Crysol(crysolPath=self.crysolPath)
+            qmax = float(self.ui.lineEdit_Qmax.text())
+            lmax = int(self.ui.lineEdit_lmax.text())
+            self.model.genSasCurve_Crysol(crysolPath=self.crysolPath, qmax=qmax, lmax=lmax)
         else:
-            self.model.genSasCurve()
+            self.model.genSasCurve(qmax=qmax, lmax=lmax)
 
         self.plotSasCurve()
 
@@ -277,31 +292,34 @@ class function:
 
     def saveSaxsData(self):
         try:
-            self.model.saveSasCurve()
+            basename = self.model.modelname + '_saxs.dat'
+            file, _ = QFileDialog.getSaveFileName(self.ui, 'Save SAXS Data', basename)
+            self.model.saveSasCurve(filename=file)
+            '''
             QMessageBox.information(self.ui,
                 "Save successful",
                 "SAXS data saved !",
                 QMessageBox.Yes
-                )
+                )'''
         except:
             print('No SAXS data yet !')
             QMessageBox.warning(self.ui,
                 "Save failed",
-                "No SAXS data yet !",
+                "No SAXS data saved yet !",
                 QMessageBox.Yes
                 )
 
     def saveSaxsPlot(self):
         try:
-            os.chdir(self.model.inputFileDir)
-            filename = self.model.modelname + '_SAXS_Plot.png'
-            self.saxsPlotFig.savefig(filename)
-            os.chdir(self.model.workingDir)
+            basename = self.model.modelname + '_SAXS_Plot.png'
+            file, _ = QFileDialog.getSaveFileName(self.ui, 'Save SAXS Plot', basename)
+            self.saxsPlotFig.savefig(file)
+            '''
             QMessageBox.information(self.ui,
                 "Save successful",
                 "SAXS plot saved !",
                 QMessageBox.Yes
-                )
+                )'''
         except:
             print('No SAXS plot yet !')
             QMessageBox.warning(self.ui,
@@ -311,47 +329,6 @@ class function:
                 )
 
     
-class function_math(function):
-    
-    def __init__(self, ui):
-        self.ui = ui
-
-        # input py file
-        self.ui.pushButton_browsePyFile_math.clicked.connect(self.browsePyFile)
-        
-        # set interval and generate points in model
-        self.ui.lineEdit_interval_math.setText('default')
-        self.ui.pushButton_genPointsInModel_math.clicked.connect(self.genPointsModel_math)
-
-        # save points model
-        self.ui.pushButton_savePointsFile.clicked.connect(self.savePointsFile)
-
-        self.ui.checkBox_useCrysol.setChecked(True)
-
-        # choose crysol.exe path
-        self.ui.pushButton_chooseCrysolPath.clicked.connect(self.chooseCrysolPath)
-        try:        
-            with open('./CrysolPath.txt', 'r') as f:
-                self.crysolPath = f.read()
-        except:
-            pass
-        self.ui.label_crysolPath.setText(self.crysolPath)
-
-        # generate SAXS curve
-        self.ui.pushButton_calcSaxs.clicked.connect(self.genSaxsCurve)
-
-        # save SAXS data
-        self.ui.pushButton_saveSaxsData.clicked.connect(self.saveSaxsData)
-
-        # save SAXS plot
-        self.ui.pushButton_saveSaxsPlot.clicked.connect(self.saveSaxsPlot)
-
-    def browsePyFile(self):
-        pass
-
-    def genPointsModel_math(self):
-        pass
-
 
 
 if __name__ == "__main__":
