@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 
+# needed for GUI panel
 import sys, os, time
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtGui import QColor, QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import QFileDialog, QApplication, QMainWindow, QMessageBox, QHeaderView
 
+# needed for multithread
+from PyQt5.QtCore import QThread, pyqtSignal
+
+# needed for function
 import matplotlib
 matplotlib.use("Qt5Agg")  # 声明使用QT5
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -31,6 +36,69 @@ class Figure_Canvas(FigureCanvas):
         self.setParent(parent)
 
         #self.axes = self.fig.add_subplot(111) # 调用figure下面的add_subplot方法，类似于matplotlib.pyplot下面的subplot方法
+
+
+class Thread_PointsInModel_stl(QThread):
+
+    # 线程结束的signal，并且带有一个列表参数
+    threadEnd = pyqtSignal(list)
+
+    def __init__(self, model):
+        super(Thread_PointsInModel_stl, self).__init__()
+        self.model = model
+
+    def run(self):
+        # 线程所需要执行的代码
+
+        self.model.buildFromFile(interval=self.model.interval)
+
+        pointsInModel_list = self.model.pointsInModel.tolist()
+        self.threadEnd.emit(pointsInModel_list)
+
+
+class Thread_PointsInModel_py(QThread):
+
+    # 线程结束的signal，并且带有一个列表参数
+    threadEnd = pyqtSignal(list)
+
+    def __init__(self, model, paramsDict):
+        super(Thread_PointsInModel_py, self).__init__()
+        self.model = model
+        self.paramsDict = paramsDict
+
+    def run(self):
+        # 线程所需要执行的代码
+
+        # generate custom args string
+        arg_string_list = []
+        for item in self.paramsDict.items():
+            arg_string_list.append('{}={}'.format(item[0], item[1]))
+        arg_string = ','.join(arg_string_list)
+        exec('self.model.buildFromMath(interval=self.model.interval, useDefault=False, {})'.format(arg_string))
+        #self.model.buildFromMath(interval=self.model.interval, useDefault=True)
+        
+        pointsInModel_list = self.model.pointsInModel.tolist()
+        self.threadEnd.emit(pointsInModel_list)
+
+
+class Thread_Crysol(QThread):
+    
+    # 线程结束的signal，并且带有一个列表参数
+    threadEnd = pyqtSignal(list)
+
+    def __init__(self, model, qmax, lmax, crysolPath):
+        super(Thread_Crysol, self).__init__()
+        self.model = model
+        self.qmax = qmax
+        self.lmax = lmax
+        self.crysolPath = crysolPath
+
+    def run(self):
+        # 线程所需要执行的代码
+        sasCurve = self.model.genSasCurve_Crysol(qmax=self.qmax, lmax=self.lmax, crysolPath=self.crysolPath)
+        sasCurve_list = sasCurve.tolist()
+        self.threadEnd.emit(sasCurve_list)
+
 
 
 class function:
@@ -80,6 +148,8 @@ class function:
         # save SAXS plot
         self.ui.pushButton_saveSaxsPlot.clicked.connect(self.saveSaxsPlot)
 
+        self.needGenSaxsCurve = False
+
 
     def browseStlFile(self):
         #options = QFileDialog.Options()
@@ -95,7 +165,16 @@ class function:
 
             self.plotStlModel()
 
-            self.ui.lineEdit_interval.setText('default')
+            # determine default interval
+            vectors = self.model.stlModelMesh.vectors
+            xmin, xmax, ymin, ymax, zmin, zmax = np.min(vectors[:,:,0]), np.max(vectors[:,:,0]), np.min(vectors[:,:,1]), np.max(vectors[:,:,1]), np.min(vectors[:,:,2]), np.max(vectors[:,:,2])
+            interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
+            if interval < 0.5:
+                interval = 0.5
+            interval = float('{:.2f}'.format(interval))  # 只保留两位小数
+            self.defaultInterval = interval
+            self.model.interval = interval
+            self.ui.lineEdit_interval.setText('{:.2f}'.format(interval))
 
     def browsePyFile(self):
         #options = QFileDialog.Options()
@@ -110,8 +189,9 @@ class function:
 
             self.showParamsTable()
             self.showPyFileCode()
+            
+            # ! determine default interval in self.showParamsTable()
 
-            self.ui.lineEdit_interval.setText('default')
     
     def showParamsTable(self):
         sys.path.append(self.model.inputFileDir)   # add dir to sys.path, then we can directly import the py file
@@ -143,6 +223,19 @@ class function:
         self.ui.tableView_params_math.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.ui.tableView_params_math.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
+        # set default interval
+        boundaryList = params['boundary_xyz'].default
+        [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
+        interval = min(np.abs([xmax-xmin, ymax-ymin, zmax-zmin])) / 20
+        if interval < 0.5:
+            interval = 0.5
+        interval = float('{:.2f}'.format(interval))  # 只保留一位小数
+        self.defaultInterval = interval
+        self.model.interval = interval
+        self.ui.lineEdit_interval.setText('{:.2f}'.format(interval))
+
+
+
     # get params table content
     # to deal with the case that params values need to be modiied
     def readParamsTable(self):
@@ -167,37 +260,44 @@ class function:
 
 
     def genPointsModel(self):
-        # 处理interval的非法输入
+        # 结束前禁用这个 button，以免被疯狂点击
+        self.ui.pushButton_genPointsInModel.setEnabled(False)
+
+        # 处理interval的非法输入并确定interval
         try:
             intervalText = self.ui.lineEdit_interval.text()
-            if intervalText == 'default':
-                interval = None
-            else:
-                interval = float(intervalText)
+            interval = float(intervalText)
         except:
-            self.ui.lineEdit_interval.setText('default')
-            interval = None
+            interval = self.defaultInterval
+        self.ui.lineEdit_interval.setText('{:.2f}'.format(interval))
         self.model.interval = interval
-        
+
         if self.model.inputFileType == 'stl':
-            self.model.buildFromFile(interval=self.model.interval)
+            self.thread_pointsInModel_stl = Thread_PointsInModel_stl(self.model)
+            self.thread_pointsInModel_stl.threadEnd.connect(self.processPointsInModelThreadOutput)
+            self.thread_pointsInModel_stl.start()
+        if self.model.inputFileType == 'py':
+            paramsDict = self.readParamsTable()
+            self.thread_pointsInModel_py = Thread_PointsInModel_py(self.model, paramsDict)
+            self.thread_pointsInModel_py.threadEnd.connect(self.processPointsInModelThreadOutput)
+            self.thread_pointsInModel_py.start()
+            
 
-        elif self.model.inputFileType == 'py':
-            self.readParamsTable()
+    def processPointsInModelThreadOutput(self, pointsInModel_list):
+        self.model.pointsInModel = np.array(pointsInModel_list)
 
-            # generate custom args string
-            arg_string_list = []
-            for item in self.paramsDict.items():
-                arg_string_list.append('{}={}'.format(item[0], item[1]))
-            arg_string = ','.join(arg_string_list)
-            exec('self.model.buildFromMath(interval=self.model.interval, useDefault=False, {})'.format(arg_string))
-            #self.model.buildFromMath(interval=self.model.interval, useDefault=True)
-
-        self.ui.lineEdit_interval.setText('{:.1f}'.format(self.model.interval))
+        self.ui.lineEdit_interval.setText('{:.2f}'.format(self.model.interval))
         pointsNum = self.model.pointsInModel.shape[0]
         self.ui.label_pointsNum.setText('{} points'.format(pointsNum))
 
         self.plotPointsModel()
+
+        if self.needGenSaxsCurve:
+            self._onlyGenSaxsCurve()
+
+        self.needGenSaxsCurve = False
+
+        self.ui.pushButton_genPointsInModel.setEnabled(True)
 
     def savePointsFile(self):
         basename = self.model.modelname + '.pdb'
@@ -213,19 +313,40 @@ class function:
             f.write(self.crysolPath)
 
     def genSaxsCurve(self):
-        # incase that pointsInModel haven't been generated
-        if len(self.model.pointsInModel) == 0:
+        # 结束前禁用这个 button，以免被疯狂点击
+        self.ui.pushButton_calcSaxs.setEnabled(False)
+
+        if self.model.pointsInModel.size == 0 or abs(self.model.interval - float(self.ui.lineEdit_interval.text())) >= 0.05:
+            # in case that pointsInModel haven't been generated
+            print('new points model')
+            self.needGenSaxsCurve = True
             self.genPointsModel()
         
+        else:
+            # model have already been built
+            self._onlyGenSaxsCurve()
+
+    def _onlyGenSaxsCurve(self):
         useCrysol = self.ui.checkBox_useCrysol.isChecked()
         if useCrysol:
             qmax = float(self.ui.lineEdit_Qmax.text())
             lmax = int(self.ui.lineEdit_lmax.text())
-            self.model.genSasCurve_Crysol(crysolPath=self.crysolPath, qmax=qmax, lmax=lmax)
+            self.model.lmax = lmax
+
+            self.thread_crysol = Thread_Crysol(self.model, qmax, lmax, self.crysolPath)
+            self.thread_crysol.threadEnd.connect(self.processCrysolThreadOutput)
+            self.thread_crysol.start()
+            
+            # self.model.genSasCurve_Crysol(crysolPath=self.crysolPath, qmax=qmax, lmax=lmax)
         else:
             self.model.genSasCurve(qmax=qmax, lmax=lmax)
 
+        # self.plotSasCurve()
+
+    def processCrysolThreadOutput(self, sasCurve_list):
+        self.model.sasCurve = np.array(sasCurve_list)
         self.plotSasCurve()
+        self.ui.pushButton_calcSaxs.setEnabled(True)
 
     def plotStlModel(self):
         stlPlot = Figure_Canvas()

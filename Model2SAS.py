@@ -5,7 +5,7 @@ from stl import mesh
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 from scipy.special import sph_harm, spherical_jn, jv
-import os, sys
+import os, sys, time
 from multiprocessing import Pool, cpu_count
 import inspect
 
@@ -21,8 +21,8 @@ class model2sas:
     'class to read 3D model from file and generate PDB file and SAS curve'
 
     def __init__(self, filename, interval=None, procNum=None, modelName=None, autoGenPoints=True, *args, **kwargs):
-        self.file_abspath = os.path.abspath(filename)                               # first convert to abs path
-        self.inputFileDir = os.path.dirname(self.file_abspath)                      # only file name, without dir info
+        self.file_abspath = os.path.abspath(filename).replace('\\', '/')             # first convert to abs path
+        self.inputFileDir = os.path.dirname(self.file_abspath).replace('\\', '/')    # only file name, without dir info
         self.inputFileName = os.path.basename(self.file_abspath)                    # only absolute dir of the file
         self.inputFileType = self.inputFileName.split('.')[-1].lower()              # file type extension, e.g. stl, py etc.
         self.modelname = self.__determineModelName(modelName, self.inputFileName)   # determine model name, without extention
@@ -31,6 +31,7 @@ class model2sas:
         self.pointsInModel = np.array([])                                           # points coordinates inside the model
         self.sasCurve = np.array([])                                                # SAS curve calculated
         self.workingDir = os.getcwd()                                               # cwd
+        self.interval = None                                          
         
         # process number in paralell computing, default is using 60% CPU maximum
         if procNum == None:
@@ -96,7 +97,7 @@ class model2sas:
             self.stlModelMesh = mesh.Mesh.from_file(filename)
             vectors = self.stlModelMesh.vectors
             xmin, xmax, ymin, ymax, zmin, zmax = np.min(vectors[:,:,0]), np.max(vectors[:,:,0]), np.min(vectors[:,:,1]), np.max(vectors[:,:,1]), np.min(vectors[:,:,2]), np.max(vectors[:,:,2])
-            if interval == None:
+            if interval == None or self.interval == None:
                 self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
                 if self.interval < 0.5:
                     self.interval = 0.5
@@ -125,6 +126,7 @@ class model2sas:
 
             self.pointsInModel = np.array(pointsInModelList)  # shape = (points number, 3)
 
+        # not fully supported
         elif filetype == 'xyz':
             lst = []
             with open(filename, 'r') as f:
@@ -134,7 +136,8 @@ class model2sas:
                         lst.append(point)
             self.pointsInModel = np.array(lst)
             self.interval = interval
-            
+        
+        # not fully supported
         elif filetype == 'txt':
             self.pointsInModel = np.loadtxt(filename)
             self.interval = interval
@@ -174,7 +177,7 @@ class model2sas:
             [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
 
             # set interval
-            if interval == None:
+            if interval == None or self.interval == None:
                 self.interval = min(np.abs([xmax-xmin, ymax-ymin, zmax-zmin])) / 20
                 if self.interval < 0.5:
                     self.interval = 0.5
@@ -208,7 +211,7 @@ class model2sas:
             [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
 
             # set interval
-            if interval == None:
+            if interval == None or self.interval == None:
                 self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
             else:
                 self.interval = interval
@@ -257,7 +260,7 @@ class model2sas:
         if filename == None:
             filename = '{}_interval={}.{}'.format(
                 self.modelname,
-                str(int(round(self.interval))),
+                str(int(round(self.interval))), # 避免出现小数点
                 filetype
             )
             # if no filename is assigned, output file will be saved in the same dir as input file
@@ -342,6 +345,7 @@ class model2sas:
         else:
             os.system('\"{}\" {} -lm {} -fb 18 -sm {} -ns {} -un 1'.format(crysolPath, self.PDBfilename, lmax, qmax, qNum))
         intfile = self.PDBfilename[:-4] + '00.int'
+        os.chdir(self.inputFileDir) # 在GUI的多进程中执行crysol后工作路径会变化，所以需要再次改变工作路径
         crysolOutput = np.loadtxt(intfile, skiprows=1)
         self.sasCurve = crysolOutput[:, :2]
         os.chdir(self.workingDir)
