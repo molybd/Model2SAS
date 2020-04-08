@@ -263,6 +263,10 @@ class function:
         # 结束前禁用这个 button，以免被疯狂点击
         self.ui.pushButton_genPointsInModel.setEnabled(False)
 
+        # progress bar 开始滚动
+        self.ui.progressBar.setMinimum(0)
+        self.ui.progressBar.setMaximum(0)
+
         # 处理interval的非法输入并确定interval
         try:
             intervalText = self.ui.lineEdit_interval.text()
@@ -292,17 +296,30 @@ class function:
 
         self.plotPointsModel()
 
+        # progress bar 停止滚动
+        self.ui.progressBar.setMinimum(0)
+        self.ui.progressBar.setMaximum(100)
+        # button 恢复
+        self.ui.pushButton_genPointsInModel.setEnabled(True)
+
         if self.needGenSaxsCurve:
             self._onlyGenSaxsCurve()
 
         self.needGenSaxsCurve = False
 
-        self.ui.pushButton_genPointsInModel.setEnabled(True)
-
     def savePointsFile(self):
-        basename = self.model.modelname + '.pdb'
-        file, _ = QFileDialog.getSaveFileName(self.ui, 'save PDB file', basename)
-        self.model.savePointsInModel(filetype='pdb', filename=file)
+        try:
+            basename = self.model.modelname + '.pdb'
+            file, _ = QFileDialog.getSaveFileName(self.ui, 'save PDB file', basename)
+            if file:
+                self.model.savePointsInModel(filetype='pdb', filename=file)
+        except:
+            print('No points data yet !')
+            QMessageBox.warning(self.ui,
+                "Save failed",
+                "No points data yet !",
+                QMessageBox.Yes
+                )
 
     def chooseCrysolPath(self):
         file, _ = QFileDialog.getOpenFileName(self.ui, "select crysol.exe file", "","All Files (*);;exe Files (*.exe)")
@@ -324,9 +341,15 @@ class function:
         
         else:
             # model have already been built
+
             self._onlyGenSaxsCurve()
 
     def _onlyGenSaxsCurve(self):
+
+        # progress bar 开始滚动
+        self.ui.progressBar.setMinimum(0)
+        self.ui.progressBar.setMaximum(0)
+
         useCrysol = self.ui.checkBox_useCrysol.isChecked()
         if useCrysol:
             qmax = float(self.ui.lineEdit_Qmax.text())
@@ -346,6 +369,11 @@ class function:
     def processCrysolThreadOutput(self, sasCurve_list):
         self.model.sasCurve = np.array(sasCurve_list)
         self.plotSasCurve()
+
+        # progress bar 停止滚动
+        self.ui.progressBar.setMinimum(0)
+        self.ui.progressBar.setMaximum(100)
+        # button 恢复
         self.ui.pushButton_calcSaxs.setEnabled(True)
 
     def plotStlModel(self):
@@ -467,18 +495,13 @@ class function:
         try:
             basename = self.model.modelname + '_saxs.dat'
             file, _ = QFileDialog.getSaveFileName(self.ui, 'Save SAXS Data', basename)
-            self.model.saveSasCurve(filename=file)
-            '''
-            QMessageBox.information(self.ui,
-                "Save successful",
-                "SAXS data saved !",
-                QMessageBox.Yes
-                )'''
+            if file:
+                self.model.saveSasCurve(filename=file)
         except:
             print('No SAXS data yet !')
             QMessageBox.warning(self.ui,
                 "Save failed",
-                "No SAXS data saved yet !",
+                "No SAXS data yet !",
                 QMessageBox.Yes
                 )
 
@@ -486,13 +509,8 @@ class function:
         try:
             basename = self.model.modelname + '_SAXS_Plot.png'
             file, _ = QFileDialog.getSaveFileName(self.ui, 'Save SAXS Plot', basename)
-            self.saxsPlotFig.savefig(file)
-            '''
-            QMessageBox.information(self.ui,
-                "Save successful",
-                "SAXS plot saved !",
-                QMessageBox.Yes
-                )'''
+            if file:
+                self.saxsPlotFig.savefig(file)
         except:
             print('No SAXS plot yet !')
             QMessageBox.warning(self.ui,
