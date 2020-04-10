@@ -251,7 +251,8 @@ class function:
     def showPyFileCode(self):
         self.ui.textBrowser_pyFileContent.clear()
         
-        with open(self.pyFile, 'r') as f:
+        # dealing with Chinese characters
+        with open(self.pyFile, 'r', encoding='UTF-8') as f:
             pyFileContentList = f.readlines() 
 
         for line in pyFileContentList:

@@ -478,9 +478,9 @@ if __name__ == '__main__':
         model.genSasCurve_Crysol()
         model.plotSasCurve()
     elif modelType == 'math':
-        model = model2sas('models\\ellipsoid_model.py', autoGenPoints=False)
-        model.buildFromMath(interval=2, useDefault=False, a=20, b=20, c=20, boundary_xyz=[-20, 20, -20, 20, -20, 20])
+        model = model2sas('models\\porous_shell.py', autoGenPoints=False)
+        model.buildFromMath(interval=2, useDefault=True)
         model.plotPointsInModel()
-        model.genSasCurve_Crysol()
-        model.plotSasCurve()
+        #model.genSasCurve_Crysol()
+        #model.plotSasCurve()
         
