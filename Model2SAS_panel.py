@@ -27,8 +27,10 @@ from multiprocessing import Process
 # 即首先 from PyQt5.QtWidgets import QWidget
 # class Ui_MainWindow(Object) 改为 class Ui_MainWindow(QWidget)
 
+
+# 通过继承FigureCanvas类，使得该类既是一个PyQt5的Qwidget，又是一个matplotlib的FigureCanvas，这是连接pyqt5与matplotlib的关键！
 class Figure_Canvas(FigureCanvas):   
-    # 通过继承FigureCanvas类，使得该类既是一个PyQt5的Qwidget，又是一个matplotlib的FigureCanvas，这是连接pyqt5与matplotlib的关键
+    
     def __init__(self, parent=None, width=5, height=5, dpi=100):
         self.fig = Figure(figsize=(width, height), dpi=dpi)  # 创建一个Figure，注意：该Figure为matplotlib下的figure，不是matplotlib.pyplot下面的figure
  
@@ -37,6 +39,11 @@ class Figure_Canvas(FigureCanvas):
 
         #self.axes = self.fig.add_subplot(111) # 调用figure下面的add_subplot方法，类似于matplotlib.pyplot下面的subplot方法
 
+###############################################
+# 以下的这些 Thread 开头的类都是为了实现功能与窗口进程的异步，
+# 以免耗时太长导致窗口进程的卡死
+# 通过pyqt的 signal & slot 机制
+###############################################
 
 class Thread_PointsInModel_stl(QThread):
 
@@ -53,6 +60,8 @@ class Thread_PointsInModel_stl(QThread):
         self.model.buildFromFile(interval=self.model.interval)
 
         pointsInModel_list = self.model.pointsInModel.tolist()
+
+        # 发射线程结束的signal，下面的thread结构相同
         self.threadEnd.emit(pointsInModel_list)
 
 
@@ -100,8 +109,28 @@ class Thread_Crysol(QThread):
         self.threadEnd.emit(sasCurve_list)
 
 
+class Thread_myImplementToCalcSaxs(QThread):
+    
+    # 线程结束的signal，并且带有一个列表参数
+    threadEnd = pyqtSignal(list)
+
+    def __init__(self, model, qmax, lmax):
+        super(Thread_myImplementToCalcSaxs, self).__init__()
+        self.model = model
+        self.qmax = qmax
+        self.lmax = lmax
+
+    def run(self):
+        # 线程所需要执行的代码
+        sasCurve = self.model.genSasCurve(qmax=self.qmax, lmax=self.lmax)
+        sasCurve_list = sasCurve.tolist()
+        self.threadEnd.emit(sasCurve_list)
+
+
 
 class function:
+
+    # 初始化一些值和类的参数
     def __init__(self, ui):
         self.ui = ui
 
@@ -160,6 +189,7 @@ class function:
             self.stlFile = file
             print(file)
             self.ui.lineEdit_stlFile.setText(self.stlFile)
+            # self.model 是核心计算文件 Model2SAS 中的 model2sas 类
             self.model = Model2SAS.model2sas(self.stlFile, autoGenPoints=False)
             self.model.stlModelMesh = mesh.Mesh.from_file(self.stlFile)
 
@@ -363,7 +393,13 @@ class function:
             
             # self.model.genSasCurve_Crysol(crysolPath=self.crysolPath, qmax=qmax, lmax=lmax)
         else:
-            self.model.genSasCurve(qmax=qmax, lmax=lmax)
+            qmax = float(self.ui.lineEdit_Qmax.text())
+            lmax = int(self.ui.lineEdit_lmax.text())
+            self.model.lmax = lmax
+
+            self.thread_myImplementToCalcSaxs = Thread_myImplementToCalcSaxs(self.model, qmax, lmax)
+            self.thread_myImplementToCalcSaxs.threadEnd.connect(self.processMyImplementToCalcSaxsThreadOutput)
+            self.thread_myImplementToCalcSaxs.start()
 
         # self.plotSasCurve()
 
@@ -376,6 +412,17 @@ class function:
         self.ui.progressBar.setMaximum(100)
         # button 恢复
         self.ui.pushButton_calcSaxs.setEnabled(True)
+
+    def processMyImplementToCalcSaxsThreadOutput(self, sasCurve_list):
+        self.model.sasCurve = np.array(sasCurve_list)
+        self.plotSasCurve()
+
+        # progress bar 停止滚动
+        self.ui.progressBar.setMinimum(0)
+        self.ui.progressBar.setMaximum(100)
+        # button 恢复
+        self.ui.pushButton_calcSaxs.setEnabled(True)
+
 
     def plotStlModel(self):
         stlPlot = Figure_Canvas()

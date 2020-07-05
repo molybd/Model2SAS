@@ -31,7 +31,7 @@ class model2sas:
         self.pointsInModel = np.array([])                                           # points coordinates inside the model
         self.sasCurve = np.array([])                                                # SAS curve calculated
         self.workingDir = os.getcwd()                                               # cwd
-        self.interval = None                                          
+        self.interval = interval                                          
         
         # process number in paralell computing, default is using 60% CPU maximum
         if procNum == None:
@@ -41,9 +41,9 @@ class model2sas:
         
         if autoGenPoints:
             if self.inputFileType != 'py':
-                self.buildFromFile(interval=interval)
+                self.buildFromFile()
             else:
-                self.buildFromMath(interval=interval)
+                self.buildFromMath()
 
     def __determineModelName(self, modelname, filename):
         if modelname == None:
@@ -88,7 +88,7 @@ class model2sas:
 
     # build points model from file
     # supported file type: .stl, .xyz, .txt(points array from np.savetxt() )
-    def buildFromFile(self, interval=None, modelname=None):
+    def buildFromFile(self, interval=None):
         os.chdir(self.inputFileDir)
         filename = self.inputFileName
         filetype = self.inputFileType # file extension in lower cases
@@ -97,12 +97,13 @@ class model2sas:
             self.stlModelMesh = mesh.Mesh.from_file(filename)
             vectors = self.stlModelMesh.vectors
             xmin, xmax, ymin, ymax, zmin, zmax = np.min(vectors[:,:,0]), np.max(vectors[:,:,0]), np.min(vectors[:,:,1]), np.max(vectors[:,:,1]), np.min(vectors[:,:,2]), np.max(vectors[:,:,2])
-            if interval == None or self.interval == None:
+            if interval != None:
+                self.interval = interval
+            elif self.interval == None:
                 self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
                 if self.interval < 0.5:
                     self.interval = 0.5
-            else:
-                self.interval = interval
+
             self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
 
             # (solved) this must be the slowest process in the whole program ! 
@@ -177,12 +178,12 @@ class model2sas:
             [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
 
             # set interval
-            if interval == None or self.interval == None:
-                self.interval = min(np.abs([xmax-xmin, ymax-ymin, zmax-zmin])) / 20
+            if interval != None:
+                self.interval = interval
+            elif self.interval == None:
+                self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
                 if self.interval < 0.5:
                     self.interval = 0.5
-            else:
-                self.interval = interval
             self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
 
             # convert coordinates
@@ -211,10 +212,12 @@ class model2sas:
             [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
 
             # set interval
-            if interval == None or self.interval == None:
-                self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
-            else:
+            if interval != None:
                 self.interval = interval
+            elif self.interval == None:
+                self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
+                if self.interval < 0.5:
+                    self.interval = 0.5
             self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
 
             # convert coordinates
