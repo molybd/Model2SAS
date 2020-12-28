@@ -29,6 +29,8 @@ from multiprocessing import Process
 
 
 # 通过继承FigureCanvas类，使得该类既是一个PyQt5的Qwidget，又是一个matplotlib的FigureCanvas，这是连接pyqt5与matplotlib的关键！
+# 这样就可以把 matplotlib 画的图嵌入到pyqt的GUI窗口中了
+# 并且可以实现画的三维图可动
 class Figure_Canvas(FigureCanvas):   
     
     def __init__(self, parent=None, width=5, height=5, dpi=100):
@@ -132,6 +134,7 @@ class function:
 
     # 初始化一些值和类的参数
     def __init__(self, ui):
+        self.initUi = ui
         self.ui = ui
 
         ########### stl file ##############
@@ -177,7 +180,30 @@ class function:
         # save SAXS plot
         self.ui.pushButton_saveSaxsPlot.clicked.connect(self.saveSaxsPlot)
 
+        # clear all
+        self.ui.pushBotton_clear.clicked.connect(self.clearAll)
+
         self.needGenSaxsCurve = False
+
+
+    def clearAll(self):
+        self.__init__(self.initUi)
+        self.ui.lineEdit_stlFile.setText('')
+        # graphicsView are not cleared yet
+        # to be realized !!!
+        emptyPlot = Figure_Canvas()
+        #emptyPlotAxes = emptyPlot.fig.add_subplot(111)
+        emptyGraphicscene = QtWidgets.QGraphicsScene()
+        emptyGraphicscene.addWidget(emptyPlot)
+
+        self.ui.graphicsView_stlModel.setScene(emptyGraphicscene)
+        self.ui.graphicsView_stlModel.show()
+
+        self.ui.graphicsView_pointsModel.setScene(emptyGraphicscene)
+        self.ui.graphicsView_pointsModel.show()
+
+        self.ui.graphicsView_saxsPlot.setScene(emptyGraphicscene)
+        self.ui.graphicsView_saxsPlot.show()
 
 
     def browseStlFile(self):
@@ -307,9 +333,13 @@ class function:
         self.ui.lineEdit_interval.setText('{:.2f}'.format(interval))
         self.model.interval = interval
 
+        # 将计算异步进行，避免阻塞主进程
         if self.model.inputFileType == 'stl':
+            # 开一个异步线程
             self.thread_pointsInModel_stl = Thread_PointsInModel_stl(self.model)
+            # 使用 signal&slot 机制，将进程结束的 threadEnd signal 与一个方法绑定，这样主进程就能知道计算结束并做一些处理
             self.thread_pointsInModel_stl.threadEnd.connect(self.processPointsInModelThreadOutput)
+            # 开始计算进程
             self.thread_pointsInModel_stl.start()
         if self.model.inputFileType == 'py':
             paramsDict = self.readParamsTable()
@@ -317,7 +347,9 @@ class function:
             self.thread_pointsInModel_py.threadEnd.connect(self.processPointsInModelThreadOutput)
             self.thread_pointsInModel_py.start()
             
-
+    # process开头的方法都是处理异步计算进程结束后的操作的
+    # 就是异步的计算进程结束后发出一个threadEnd的signal，然后将这个signal和下面这个方法绑定
+    # 这样就可以在计算进程结束后回到主线程进行一些操作
     def processPointsInModelThreadOutput(self, pointsInModel_list):
         self.model.pointsInModel = np.array(pointsInModel_list)
 
@@ -387,8 +419,12 @@ class function:
             lmax = int(self.ui.lineEdit_lmax.text())
             self.model.lmax = lmax
 
+            # 将计算异步进行，避免阻塞主进程
+            # 开一个异步线程
             self.thread_crysol = Thread_Crysol(self.model, qmax, lmax, self.crysolPath)
+            # 使用 signal&slot 机制，将进程结束的 threadEnd signal 与一个方法绑定，这样主进程就能知道计算结束并做一些处理
             self.thread_crysol.threadEnd.connect(self.processCrysolThreadOutput)
+            # 开始计算进程
             self.thread_crysol.start()
             
             # self.model.genSasCurve_Crysol(crysolPath=self.crysolPath, qmax=qmax, lmax=lmax)
@@ -403,6 +439,7 @@ class function:
 
         # self.plotSasCurve()
 
+    # 处理 Thread_Crysol 计算结束后的结果
     def processCrysolThreadOutput(self, sasCurve_list):
         self.model.sasCurve = np.array(sasCurve_list)
         self.plotSasCurve()
@@ -413,6 +450,7 @@ class function:
         # button 恢复
         self.ui.pushButton_calcSaxs.setEnabled(True)
 
+    # 处理 Thread_myImplementToCalcSaxs 计算结束后的结果
     def processMyImplementToCalcSaxsThreadOutput(self, sasCurve_list):
         self.model.sasCurve = np.array(sasCurve_list)
         self.plotSasCurve()
