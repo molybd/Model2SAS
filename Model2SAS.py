@@ -1,489 +1,223 @@
 # -*- coding: UTF-8 -*-
 
+import os
 import numpy as np
 from stl import mesh
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
-from scipy.special import sph_harm, spherical_jn, jv
-import os, sys, time
-from multiprocessing import Pool, cpu_count
-import inspect
+from shutil import copyfile
 
-# attention: in this program, spherical coordinates are (r, theta, phi) |theta: 0~pi ; phi: 0~2pi
-#
-# unsolved problem:
-# Q1. SAS curve is wrong when there are points coordinates less than zero
-#     have add some solution, but don't know the reason behind
-# A1. the problem should result from the func xyz2sph, where the range of arctan is not 2pi, is [-pi/2, pi/2]
-#     solution: use np.arctan2() method instead of np.arctan()
+from ModelSection import stlmodel
+from Functions import intensity, xyz2sph
+
 
 class model2sas:
-    'class to read 3D model from file and generate PDB file and SAS curve'
+    ''' A project that contain model and calculation
 
-    def __init__(self, filename, interval=None, procNum=None, modelName=None, autoGenPoints=True, *args, **kwargs):
-        self.file_abspath = os.path.abspath(filename).replace('\\', '/')             # first convert to abs path
-        self.inputFileDir = os.path.dirname(self.file_abspath).replace('\\', '/')    # only file name, without dir info
-        self.inputFileName = os.path.basename(self.file_abspath)                    # only absolute dir of the file
-        self.inputFileType = self.inputFileName.split('.')[-1].lower()              # file type extension, e.g. stl, py etc.
-        self.modelname = self.__determineModelName(modelName, self.inputFileName)   # determine model name, without extention
-        self.stlModelMesh = None                                                    # initial mesh of stl file
-        self.meshgrid = np.array([])                                                # the initial meshgrid
-        self.pointsInModel = np.array([])                                           # points coordinates inside the model
-        self.sasCurve = np.array([])                                                # SAS curve calculated
-        self.workingDir = os.getcwd()                                               # cwd
-        self.interval = interval                                          
-        
-        # process number in paralell computing, default is using 60% CPU maximum
-        if procNum == None:
-            self.procNum = min(round(0.6*cpu_count()), cpu_count()-1)
+    Attributes:
+    model: model object
+    data: data object
+    '''
+
+    def __init__(self, dir):
+        ''' 创建project文件夹dir，并且把工作目录设在此文件夹下
+        这样后面就可以都使用相对位置
+        '''
+        self.dir = os.path.abspath(dir)
+        try:
+            os.mkdir(dir)
+        except FileExistsError:
+            print('dir already exists')
+        finally:
+            os.chdir(dir)
+            print('project dir: {}'.format(dir))
+
+    def genModel(self, modelname=None):
+        self.model = model(modelname)
+
+    def genData(self):
+        self.data = data(self.model.points_with_sld)
+
+    def importFile(self, filepath, sld):
+        basename = os.path.basename(filepath)
+        destination_path = os.path.join(self.dir, basename)
+        try:
+            copyfile(filepath, destination_path)
+        except SameFileError as e:
+            print(str(e))
+
+        filetype = filepath.split('.')[-1].lower()
+        if filetype == 'stl':
+            self.model.importStlFile(filepath, sld)
+        elif filetype == 'py':
+            pass
+
+
+
+class model:
+    ''' a 3d model
+    A points model from stl file (.stl) or math description (.py) or saved numpy txt (.txt) file
+
+    Attributes:
+
+    Methods:
+
+    '''
+
+    def __init__(self, modelname=None):
+        # filename is a relative path
+        self.modelname = modelname    # 如果是None，等到后面有文件输入后以文件名做modelname
+        self.stlmodel_list = []
+
+    def importStlFile(self, filepath, sld):
+        filepath = os.path.abspath(filepath)
+        sld = float(sld)
+        this_stl_model = stlmodel(filepath, sld)
+        self.stlmodel_list.append(this_stl_model)
+
+    def genPoints(self, interval=None, grid_num=10000):
+        '''Generate points model from configured several models
+        In case of translating or rotating model sections, importing file part
+        and generating points model parts are separated.
+        So please configure your model before this step!
+        '''
+        # determine the overall boundary first
+        stlmodel_list = self.stlmodel_list
+        min_boundary_points_list, max_boundary_points_list = [], []
+        for stlmodel in stlmodel_list:
+            min_point, max_point = stlmodel.getBoundaryPoints()
+            min_boundary_points_list.append(min_point)
+            max_boundary_points_list.append(max_point)
+        min_boundary_points = np.vstack(min_boundary_points_list)
+        max_boundary_points = np.vstack(max_boundary_points_list)
+        boundary_min = np.min(min_boundary_points, axis=0)
+        boundary_max = np.max(max_boundary_points, axis=0)
+
+        # determine interval
+        if interval:
+            interval = interval
         else:
-            self.procNum = procNum
+            scale = boundary_max - boundary_min
+            # grid_num defauld is 10000
+            interval = (scale[0]*scale[1]*scale[2] / grid_num)**(1/3)
+
+        # generate grid
+        grid = self._genGrid(boundary_min, boundary_max, interval)   # shape == (n, 3)
         
-        if autoGenPoints:
-            if self.inputFileType != 'py':
-                self.buildFromFile()
-            else:
-                self.buildFromMath()
+        # calculate in model index for each stlmodel
+        for stlmodel in stlmodel_list:
+            stlmodel.importGrid(grid)
+            stlmodel.calcInModelGridIndex()
 
-    def __determineModelName(self, modelname, filename):
-        if modelname == None:
-            modelname = '.'.join(filename.split('.')[:-1])
-        else:
-            modelname = modelname
-        return modelname
+        # combine all the stl model
+        # !! ATTENTION !!
+        # I choose to use the higher sld value for the overlapped point
+        sld_grid_index_list = []
+        for stlmodel in stlmodel_list:
+            sld_grid_index_list.append(stlmodel.sld_grid_index)
+        sld_grid_index_stack = np.vstack(sld_grid_index_list)
+        sld_grid_index = np.max(sld_grid_index_stack, axis=0)
 
-    def generateMeshgrid(self, xmin, xmax, ymin, ymax, zmin, zmax):
-        xscale = np.linspace(xmin, xmax, num=int((xmax-xmin)/self.interval+1))
-        yscale = np.linspace(ymin, ymax, num=int((ymax-ymin)/self.interval+1))
-        zscale = np.linspace(zmin, zmax, num=int((zmax-zmin)/self.interval+1))
+        points = grid[np.where(sld_grid_index!=0)]
+        slds = sld_grid_index[np.where(sld_grid_index!=0)]
+        slds = slds.reshape((slds.size,1))
+        points_with_sld = np.hstack((points, slds))
+
+
+        self.grid = grid
+        self.interval = interval
+        self.sld_grid_index = sld_grid_index
+        self.stlmodel_list = stlmodel_list
+        self.points = points
+        self.points_with_sld = points_with_sld # shape==(n, 4) 前三列是坐标，最后一列是相应的sld
+
+    def importMathFile(self):
+        pass
+
+    def _genGrid(self, boundary_min, boundary_max, interval):
+        '''Generate grid points
+        boundary_min = np.array([xmin, ymin, zmin])
+        boundary_max = np.array([xmax, ymax, zmax])
+        '''
+        xmin, ymin, zmin = boundary_min[0], boundary_min[1], boundary_min[2]
+        xmax, ymax, zmax = boundary_max[0], boundary_max[1], boundary_max[2]
+        xscale = np.linspace(xmin, xmax, num=int((xmax-xmin)/interval+1))
+        yscale = np.linspace(ymin, ymax, num=int((ymax-ymin)/interval+1))
+        zscale = np.linspace(zmin, zmax, num=int((zmax-zmin)/interval+1))
         x, y, z = np.meshgrid(xscale, yscale, zscale)
         x, y, z = x.reshape(x.size,1), y.reshape(y.size,1), z.reshape(z.size,1)
-        self.meshgrid = np.hstack((x, y, z))
-        return self.meshgrid
+        grid = np.hstack((x, y, z))
+        return grid   # shape == (n, 3)
 
-    # new method, about 1000 times faster than old one...
-    # make full use of numpy
-    # calculate all the points intersect with 1 reiangle using multi-D array
-    def isIntersect(self, origins, ray, triangle):
-        O = origins
-        D = ray
-        V0 = triangle[0]
-        V1 = triangle[1]
-        V2 = triangle[2]
-        E1 = V1 - V0
-        E2 = V2 - V0
-        T = O - V0
-        P = np.cross(D, E2)
-        Q = np.cross(T, E1)
-        det = np.dot(P, E1)
-        if abs(det) >= np.finfo(np.float32).eps: #因为三角形里使用的是float32，所以在float32下判断是否等于0
-            tuv = (1/det) * np.vstack((np.dot(Q,E2), np.dot(T,P), np.dot(Q,D))).T
-            ispositive = np.sign(tuv) + 1  #大于等于零的数会变成正数（1或2），小于零的数会变成 0，结果和原数组形状完全相同，一一对应
-            isallpositive =  ispositive[:,0]*ispositive[:,1]*ispositive[:,2] #只要tuv三个中有一个数小于零那么这一行结果就是0
-            uplusv = -1*np.sign(tuv[:,1] + tuv[:,2] - 1) + 1 #判断u+v是否小于1，小于1的那一行变成正数，大于1的那一行结果是0
-            return np.sign(isallpositive * uplusv) #最终输出的结果是对应着输入每一个点的一维数组，如果与三角形有交集那么该点对应的值为1，否则为0
+
+class data:
+
+    def __init__(self, points_with_sld):
+        self.points_with_sld = points_with_sld
+        self.points = points_with_sld[:,:3]
+        self.slds = points_with_sld[:,-1]
+
+    def genQ(self, qmin, qmax, qnum=200, logq=False):
+        if logq:
+            q = np.logspace(np.log10(qmin), np.log10(qmax), num=qnum, base=10, dtype='float32')
         else:
-            return np.zeros(origins.shape[0])
-        
+            q = np.linspace(qmin, qmax, num=qnum, dtype='float32')
+        return q
 
-    # build points model from file
-    # supported file type: .stl, .xyz, .txt(points array from np.savetxt() )
-    def buildFromFile(self, interval=None):
-        os.chdir(self.inputFileDir)
-        filename = self.inputFileName
-        filetype = self.inputFileType # file extension in lower cases
-        
-        if filetype == 'stl':
-            self.stlModelMesh = mesh.Mesh.from_file(filename)
-            vectors = self.stlModelMesh.vectors
-            xmin, xmax, ymin, ymax, zmin, zmax = np.min(vectors[:,:,0]), np.max(vectors[:,:,0]), np.min(vectors[:,:,1]), np.max(vectors[:,:,1]), np.min(vectors[:,:,2]), np.max(vectors[:,:,2])
-            if interval != None:
-                self.interval = interval
-            elif self.interval == None:
-                self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
-                if self.interval < 0.5:
-                    self.interval = 0.5
+    def calcSas(self, q, lmax=50):
+        points = self.points
+        slds = self.slds
+        I = intensity(q, points, slds, lmax)
 
-            self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
-
-            # (solved) this must be the slowest process in the whole program ! 
-            # (solved) must be a way to accelerate, still working on it...
-            # (solved) no need to use multiprocessing
-            # 
-            # accelerated * 1
-            # about 1000 times faster
-            ray = np.random.rand(3) + 0.01     # in case that all coordinates are 0, which is almost impossible
-            intersect_count = np.zeros(self.meshgrid.shape[0])  # same number as the points in initial meshgrid
-            # For each triangle in model mesh, determine that every points
-            # in initial meshgrid intersect with this triangle or not.
-            for triangle in vectors:
-                intersect_count += self.isIntersect(self.meshgrid, ray, triangle)
-            indexInOrOut = intersect_count % 2   # index to judge a point is in or out of the model, 1 is in, 0 is out
-
-            pointsInModelList = []
-            for i in range(len(indexInOrOut)):
-                if indexInOrOut[i] > 0:
-                    pointsInModelList.append(self.meshgrid[i])
-
-            self.pointsInModel = np.array(pointsInModelList)  # shape = (points number, 3)
-
-        # not fully supported
-        elif filetype == 'xyz':
-            lst = []
-            with open(filename, 'r') as f:
-                for line in f.readlines():
-                    if line[0] != '#':
-                        point = [float(i) for i in line.split()[1:4]]
-                        lst.append(point)
-            self.pointsInModel = np.array(lst)
-            self.interval = interval
-        
-        # not fully supported
-        elif filetype == 'txt':
-            self.pointsInModel = np.loadtxt(filename)
-            self.interval = interval
-        
-        os.chdir(self.workingDir)
-        return self.pointsInModel
+        self.q = q
+        self.I = I
+        self.lmax = lmax
 
 
-    # to generate a 3D model from a mathematical description
-    # math description is in seperated file module.py
-    # function in module.py return True or False if a point is in the model
-    # boundaryList is [xmin, xmax, ymin, ymax, zmin, zmax]
-    # coord is 'xyz' 
-    # or 'sph'(r, theta, phi)|theta: 0~pi ; phi: 0~2pi
-    # or 'cyl'(rho, phi, z)
-    def buildFromMath(self, interval=None, useDefault=True, **kwargs):
-        os.chdir(self.inputFileDir)
+##### 测试使用 #####
+def plotPoints(points):
+    fig = plt.figure()
+    axes = mplot3d.Axes3D(fig)
 
-        sys.path.append(self.inputFileDir)   # add dir to sys.path, then we can directly import the py file
-        modelModule = '.'.join(self.inputFileName.split('.')[:-1])
-        mathModel = __import__(modelModule)
+    axes.scatter(points[:,0], points[:,1], points[:,2], color='k')
+    # Show the plot to the screen
+    plt.show()
 
-        # read function arguments
-        # inspect.getargspec() is deprecated since Python 3.0
-        # args = inspect.getargspec(mathModel.model) 
-        sig = inspect.signature(mathModel.model)
-        params = sig.parameters
+def plotSection(stlmodel_list):
+    fig = plt.figure()
+    axes = mplot3d.Axes3D(fig)
 
-        # read coordinates from math model file
-        coord = params['coord'].default
-
-        # means use default value in model file
-        if useDefault:
-            
-            # read boundaryList from math model file
-            boundaryList = params['boundary_xyz'].default
-            [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
-
-            # set interval
-            if interval != None:
-                self.interval = interval
-            elif self.interval == None:
-                self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
-                if self.interval < 0.5:
-                    self.interval = 0.5
-            self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
-
-            # convert coordinates
-            if coord == 'xyz':
-                points = self.meshgrid
-            elif coord == 'sph':
-                points = self.xyz2sph(self.meshgrid)
-            elif coord == 'cyl':
-                points = self.xyz2cyl(self.meshgrid)
-
-            pointsInModelList = []
-            inModelIndex = mathModel.model(points)
-            for i in range(len(inModelIndex)):
-                if inModelIndex[i] > 0:
-                    pointsInModelList.append(self.meshgrid[i,:])
-            self.pointsInModel = np.array(pointsInModelList)
-
-        else:
-            
-            if 'boundary_xyz' in kwargs.keys():
-                # read boundaryList from custom input
-                boundaryList = kwargs['boundary_xyz']
-            else:
-                # read boundaryList from math model file
-                boundaryList = params['boundary_xyz'].default
-            [xmin, xmax, ymin, ymax, zmin, zmax] = boundaryList
-
-            # set interval
-            if interval != None:
-                self.interval = interval
-            elif self.interval == None:
-                self.interval = min([xmax-xmin, ymax-ymin, zmax-zmin]) / 20
-                if self.interval < 0.5:
-                    self.interval = 0.5
-            self.generateMeshgrid(xmin, xmax, ymin, ymax, zmin, zmax)
-
-            # convert coordinates
-            if coord == 'xyz':
-                points = self.meshgrid
-            elif coord == 'sph':
-                points = self.xyz2sph(self.meshgrid)
-            elif coord == 'cyl':
-                points = self.xyz2cyl(self.meshgrid)
-
-            # generate custom args string
-            arg_string_list = []
-            for item in kwargs.items():
-                arg_string_list.append('{}={}'.format(item[0], item[1]))
-            arg_string = ','.join(arg_string_list)
-
-            pointsInModelList = []
-
-            # 这里是 exec() 使用的的一个坑，要弄清楚变量命名空间以及exec()作用方式等问题
-            g, l = globals().copy(), locals().copy()
-            exec(
-                'inModelIndex = mathModel.model(points, {})'.format(arg_string),
-                g,
-                l
-            )
-            inModelIndex = l['inModelIndex']
-            for i in range(len(inModelIndex)):
-                if inModelIndex[i] > 0:
-                    pointsInModelList.append(self.meshgrid[i,:])
-            self.pointsInModel = np.array(pointsInModelList)
+    for stlmodel in stlmodel_list:
+        axes.scatter(stlmodel.points[:,0], stlmodel.points[:,1], stlmodel.points[:,2])
+    # Show the plot to the screen
+    plt.show()
+################
 
 
-        os.chdir(self.workingDir)
-        return self.pointsInModel
-
-
-    # save points in model in a file
-    # you must provide at least file type or filename
-    # otherwise by default it will save a pdb file
-    def savePointsInModel(self, filetype='pdb', filename=None):
-        os.chdir(self.inputFileDir)
-
-        if filename == None:
-            filename = '{}_interval={}.{}'.format(
-                self.modelname,
-                str(int(round(self.interval))), # 避免出现小数点
-                filetype
-            )
-            # if no filename is assigned, output file will be saved in the same dir as input file
-            filename = os.path.join(self.inputFileDir, filename)
-        else:
-            filetype = filename.split('.')[-1]
-
-        if filetype == 'txt':
-            np.savetxt(filename, self.pointsInModel)
-        elif filetype == 'pdb':
-            self.savePDBFile(filename=filename)
-        elif filetype == 'xyz':
-            self.saveXYZFile(filename=filename)
-        
-        os.chdir(self.workingDir)
-
-    def saveXYZFile(self, filename='', head='created by program Model2SAS', atom='CA'):
-        if filename == '':
-            filename = self.modelname + '.xyz'
-        with open(filename, 'w') as f:
-            s = '#' + head + '\n'
-            for point in self.pointsInModel:
-                s += '{}\t{}\t{}\t{}\n'.format(atom, point[0], point[1], point[2])
-            f.write(s)
-
-    def savePDBFile(self, filename=None, atom='CA', occupancy=1.0, tempFactor=20.0):
-        if filename == None:
-            filename = self.modelname + '.pdb'
-        self.PDBfilename = os.path.basename(filename)
-        with open(filename, 'w') as f:
-            s = 'REMARK 265 EXPERIMENT TYPE: THEORETICAL MODELLING\n'
-            for i in range(len(self.pointsInModel)):
-                x = '{:.2f}'.format(self.pointsInModel[i, 0])
-                y = '{:.2f}'.format(self.pointsInModel[i, 1])
-                z = '{:.2f}'.format(self.pointsInModel[i, 2])
-                s += 'ATOM  {:5d} {:<4} ASP A{:4d}    {:>8}{:>8}{:>8}{:>6}{:>6} 0 2 201\n'.format(int(i), atom, i%10, x, y, z, str(occupancy), str(tempFactor))
-            f.write(s)
-
-    def plotSTLMeshModel(self, plot=True):
-        # Create a new plot
-        fig = plt.figure()
-        axes = mplot3d.Axes3D(fig)
-
-        # Load the STL files and add the vectors to the plot
-        axes.add_collection3d(mplot3d.art3d.Poly3DCollection(self.stlModelMesh.vectors))
+if __name__ == "__main__":
+    model = model()
+    model.importStlFile('models\\shell_12_large_hole.STL', 1)
+    #model.importStlFile('models\\torus.STL', 2)
+    #model.importStlFile('models\\torus.STL', 4)
+    # 平移与旋转模型
+    #model.stlmodel_list[1].mesh.translate([30,10,10])
+    #model.stlmodel_list[1].mesh.rotate([1,0,0], theta=np.pi/2, point=[0,0,0])
     
-        # Auto scale to the mesh size
-        scale = self.stlModelMesh.points.flatten()
-        axes.auto_scale_xyz(scale, scale, scale)
+    model.genPoints()
 
-        # Show the plot to the screen
-        if plot:
-            plt.show()
-        return fig
+    
+    #plotSection(model.stlmodel_list)
 
-    def plotPointsInModel(self, plot=True):
-        # Create a new plot
-        fig = plt.figure()
-        axes = mplot3d.Axes3D(fig)
+    #plotPoints(model.points)
 
-        axes.scatter(self.pointsInModel[:,0], self.pointsInModel[:,1], self.pointsInModel[:,2], color='k')
-        # Show the plot to the screen
-        if plot:
-            plt.show()
-        return fig
+    model_data = data(model.points_with_sld)
+    q = model_data.genQ(0.001, 1)
+    model_data.calcSas(q, lmax=50)
 
-    def genSasCurve_Crysol(self, qmax=1, qNum=256, lmax=50, crysolPath=None):
-        self.lmax = lmax
-        self.savePointsInModel(filetype='pdb')
-        os.chdir(self.inputFileDir)
-        # first delete all files genetated by crysol before
-        checkFilename = self.PDBfilename[:-4]
-        filelist = list(os.listdir(self.inputFileDir))
-        for i in range(len(filelist)):
-            if checkFilename in filelist[i] and filelist[i].split('.')[-1] in ['abs', 'alm', 'int', 'log']:
-                os.remove(
-                    os.path.join(self.inputFileDir, filelist[i])
-                )
+    np.savetxt('test.dat', np.vstack((q, model_data.I)).T)
 
-        if crysolPath == None:
-            os.system('crysol {} -lm {} -fb 18 -sm {} -ns {} -un 1'.format(self.PDBfilename, lmax, qmax, qNum))
-        else:
-            os.system('\"{}\" {} -lm {} -fb 18 -sm {} -ns {} -un 1'.format(crysolPath, self.PDBfilename, lmax, qmax, qNum))
-        intfile = self.PDBfilename[:-4] + '00.int'
-        os.chdir(self.inputFileDir) # 在GUI的多进程中执行crysol后工作路径会变化，所以需要再次改变工作路径
-        crysolOutput = np.loadtxt(intfile, skiprows=1)
-        self.sasCurve = crysolOutput[:, :2]
-        os.chdir(self.workingDir)
-        return self.sasCurve
+    plt.plot(q, model_data.I)
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.show()
 
-    # transfer points coordinates from cartesian coordinate to cylindrical coordinate
-    # points_xyz must be array([[x0,y0,z0], [x1,y1,z1], [x1,y1,z1], ...])
-    # returned points_sph is array([[r0, phi0, z0], [r1, phi1, z1], [r2, phi2, z2], ...])
-    def xyz2cyl(self, points_xyz):
-        r = np.linalg.norm(points_xyz[:,:2], axis=1)
-        phi = np.arctan2(points_xyz[:,1], points_xyz[:,0])
-        z = points_xyz[:,2]
-        points_cyl = np.vstack((r, phi, z)).T
-        return points_cyl
-
-    # transfer points coordinates from cartesian coordinate to spherical coordinate
-    # points_xyz must be array([[x0,y0,z0], [x1,y1,z1], [x1,y1,z1], ...])
-    # returned points_sph is array([[r0, theta0, phi0], [r1, theta1, phi1], [r1, theta1, phi1], ...])
-    def xyz2sph(self, points_xyz):
-        epsilon=1e-100
-        r = np.linalg.norm(points_xyz, axis=1)
-        theta = np.arccos(points_xyz[:,2] / (r+epsilon))
-        phi = np.arctan2(points_xyz[:,1], points_xyz[:,0]) # range [-pi, pi]
-        phi = phi + np.sign((np.sign(-1*phi) + 1))*2*np.pi # convert range to [0, 2pi]
-        points_sph = np.vstack((r, theta, phi)).T
-        return points_sph  # theta: 0~pi ; phi: 0~2pi
-
-    def sph2xyz(self, points_sph):
-        r, theta, phi = points_sph[:,0], points_sph[:,1], points_sph[:,2]
-        x = r * np.sin(theta) * np.cos(phi)
-        y = r * np.sin(theta) * np.sin(phi)
-        z = r * np.cos(theta)
-        points_xyz = np.vstack((x, y, z)).T
-        return points_xyz
-
-
-    # unit sphere form factor actually results in wrong outcomes
-    # so I delete it ...
-    #
-    # new method using matrix calculation to accelerate
-    # it actually only becomes a little bit faster (about 10%)... 
-    #
-    def Alm(self, args):
-        q, points_sph, l, m = args
-        A = 0
-        # p_sph: array[r, theta, phi]; theta: 0~pi, phi: 0~2pi
-        r, theta, phi = points_sph[:, 0], points_sph[:, 1], points_sph[:, 2] # theta: 0~pi ; phi: 0~2pi
-        q = q.reshape(q.shape[0], 1)
-        r = r.reshape(1, r.shape[0])
-        A = spherical_jn(l, q*r) * sph_harm(m, l, phi, theta)
-        A = A.sum(axis=1)
-        return 4 * np.pi * complex(0,1)**l * A
-
-    # used in func genSasCurve()
-    # points in spherical coordinates
-    def Iq(self, q, points_sph, lmax):
-        def gen_args(lmax):
-            for l in range(lmax+1):
-                for m in range(-l, l+1):
-                    yield (q, points_sph, l, m)
-        # use mult-processing to accelarate
-        # use map_async() instead of apply_async()
-        pool = Pool(self.procNum)
-        result = pool.map_async(self.Alm, gen_args(lmax))
-        pool.close()
-        pool.join()
-        I = abs(np.array(result.get()))**2
-        I = I.sum(axis=0)
-        return I
-
-    def genSasCurve(self, qmin=0.001, qmax=1, qnum=200, lmax=50):
-        self.lmax = lmax
-        points_sph = self.xyz2sph(self.pointsInModel)
-        q = np.linspace(qmin, qmax, num=qnum)
-        I = self.Iq(q, points_sph, lmax)
-        self.sasCurve = np.vstack((q, I)).T
-        return self.sasCurve
-
-    def saveSasCurve(self, folder=None, filename=None):
-        if folder == None:
-            os.chdir(self.inputFileDir)
-        else:
-            os.chdir(folder)
-        if filename == None:
-            filename = self.modelname + '_saxs.dat'
-        
-        header = 'theoretical SAXS curve of {} model\ninterval between points = {}\nl_max in spherical harmonics = {}\nmodel generated by program Model2SAS\n'.format(self.modelname, self.interval, self.lmax)
-        header += '\nq\tI'
-        np.savetxt(filename, self.sasCurve, header=header)
-        os.chdir(self.workingDir)
-
-    def plotSasCurve(self, show=True, save=False, figsize=None, dpi=None, figname=None):
-        q = self.sasCurve[:, 0]
-        I = self.sasCurve[:, 1]
-
-        if save:
-            fig = plt.figure(figsize=figsize, dpi=dpi, facecolor='white')
-        else:
-            fig = plt.figure()
-        ax1 = fig.add_subplot(111)
-
-        ax1.plot(q, I, '-', label=self.modelname)
-
-        ax1.set_xscale('log')
-        ax1.set_yscale('log')
-
-        ax1.set_xlabel(r'Q $(\AA^{-1})$', fontsize=13)
-        ax1.set_ylabel(r'Intensity (a.u.)', fontsize=13)
-
-        ax1.legend(fontsize=11, frameon=False)
-
-        if show:
-            plt.show()
-        if save:
-            cwd = os.getcwd()
-            os.chdir(self.inputFileDir)
-            fig.savefig(figname)
-            os.chdir(cwd)
-
-        return fig
-
-if __name__ == '__main__':
-
-    modelType = 'math'
-
-    if modelType == 'stlfile':
-        model = model2sas('mdoels/sphere_phi100.STL') # this will generate points model automatically
-        #model.plotPointsInModel()
-        model.savePointsInModel(filetype='pdb')
-        model.genSasCurve_Crysol()
-        model.plotSasCurve()
-    elif modelType == 'math':
-        model = model2sas('models\\porous_shell.py', autoGenPoints=False)
-        model.buildFromMath(interval=2, useDefault=True)
-        model.plotPointsInModel()
-        #model.genSasCurve_Crysol()
-        #model.plotSasCurve()
-        
