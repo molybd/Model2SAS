@@ -128,6 +128,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+###### 以下是本项目的特殊需求 ######
+
 # generated pictures
 *.svg
 *.png
@@ -142,3 +144,12 @@ CrysolPath.txt
 
 # discarded design
 discarded design/
+
+# vscode configurations
+.vscode/
+
+# models
+models/
+
+# documents
+doc/

@@ -7,8 +7,9 @@ from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 from shutil import copyfile
 
-from ModelSection import stlmodel
-from Functions import intensity, xyz2sph
+from ModelSection import stlmodel, mathmodel
+from Functions import intensity, xyz2sph, intensity_parallel
+from Plot import *
 
 
 class model2sas:
@@ -19,38 +20,47 @@ class model2sas:
     data: data object
     '''
 
-    def __init__(self, dir):
-        ''' 创建project文件夹dir，并且把工作目录设在此文件夹下
-        这样后面就可以都使用相对位置
+    def __init__(self, name, dir):
+        ''' Make project folder: dir/name
         '''
-        self.dir = os.path.abspath(dir)
+        path = os.path.abspath(os.path.join(dir, name))
         try:
-            os.mkdir(dir)
+            os.mkdir(path)
         except FileExistsError:
-            print('dir already exists')
+            print('path already exists')
         finally:
-            os.chdir(dir)
-            print('project dir: {}'.format(dir))
+            print('project dir: {}'.format(path))
+        self.path = path
+        self.name = name
 
-    def genModel(self, modelname=None):
-        self.model = model(modelname)
+    def setupModel(self):
+        self.model = model(self.name)
 
-    def genData(self):
-        self.data = data(self.model.points_with_sld)
-
-    def importFile(self, filepath, sld):
+    def importFile(self, filepath, sld=1):
+        filepath = os.path.abspath(filepath)
         basename = os.path.basename(filepath)
-        destination_path = os.path.join(self.dir, basename)
+        destination_path = os.path.join(self.path, basename)
         try:
             copyfile(filepath, destination_path)
-        except SameFileError as e:
-            print(str(e))
+        except:
+            print('file already exists, using existed model file')
 
         filetype = filepath.split('.')[-1].lower()
         if filetype == 'stl':
             self.model.importStlFile(filepath, sld)
         elif filetype == 'py':
-            pass
+            self.model.importMathFile(filepath)
+
+    def genPoints(self):
+        self.model.genPoints()
+
+    def setupData(self):
+        self.data = data(self.model.points_with_sld)
+
+    def calcSas(self, qmin, qmax, qnum=200, logq=False, lmax=50, parallel=True, cpu_usage=0.6):
+        q = self.data.genQ(qmin, qmax, qnum=qnum, logq=logq)
+        self.data.calcSas(q, lmax=lmax, parallel=True, cpu_usage=0.6)
+
 
 
 
@@ -66,26 +76,41 @@ class model:
 
     def __init__(self, modelname=None):
         # filename is a relative path
-        self.modelname = modelname    # 如果是None，等到后面有文件输入后以文件名做modelname
+        self.modelname = modelname
         self.stlmodel_list = []
+        self.mathmodel_list = []
 
     def importStlFile(self, filepath, sld):
         filepath = os.path.abspath(filepath)
         sld = float(sld)
-        this_stl_model = stlmodel(filepath, sld)
-        self.stlmodel_list.append(this_stl_model)
+        this_stlmodel = stlmodel(filepath, sld)
+        self.stlmodel_list.append(this_stlmodel)
+    
+    def importMathFile(self, filepath):
+        filepath = os.path.abspath(filepath)
+        this_mathmodel = mathmodel(filepath)
+        self.mathmodel_list.append(this_mathmodel)
+
 
     def genPoints(self, interval=None, grid_num=10000):
         '''Generate points model from configured several models
         In case of translating or rotating model sections, importing file part
         and generating points model parts are separated.
         So please configure your model before this step!
+
+        Also, stl model and math model can be used in the same project.
+        So in this method, points are generated for all the model section.
         '''
         # determine the overall boundary first
         stlmodel_list = self.stlmodel_list
+        mathmodel_list = self.mathmodel_list
         min_boundary_points_list, max_boundary_points_list = [], []
         for stlmodel in stlmodel_list:
             min_point, max_point = stlmodel.getBoundaryPoints()
+            min_boundary_points_list.append(min_point)
+            max_boundary_points_list.append(max_point)
+        for mathmodel in mathmodel_list:
+            min_point, max_point = mathmodel.getBoundaryPoints()
             min_boundary_points_list.append(min_point)
             max_boundary_points_list.append(max_point)
         min_boundary_points = np.vstack(min_boundary_points_list)
@@ -104,17 +129,22 @@ class model:
         # generate grid
         grid = self._genGrid(boundary_min, boundary_max, interval)   # shape == (n, 3)
         
-        # calculate in model index for each stlmodel
+        # calculate in model index for each stlmodel and mathmodel
         for stlmodel in stlmodel_list:
             stlmodel.importGrid(grid)
             stlmodel.calcInModelGridIndex()
+        for mathmodel in mathmodel_list:
+            mathmodel.importGrid(grid)
+            mathmodel.calcInModelGridIndex()
 
-        # combine all the stl model
+        # combine all the model sections
         # !! ATTENTION !!
         # I choose to use the higher sld value for the overlapped point
         sld_grid_index_list = []
         for stlmodel in stlmodel_list:
             sld_grid_index_list.append(stlmodel.sld_grid_index)
+        for mathmodel in mathmodel_list:
+            sld_grid_index_list.append(mathmodel.sld_grid_index)
         sld_grid_index_stack = np.vstack(sld_grid_index_list)
         sld_grid_index = np.max(sld_grid_index_stack, axis=0)
 
@@ -123,16 +153,12 @@ class model:
         slds = slds.reshape((slds.size,1))
         points_with_sld = np.hstack((points, slds))
 
-
         self.grid = grid
         self.interval = interval
         self.sld_grid_index = sld_grid_index
         self.stlmodel_list = stlmodel_list
         self.points = points
         self.points_with_sld = points_with_sld # shape==(n, 4) 前三列是坐标，最后一列是相应的sld
-
-    def importMathFile(self):
-        pass
 
     def _genGrid(self, boundary_min, boundary_max, interval):
         '''Generate grid points
@@ -164,13 +190,17 @@ class data:
             q = np.linspace(qmin, qmax, num=qnum, dtype='float32')
         return q
 
-    def calcSas(self, q, lmax=50):
+    def calcSas(self, q, lmax=50, parallel=True, cpu_usage=0.6):
         points = self.points
         slds = self.slds
-        I = intensity(q, points, slds, lmax)
+        if parallel:
+            I = intensity_parallel(q, points, slds, lmax, cpu_usage=cpu_usage)
+        else:
+            I = intensity(q, points, slds, lmax)
 
         self.q = q
         self.I = I
+        self.error = 0.001 * I   # 默认生成千分之一的误差，主要用于写文件的占位
         self.lmax = lmax
 
 
@@ -195,29 +225,21 @@ def plotSection(stlmodel_list):
 
 
 if __name__ == "__main__":
-    model = model()
-    model.importStlFile('models\\shell_12_large_hole.STL', 1)
-    #model.importStlFile('models\\torus.STL', 2)
-    #model.importStlFile('models\\torus.STL', 4)
-    # 平移与旋转模型
-    #model.stlmodel_list[1].mesh.translate([30,10,10])
-    #model.stlmodel_list[1].mesh.rotate([1,0,0], theta=np.pi/2, point=[0,0,0])
+    test = model2sas('test', 'D:\Research\My_program\Model2SAS\models')
+    test.setupModel()
+    test.importFile('models\\torus.STL', sld=1)
+    test.importFile('D:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
+    test.importFile('models\\new_hollow_sphere_model.py', sld=15)
+    plotStlMeshes([stlmodel.mesh for stlmodel in test.model.stlmodel_list],label_list=[stlmodel.name for stlmodel in test.model.stlmodel_list])
     
-    model.genPoints()
-
-    
-    #plotSection(model.stlmodel_list)
-
-    #plotPoints(model.points)
-
-    model_data = data(model.points_with_sld)
-    q = model_data.genQ(0.001, 1)
-    model_data.calcSas(q, lmax=50)
-
-    np.savetxt('test.dat', np.vstack((q, model_data.I)).T)
-
-    plt.plot(q, model_data.I)
+    test.genPoints()
+    plotPointsWithSld(test.model.points_with_sld, figure=plt.figure())
+    '''
+    plotSection(test.model.stlmodel_list+test.model.mathmodel_list)
+    test.setupData()
+    test.calcSas(0.01, 1)
+    plt.plot(test.data.q, test.data.I)
     plt.xscale('log')
     plt.yscale('log')
     plt.show()
-
+    '''

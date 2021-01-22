@@ -2,9 +2,16 @@
 
 import numpy as np
 from scipy.special import sph_harm, spherical_jn, jv
+from multiprocessing import Pool, cpu_count
 
 
 def intensity(q, points, f, lmax):
+
+    # test
+    print(q)
+    #########
+
+
     q = q.astype('float32')
     q = q.reshape(q.size)  # (q,)
     points_sph = xyz2sph(points)
@@ -73,9 +80,21 @@ def intensity(q, points, f, lmax):
     il_ext5 = np.array([il_ext4_i*np.ones_like(q) for il_ext4_i in il_ext4], dtype='complex64')  # (m, q)
 
     Alm = il_ext5 * Sigma1  # (m, q)
-    Iq = 16 * np.pi**2 * np.sum(np.absolute(Alm)**2, axis=0)  # (q,)
+    I = 16 * np.pi**2 * np.sum(np.absolute(Alm)**2, axis=0)  # (q,)
 
-    return Iq
+    return I
+
+
+def intensity_parallel(q, points, f, lmax, cpu_usage=0.6):
+    def gen_args(q, points=points, f=f, lmax=lmax):
+        for qi in q:
+            yield np.array([qi]), points, f, lmax
+    proc_num = round(cpu_usage*cpu_count())
+    with Pool(proc_num) as pool:
+        result = pool.starmap(intensity, gen_args(q))
+    I = np.array(result, dtype='float32')
+    I = I.reshape(I.size)
+    return I
 
 
 
@@ -100,29 +119,65 @@ def xyz2sph(points_xyz):
     points_sph = np.vstack((r, theta, phi)).T
     return points_sph
 
-# ！！！需要修改 ！！！
-'''
-def sph2xyz(points_sph):
-    r, theta, phi = points_sph[:,0], points_sph[:,1], points_sph[:,2]
-    x = r * np.sin(theta) * np.cos(phi)
-    y = r * np.sin(theta) * np.sin(phi)
-    z = r * np.cos(theta)
-    points_xyz = np.vstack((x, y, z)).T
-    return points_xyz
-'''
 
-# ！！！需要修改 ！！！
-# transfer points coordinates from cartesian coordinate to cylindrical coordinate
-# points_xyz must be array([[x0,y0,z0], [x1,y1,z1], [x1,y1,z1], ...])
-# returned points_sph is array([[r0, phi0, z0], [r1, phi1, z1], [r2, phi2, z2], ...])
-'''
-def xyz2cyl(points_xyz):
-    r = np.linalg.norm(points_xyz[:,:2], axis=1)
-    phi = np.arctan2(points_xyz[:,1], points_xyz[:,0])
-    z = points_xyz[:,2]
-    points_cyl = np.vstack((r, phi, z)).T
-    return points_cyl
-'''
+def coordConvert(points, source_coord, target_coord):
+    ''' Convert coordinates
+
+    Attributes:
+        points: ndarray, shape==(n, 3)
+        source_coord: 'xyz' or 'sph' or 'cyl'
+        target_coord: 'xyz' or 'sph' or 'cyl'
+    
+    Return: 
+        same shape as points
+    '''
+    def xyz2sph(points_xyz):
+        epsilon=1e-100
+        x, y, z = points_xyz[:,0], points_xyz[:,1], points_xyz[:,2]
+        r = np.linalg.norm(points_xyz, axis=1)
+        phi = np.arccos(z / (r+epsilon))
+        theta = np.arctan2(y, x) # range [-pi, pi]
+        theta = theta + (1-np.sign(np.sign(theta)+1))*2*np.pi # convert range to [0, 2pi]
+        points_sph = np.vstack((r, theta, phi)).T
+        return points_sph
+    def xyz2cyl(points_xyz):
+        x, y, z = points_xyz[:,0], points_xyz[:,1], points_xyz[:,2]
+        rho = np.sqrt(x**2+y**2)
+        theta = np.arctan2(y, x) # range [-pi, pi]
+        theta = theta + (1-np.sign(np.sign(theta)+1))*2*np.pi # convert range to [0, 2pi]
+        points_cyl = np.vstack((rho, theta, z)).T
+        return points_cyl
+    def sph2xyz(points_sph):
+        r, theta, phi = points_sph[:,0], points_sph[:,1], points_sph[:,2]
+        x = r * np.cos(theta) * np.sin(phi)
+        y = r * np.sin(theta) * np.sin(phi)
+        z = r * np.cos(phi)
+        points_xyz = np.vstack((x, y, z)).T
+        return points_xyz
+    def cyl2xyz(points_cyl):
+        rho, theta, z = points_cyl[:,0], points_cyl[:,1], points_cyl[:,2]
+        x = rho * np.cos(theta)
+        y = rho * np.sin(theta)
+        points_xyz = np.vstack((x, y, z)).T
+        return points_xyz
+
+    # 先全部转换成直角坐标系
+    if source_coord != 'xyz':
+        if source_coord == 'sph':
+            points_xyz = sph2xyz(points)
+        elif source_coord == 'cyl':
+            points_xyz = cyl2xyz(points)
+    else:
+        points_xyz = points
+    
+    # 再转换为目标坐标系
+    if target_coord == 'xyz':
+        return points_xyz
+    elif target_coord == 'sph':
+        return xyz2sph(points_xyz)
+    elif target_coord == 'cyl':
+        return xyz2cyl(points_xyz)
+    
 
 
 if __name__ == "__main__":
