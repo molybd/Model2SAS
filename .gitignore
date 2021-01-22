@@ -133,3 +133,12 @@ dmypy.json
 *.png
 *.jpg
 *.tif
+
+# test files
+test*
+
+# CrysolPath file
+CrysolPath.txt
+
+# discarded design
+discarded design/
