@@ -3,7 +3,6 @@
 import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
-from cycler import cycler
 
 def genRgb(i, colormap='tab10', discrete_colormap=True):
     colors = eval('plt.cm.{}.colors'.format(colormap))
@@ -51,7 +50,7 @@ def plotStlMeshes(mesh_list, label_list=None, show=True, figure=None):
         
 
 def plotPointsWithSld(points_with_sld, colormap='viridis', show=True, figure=None):
-    # Create a new plot
+    # Create a new figure
     if figure:
         pass
     else:
@@ -72,3 +71,22 @@ def plotPointsWithSld(points_with_sld, colormap='viridis', show=True, figure=Non
         plt.show()
     return figure
 
+
+def plotSasCurve(q, I, label=None, show=True, figure=None):
+    # Create a new figure
+    if figure:
+        pass
+    else:
+        figure = plt.figure()
+    axes = figure.add_subplot(111)
+
+    axes.plot(q, I, label=label)
+    axes.set_xscale('log')
+    axes.set_yscale('log')
+    axes.set_xlabel(r'Q $(\AA^{-1})$')
+    axes.set_ylabel(r'Intensity (a.u.)')
+    axes.legend(frameon=False)
+
+    if show:
+        plt.show()
+    return figure

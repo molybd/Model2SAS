@@ -34,7 +34,7 @@ class model2sas:
         self.name = name
 
     def setupModel(self):
-        self.model = model(self.name)
+        self.model = model(name=self.name, path=self.path)
 
     def importFile(self, filepath, sld=1):
         filepath = os.path.abspath(filepath)
@@ -53,13 +53,16 @@ class model2sas:
 
     def genPoints(self):
         self.model.genPoints()
+        self.points_with_sld = self.model.points_with_sld
 
     def setupData(self):
         self.data = data(self.model.points_with_sld)
 
     def calcSas(self, qmin, qmax, qnum=200, logq=False, lmax=50, parallel=True, cpu_usage=0.6):
         q = self.data.genQ(qmin, qmax, qnum=qnum, logq=logq)
-        self.data.calcSas(q, lmax=lmax, parallel=True, cpu_usage=0.6)
+        self.data.calcSas(q, lmax=lmax, parallel=parallel, cpu_usage=cpu_usage)
+        self.q = self.data.q
+        self.I = self.data.I
 
 
 
@@ -74,9 +77,10 @@ class model:
 
     '''
 
-    def __init__(self, modelname=None):
+    def __init__(self, name='model', path=None):
         # filename is a relative path
-        self.modelname = modelname
+        self.name = name
+        self.path = path
         self.stlmodel_list = []
         self.mathmodel_list = []
 
@@ -159,6 +163,13 @@ class model:
         self.stlmodel_list = stlmodel_list
         self.points = points
         self.points_with_sld = points_with_sld # shape==(n, 4) 前三列是坐标，最后一列是相应的sld
+        self.savePointsWithSld()
+
+    def savePointsWithSld(self):
+        header = 'x\ty\tz\tsld'
+        fname = '{}.points'.format(self.name)
+        fname = os.path.join(self.path, fname)
+        np.savetxt(fname, self.points_with_sld, header=header)
 
     def _genGrid(self, boundary_min, boundary_max, interval):
         '''Generate grid points
@@ -196,7 +207,7 @@ class data:
         if parallel:
             I = intensity_parallel(q, points, slds, lmax, cpu_usage=cpu_usage)
         else:
-            I = intensity(q, points, slds, lmax)
+            I = intensity_parallel(q, points, slds, lmax, proc_num=1)
 
         self.q = q
         self.I = I
@@ -204,42 +215,19 @@ class data:
         self.lmax = lmax
 
 
-##### 测试使用 #####
-def plotPoints(points):
-    fig = plt.figure()
-    axes = mplot3d.Axes3D(fig)
-
-    axes.scatter(points[:,0], points[:,1], points[:,2], color='k')
-    # Show the plot to the screen
-    plt.show()
-
-def plotSection(stlmodel_list):
-    fig = plt.figure()
-    axes = mplot3d.Axes3D(fig)
-
-    for stlmodel in stlmodel_list:
-        axes.scatter(stlmodel.points[:,0], stlmodel.points[:,1], stlmodel.points[:,2])
-    # Show the plot to the screen
-    plt.show()
-################
-
-
 if __name__ == "__main__":
     test = model2sas('test', 'D:\Research\My_program\Model2SAS\models')
     test.setupModel()
-    test.importFile('models\\torus.STL', sld=1)
-    test.importFile('D:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
+    #test.importFile('models\\torus.STL', sld=1)
+    #test.importFile('D:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
     test.importFile('models\\new_hollow_sphere_model.py', sld=15)
-    plotStlMeshes([stlmodel.mesh for stlmodel in test.model.stlmodel_list],label_list=[stlmodel.name for stlmodel in test.model.stlmodel_list])
+    #plotStlMeshes([stlmodel.mesh for stlmodel in test.model.stlmodel_list],label_list=[stlmodel.name for stlmodel in test.model.stlmodel_list])
     
     test.genPoints()
     plotPointsWithSld(test.model.points_with_sld, figure=plt.figure())
-    '''
-    plotSection(test.model.stlmodel_list+test.model.mathmodel_list)
+    # np.savetxt('test_points_with_sld.txt', test.points_with_sld)
+    
     test.setupData()
-    test.calcSas(0.01, 1)
-    plt.plot(test.data.q, test.data.I)
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.show()
-    '''
+    test.calcSas(0.01, 1, parallel=True)
+    plotSasCurve(test.q, test.I)
+    

@@ -2,12 +2,16 @@
 
 import numpy as np
 from stl import mesh
+import os, sys
+
+from Functions import coordConvert
 
 
 class stlmodel:
 
     def __init__(self, filepath, sld):
-        self.filepath = filepath
+        self.filepath = os.path.abspath(filepath)
+        self.name = os.path.basename(filepath)
         self.sld = sld
         self.mesh = mesh.Mesh.from_file(filepath)
 
@@ -70,3 +74,42 @@ class stlmodel:
             return np.sign(isallpositive * uplusv) #最终输出的结果是对应着输入每一个点的一维数组，如果与三角形有交集那么该点对应的值为1，否则为0
         else:
             return np.zeros(origins.shape[0])
+
+
+
+class mathmodel:
+
+    def __init__(self, filepath):
+        self.filepath = os.path.abspath(filepath)
+        self.name = os.path.basename(filepath)
+        dirname, basename = os.path.split(filepath)
+        sys.path.append(dirname)
+        module_name = os.path.splitext(basename)[0]
+        mathmodel_module = __import__(module_name)
+        mathmodel_object = mathmodel_module.specific_mathmodel()
+        self.specific_mathmodel = mathmodel_object 
+
+    def getBoundaryPoints(self):
+        boundary_min = self.specific_mathmodel.boundary_min
+        boundary_max = self.specific_mathmodel.boundary_max
+        return boundary_min, boundary_max
+
+    def importGrid(self, grid):
+        self.grid = grid
+
+    def calcInModelGridIndex(self):
+        grid = self.grid
+        specific_mathmodel = self.specific_mathmodel
+
+        # change grid coords (xyz) to destination coords
+        coord = specific_mathmodel.coord
+        grid_in_coord = coordConvert(grid, 'xyz', coord)
+
+        in_model_grid_index = specific_mathmodel.shape(grid_in_coord)
+        sld_grid_index = specific_mathmodel.sld()
+        points = grid[np.where(in_model_grid_index != 0)] # screen points in model
+
+        self.in_model_grid_index = in_model_grid_index
+        self.sld_grid_index = sld_grid_index
+        self.points = points
+        return in_model_grid_index  # shape == (n,)      
