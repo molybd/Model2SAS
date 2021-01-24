@@ -54,6 +54,13 @@ class model2sas:
     def genPoints(self):
         self.model.genPoints()
         self.points_with_sld = self.model.points_with_sld
+        self.savePointsWithSld()
+
+    def savePointsWithSld(self):
+        header = 'x\ty\tz\tsld'
+        fname = '{}.points'.format(self.name)
+        fname = os.path.join(self.path, fname)
+        np.savetxt(fname, self.points_with_sld, header=header)
 
     def setupData(self):
         self.data = data(self.model.points_with_sld)
@@ -63,6 +70,14 @@ class model2sas:
         self.data.calcSas(q, lmax=lmax, parallel=parallel, cpu_usage=cpu_usage)
         self.q = self.data.q
         self.I = self.data.I
+        self.saveSasData()
+
+    def saveSasData(self):
+        header = 'q\tI\tpseudo error(I/1000)'
+        fname = '{}.dat'.format(self.name)
+        fname = os.path.join(self.path, fname)
+        data = np.vstack((self.q, self.I, self.data.error)).T
+        np.savetxt(fname, data, header=header)
 
 
 
@@ -163,13 +178,6 @@ class model:
         self.stlmodel_list = stlmodel_list
         self.points = points
         self.points_with_sld = points_with_sld # shape==(n, 4) 前三列是坐标，最后一列是相应的sld
-        self.savePointsWithSld()
-
-    def savePointsWithSld(self):
-        header = 'x\ty\tz\tsld'
-        fname = '{}.points'.format(self.name)
-        fname = os.path.join(self.path, fname)
-        np.savetxt(fname, self.points_with_sld, header=header)
 
     def _genGrid(self, boundary_min, boundary_max, interval):
         '''Generate grid points
@@ -216,12 +224,12 @@ class data:
 
 
 if __name__ == "__main__":
-    test = model2sas('test', 'D:\Research\My_program\Model2SAS\models')
+    test = model2sas('test_multimodels', 'D:\Research\My_program\Model2SAS\models')
     test.setupModel()
-    #test.importFile('models\\torus.STL', sld=1)
-    #test.importFile('D:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
+    test.importFile('models\\torus.STL', sld=1)
+    test.importFile('D:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
     test.importFile('models\\new_hollow_sphere_model.py', sld=15)
-    #plotStlMeshes([stlmodel.mesh for stlmodel in test.model.stlmodel_list],label_list=[stlmodel.name for stlmodel in test.model.stlmodel_list])
+    plotStlMeshes([stlmodel.mesh for stlmodel in test.model.stlmodel_list],label_list=[stlmodel.name for stlmodel in test.model.stlmodel_list])
     
     test.genPoints()
     plotPointsWithSld(test.model.points_with_sld, figure=plt.figure())
