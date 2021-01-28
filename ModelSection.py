@@ -87,7 +87,8 @@ class mathmodel:
         module_name = os.path.splitext(basename)[0]
         mathmodel_module = __import__(module_name)
         mathmodel_object = mathmodel_module.specific_mathmodel()
-        self.specific_mathmodel = mathmodel_object 
+        self.specific_mathmodel = mathmodel_object
+        self.genSamplePoints()
 
     def getBoundaryPoints(self):
         boundary_min = self.specific_mathmodel.boundary_min
@@ -112,4 +113,45 @@ class mathmodel:
         self.in_model_grid_index = in_model_grid_index
         self.sld_grid_index = sld_grid_index
         self.points = points
-        return in_model_grid_index  # shape == (n,)      
+        return in_model_grid_index  # shape == (n,)
+
+    def genSamplePoints(self, interval=None, grid_num=10000):
+        specific_mathmodel = self.specific_mathmodel
+        # generate grid for sample points
+        boundary_min = self.specific_mathmodel.boundary_min
+        boundary_max = self.specific_mathmodel.boundary_max
+        # determine interval for sample points
+        if interval:
+            interval = interval
+        else:
+            scale = boundary_max - boundary_min
+            # grid_num defauld is 10000
+            interval = (scale[0]*scale[1]*scale[2] / grid_num)**(1/3)
+
+        xmin, ymin, zmin = boundary_min[0], boundary_min[1], boundary_min[2]
+        xmax, ymax, zmax = boundary_max[0], boundary_max[1], boundary_max[2]
+        xscale = np.linspace(xmin, xmax, num=int((xmax-xmin)/interval+1))
+        yscale = np.linspace(ymin, ymax, num=int((ymax-ymin)/interval+1))
+        zscale = np.linspace(zmin, zmax, num=int((zmax-zmin)/interval+1))
+        x, y, z = np.meshgrid(xscale, yscale, zscale)
+        x, y, z = x.reshape(x.size,1), y.reshape(y.size,1), z.reshape(z.size,1)
+        grid = np.hstack((x, y, z))
+
+        # change grid coords (xyz) to destination coords
+        coord = specific_mathmodel.coord
+        grid_in_coord = coordConvert(grid, 'xyz', coord)
+
+        in_model_grid_index = specific_mathmodel.shape(grid_in_coord)
+        sld_grid_index = specific_mathmodel.sld()
+        points = grid[np.where(in_model_grid_index != 0)] # screen points in model
+        sld = sld_grid_index[np.where(sld_grid_index != 0)]
+        sld = sld.reshape((sld.size, 1))
+        points_with_sld = np.hstack((points, sld))
+
+        self.sample_points = points
+        self.sample_points_with_sld = points_with_sld
+        return points_with_sld
+
+        
+
+

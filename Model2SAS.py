@@ -224,12 +224,15 @@ class data:
 
 
 if __name__ == "__main__":
-    test = model2sas('test_multimodels', 'D:\Research\My_program\Model2SAS\models')
+    test = model2sas('test_torus', 'D:\Research\My_program\Model2SAS\models')
     test.setupModel()
     test.importFile('models\\torus.STL', sld=1)
     test.importFile('D:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
     test.importFile('models\\new_hollow_sphere_model.py', sld=15)
     plotStlMeshes([stlmodel.mesh for stlmodel in test.model.stlmodel_list],label_list=[stlmodel.name for stlmodel in test.model.stlmodel_list])
+    '''
+    plotPoints(test.model.mathmodel_list[0].sample_points)
+    plotPointsWithSld(test.model.mathmodel_list[0].sample_points_with_sld)
     
     test.genPoints()
     plotPointsWithSld(test.model.points_with_sld, figure=plt.figure())
@@ -238,4 +241,6 @@ if __name__ == "__main__":
     test.setupData()
     test.calcSas(0.01, 1, parallel=True)
     plotSasCurve(test.q, test.I)
+    '''
+
     

@@ -49,6 +49,26 @@ def plotStlMeshes(mesh_list, label_list=None, show=True, figure=None):
     return figure
         
 
+def plotPoints(points, show=True, figure=None):
+    # Create a new figure
+    if figure:
+        pass
+    else:
+        figure = plt.figure()
+    axes = mplot3d.Axes3D(figure)
+
+    x, y, z = points[:, 0], points[:, 1], points[:, 2]
+    x, y, z = x.flatten(), y.flatten(), z.flatten()
+    axes.scatter(x, y, z, color='k')
+
+    scale = points[:,:].flatten()
+    axes.auto_scale_xyz(scale, scale, scale)
+
+    if show:
+        plt.show()
+    return figure
+
+
 def plotPointsWithSld(points_with_sld, colormap='viridis', show=True, figure=None):
     # Create a new figure
     if figure:
