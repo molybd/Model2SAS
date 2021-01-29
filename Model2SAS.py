@@ -20,9 +20,11 @@ class model2sas:
     data: data object
     '''
 
-    def __init__(self, name, dir):
+    def __init__(self, name):
         ''' Make project folder: dir/name
         '''
+        '''
+        # 改结构，不在一开始就建立文件夹了
         path = os.path.abspath(os.path.join(dir, name))
         try:
             os.mkdir(path)
@@ -30,37 +32,36 @@ class model2sas:
             print('path already exists')
         finally:
             print('project dir: {}'.format(path))
-        self.path = path
+        '''
         self.name = name
+        self.setupModel()
 
     def setupModel(self):
-        self.model = model(name=self.name, path=self.path)
+        self.model = model(name=self.name)
 
     def importFile(self, filepath, sld=1):
         filepath = os.path.abspath(filepath)
         basename = os.path.basename(filepath)
+        '''
         destination_path = os.path.join(self.path, basename)
         try:
             copyfile(filepath, destination_path)
         except:
             print('file already exists, using existed model file')
-
+        '''
         filetype = filepath.split('.')[-1].lower()
         if filetype == 'stl':
             self.model.importStlFile(filepath, sld)
         elif filetype == 'py':
             self.model.importMathFile(filepath)
 
-    def genPoints(self):
-        self.model.genPoints()
+    def genPoints(self, interval=None, grid_num=10000):
+        self.model.genPoints(interval=interval, grid_num=grid_num)
         self.points_with_sld = self.model.points_with_sld
-        self.savePointsWithSld()
 
-    def savePointsWithSld(self):
+    def savePointsWithSld(self, filename):
         header = 'x\ty\tz\tsld'
-        fname = '{}.points'.format(self.name)
-        fname = os.path.join(self.path, fname)
-        np.savetxt(fname, self.points_with_sld, header=header)
+        np.savetxt(filename, self.points_with_sld, header=header)
 
     def setupData(self):
         self.data = data(self.model.points_with_sld)
@@ -70,14 +71,12 @@ class model2sas:
         self.data.calcSas(q, lmax=lmax, parallel=parallel, cpu_usage=cpu_usage)
         self.q = self.data.q
         self.I = self.data.I
-        self.saveSasData()
+        #self.saveSasData()
 
-    def saveSasData(self):
+    def saveSasData(self, filename):
         header = 'q\tI\tpseudo error(I/1000)'
-        fname = '{}.dat'.format(self.name)
-        fname = os.path.join(self.path, fname)
         data = np.vstack((self.q, self.I, self.data.error)).T
-        np.savetxt(fname, data, header=header)
+        np.savetxt(filename, data, header=header)
 
 
 
@@ -92,10 +91,9 @@ class model:
 
     '''
 
-    def __init__(self, name='model', path=None):
+    def __init__(self, name='model'):
         # filename is a relative path
         self.name = name
-        self.path = path
         self.stlmodel_list = []
         self.mathmodel_list = []
 
@@ -224,8 +222,7 @@ class data:
 
 
 if __name__ == "__main__":
-    test = model2sas('test_torus', 'D:\Research\My_program\Model2SAS\models')
-    test.setupModel()
+    test = model2sas('test_torus')
     test.importFile('models\\torus.STL', sld=1)
     test.importFile('D:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
     test.importFile('models\\new_hollow_sphere_model.py', sld=15)
