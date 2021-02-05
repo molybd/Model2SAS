@@ -166,9 +166,9 @@ class model:
         sld_grid_index = np.max(sld_grid_index_stack, axis=0)
 
         points = grid[np.where(sld_grid_index!=0)]
-        slds = sld_grid_index[np.where(sld_grid_index!=0)]
-        slds = slds.reshape((slds.size,1))
-        points_with_sld = np.hstack((points, slds))
+        sld = sld_grid_index[np.where(sld_grid_index!=0)]
+        sld = sld.reshape((sld.size,1))
+        points_with_sld = np.hstack((points, sld))
 
         self.grid = grid
         self.interval = interval
@@ -198,7 +198,7 @@ class data:
     def __init__(self, points_with_sld):
         self.points_with_sld = points_with_sld
         self.points = points_with_sld[:,:3]
-        self.slds = points_with_sld[:,-1]
+        self.sld = points_with_sld[:,-1]
 
     def genQ(self, qmin, qmax, qnum=200, logq=False):
         if logq:
@@ -209,11 +209,11 @@ class data:
 
     def calcSas(self, q, lmax=50, parallel=True, cpu_usage=0.6):
         points = self.points
-        slds = self.slds
+        sld = self.sld
         if parallel:
-            I = intensity_parallel(q, points, slds, lmax, cpu_usage=cpu_usage)
+            I = intensity_parallel(q, points, sld, lmax, cpu_usage=cpu_usage)
         else:
-            I = intensity_parallel(q, points, slds, lmax, proc_num=1)
+            I = intensity_parallel(q, points, sld, lmax, proc_num=1)
 
         self.q = q
         self.I = I
@@ -224,10 +224,10 @@ class data:
 if __name__ == "__main__":
     test = model2sas('test_torus')
     test.importFile('models\\torus.STL', sld=1)
-    test.importFile('D:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
-    test.importFile('models\\new_hollow_sphere_model.py', sld=15)
-    plotStlMeshes([stlmodel.mesh for stlmodel in test.model.stlmodel_list],label_list=[stlmodel.name for stlmodel in test.model.stlmodel_list])
-    '''
+    test.importFile('C:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
+    test.importFile('models\\new_hollow_sphere_model.py')
+    plotStlMeshes([stlmodel.mesh for stlmodel in test.model.stlmodel_list], label_list=[stlmodel.name for stlmodel in test.model.stlmodel_list])
+    
     plotPoints(test.model.mathmodel_list[0].sample_points)
     plotPointsWithSld(test.model.mathmodel_list[0].sample_points_with_sld)
     
@@ -238,6 +238,6 @@ if __name__ == "__main__":
     test.setupData()
     test.calcSas(0.01, 1, parallel=True)
     plotSasCurve(test.q, test.I)
-    '''
+    
 
     

@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 
 import os
+import time
 import numpy as np
 from stl import mesh
 from mpl_toolkits import mplot3d
@@ -33,6 +34,15 @@ from qtgui.pointsWithSldView_ui import Ui_pointsWithSldView
 # needed for multithread
 from PyQt5.QtCore import QThread, pyqtSignal
 
+
+''' 尚待解决的问题
+主要功能：
+1. 改变stl模型sld的功能
+2. 改变math模型参数的功能
+次要功能：
+1. 删除模型
+2. 保存project
+'''
 
 
 class ControlPanelWindow(QWidget, Ui_controlPanel):
@@ -70,8 +80,8 @@ class Figure_Canvas(FigureCanvas):
     graphicScene.addWidget(canvas)
     stlmodelView.graphicsView.setScene(graphicScene)
     '''
-    def __init__(self, parent=None, figsize=(4,3), dpi=100):
-        self.figure = Figure(figsize=figsize, dpi=dpi)  # 创建一个Figure，注意：该Figure为matplotlib下的figure，不是matplotlib.pyplot下面的figure
+    def __init__(self, parent=None, **kwargs):
+        self.figure = Figure(**kwargs)  # 创建一个Figure，注意：该Figure为matplotlib下的figure，不是matplotlib.pyplot下面的figure
         FigureCanvas.__init__(self, self.figure) # 初始化父类
         self.setParent(parent)
 
@@ -84,7 +94,7 @@ class EmittingStream(QtCore.QObject):
 
 class Thread_calcSas(QThread):
     # 线程结束的signal，并且带有一个列表参数
-    threadEnd = pyqtSignal(list)
+    threadEnd = pyqtSignal(np.ndarray)
     def __init__(self, q, points, sld, lmax, parallel, cpu_usage, proc_num):
         super(Thread_calcSas, self).__init__()
         self.q = q
@@ -93,16 +103,16 @@ class Thread_calcSas(QThread):
         self.lmax = lmax
         self.parallel = parallel
         self.cpu_usage = cpu_usage
+        self.proc_num = proc_num
     def run(self):
         # 线程所需要执行的代码
-        print('doing thread')
         if self.parallel:
-            I = intensity_parallel(self.q, self.points, self.sld, self.lmax, cpu_usage=self.cpu_usage, proc_num=self.proc_num)
+            self.I = intensity_parallel(self.q, self.points, self.sld, self.lmax, cpu_usage=self.cpu_usage, proc_num=self.proc_num)
         else:
             #I = intensity_parallel(self.q, self.points, self.sld, self.lmax, proc_num=1)
-            I = intensity(self.q, self.points, self.sld, self.lmax)
-            I = I.tolist()
-        self.threadEnd.emit(I)
+            self.I = intensity_parallel(self.q, self.points, self.sld, self.lmax, proc_num=1)
+            #I = I.tolist()
+        self.threadEnd.emit(self.I)
 
 
 
@@ -117,6 +127,8 @@ class mainwindowFunction:
         self.ui.actionNew_Project.triggered.connect(self.newProject)
         self.ui.actionControl_Panel.triggered.connect(self.showControlPanel)
         self.ui.actionImport_model_s.triggered.connect(self.importModels)
+        self.ui.actionCascade_2.triggered.connect(self.ui.mdiArea.cascadeSubWindows)
+        self.ui.actionTile_2.triggered.connect(self.ui.mdiArea.tileSubWindows)
         
         self.ui.label_projectName.setText('Project: {}'.format(self.project.name))
         self.ui.pushButton_importModels.clicked.connect(self.importModels)
@@ -127,7 +139,9 @@ class mainwindowFunction:
 
         #下面将输出重定向到textEdit中
         sys.stdout = EmittingStream(textWritten=self.outputWritten) 
-        #sys.stderr = EmittingStream(textWritten=self.outputWritten)
+        sys.stderr = EmittingStream(textWritten=self.outputWritten)
+
+        self.consolePrint('New project established with name: {}'.format(self.project.name))
 
     #接收信号str的信号槽
     def outputWritten(self, text):
@@ -157,10 +171,8 @@ class mainwindowFunction:
         self.ui.mdiArea.addSubWindow(self.controlPanel)
         self.controlPanel.show()
 
-
     def showControlPanel(self):
         self.initControlPanel()
-
 
     def newProject(self):
         name, ok_pressed = QInputDialog.getText(None, 'New Project', 'Name: ')
@@ -170,31 +182,7 @@ class mainwindowFunction:
             project = model2sas(name)
             self.project = project
             self.ui.label_projectName.setText('Project: {}'.format(self.project.name))
-            print('New Project: {}'.format(name))
-
-
-    '''
-    def browseFolder(self):
-        folder = QFileDialog.getExistingDirectory(None, 'Select Folder', './')
-        self.newProjectWindow.lineEdit_path.setText(folder)
-    def readNewProjectInfo(self):
-        newProjectWindow = self.newProjectWindow
-        name = newProjectWindow.lineEdit_name.text()
-        folder = newProjectWindow.lineEdit_path.text()
-        print(name, folder)
-        project = model2sas(name, folder)
-        project.setupModel()
-        self.project = project
-        self.ui.label_projectName.setText(self.project.name)
-    def newProject(self):
-        # new window for new project info
-        dialog = QDialog()
-        self.newProjectWindow = Ui_newProject()
-        self.newProjectWindow.setupUi(dialog)
-        self.newProjectWindow.pushButton_browse.clicked.connect(self.browseFolder)
-        self.newProjectWindow.pushButton_newProject.clicked.connect(self.readNewProjectInfo)
-        dialog.exec()
-    '''
+            self.consolePrint('New project established with name: {}'.format(self.project.name))
 
     def importModels(self):
         filepath_list, filetype_list = QFileDialog.getOpenFileNames(None, 'Select Model File(s)', './', "All Files (*);;stl Files (*.stl);;math model Files (*.py)")
@@ -209,6 +197,11 @@ class mainwindowFunction:
         '''
         for filepath in filepath_list:
             self.project.importFile(filepath, sld=1)
+            filetype = filepath.split('.')[-1].upper()
+            if filetype == 'STL':
+                self.consolePrint('import {} models with path: {}'.format(filetype, filepath))
+            elif filetype == 'PY':
+                self.consolePrint('import {} models with path: {}'.format('MATH', filepath))
         self.refreshTableViews()
 
     def refreshTableViews(self):
@@ -240,52 +233,56 @@ class mainwindowFunction:
             self.tableModel_mathmodels.setItem(i, 0, item1)
         
 
-    # 仍然不显示legend！！！
     def showStlModels(self):
-        indexes = self.ui.tableView_stlmodels.selectionModel().selectedRows()
-        #print([index.row() for index in indexes])
-        mesh_list, label_list = [], []
-        for index in indexes:
-            i = index.row()
-            mesh_list.append(self.project.model.stlmodel_list[i].mesh)
-            label_list.append(self.project.model.stlmodel_list[i].name)
-        if len(mesh_list) == 0:
-            mesh_list = [stlmodel.mesh for stlmodel in self.project.model.stlmodel_list]
-            label_list = [stlmodel.name for stlmodel in self.project.model.stlmodel_list]
-        #print(label_list)
-        canvas = Figure_Canvas(figsize=(5,4))
-        plotStlMeshes(mesh_list, label_list=label_list, show=False, figure=canvas.figure)
-        graphicScene = QtWidgets.QGraphicsScene()
-        graphicScene.addWidget(canvas)
-        stlmodelView = stlmodelViewWindow()
-        stlmodelView.graphicsView.setScene(graphicScene)
-        self.ui.mdiArea.addSubWindow(stlmodelView)
-        stlmodelView.show()
+        try:
+            indexes = self.ui.tableView_stlmodels.selectionModel().selectedRows()
+            #self.consolePrint([index.row() for index in indexes])
+            mesh_list, label_list = [], []
+            for index in indexes:
+                i = index.row()
+                mesh_list.append(self.project.model.stlmodel_list[i].mesh)
+                label_list.append(self.project.model.stlmodel_list[i].name)
+            if len(mesh_list) == 0:
+                mesh_list = [stlmodel.mesh for stlmodel in self.project.model.stlmodel_list]
+                label_list = [stlmodel.name for stlmodel in self.project.model.stlmodel_list]
+            #self.consolePrint(label_list)
+            canvas = Figure_Canvas()
+            plotStlMeshes(mesh_list, label_list=label_list, show=False, figure=canvas.figure)
+            graphicScene = QtWidgets.QGraphicsScene()
+            graphicScene.addWidget(canvas)
+            stlmodelView = stlmodelViewWindow()
+            stlmodelView.graphicsView.setScene(graphicScene)
+            self.ui.mdiArea.addSubWindow(stlmodelView)
+            stlmodelView.show()
+        except:
+            self.consolePrint('(X) There is no model to show...')
     def showMathModel(self):
-        index = self.ui.tableView_mathmodels.currentIndex()
-        print(index.row())
-        i = index.row()
-        canvas = Figure_Canvas(figsize=(5,4))
-        plotPointsWithSld(self.project.model.mathmodel_list[i].sample_points_with_sld, show=False, figure=canvas.figure)
-        graphicScene = QtWidgets.QGraphicsScene()
-        graphicScene.addWidget(canvas)
-        mathmodelView = mathmodelViewWindow()
-        mathmodelView.graphicsView.setScene(graphicScene)
-        self.ui.mdiArea.addSubWindow(mathmodelView)
-        mathmodelView.show()
+        try:
+            index = self.ui.tableView_mathmodels.currentIndex()
+            i = index.row()
+            canvas = Figure_Canvas()
+            plotPointsWithSld(self.project.model.mathmodel_list[i].sample_points_with_sld, show=False, figure=canvas.figure)
+            graphicScene = QtWidgets.QGraphicsScene()
+            graphicScene.addWidget(canvas)
+            mathmodelView = mathmodelViewWindow()
+            mathmodelView.graphicsView.setScene(graphicScene)
+            self.ui.mdiArea.addSubWindow(mathmodelView)
+            mathmodelView.show()
+        except:
+            self.consolePrint('(X) There is no model to show...')
     def showPointsWithSld(self):
-        canvas = Figure_Canvas(figsize=(5,4))
+        canvas = Figure_Canvas()
         plotPointsWithSld(self.project.points_with_sld, show=False, figure=canvas.figure)
         graphicScene = QtWidgets.QGraphicsScene()
         graphicScene.addWidget(canvas)
         pointsWithSldView = pointsWithSldViewWindow()
         pointsWithSldView.graphicsView.setScene(graphicScene)
         interval = self.project.model.interval
-        pointsWithSldView.label_interval.setText('interval = {:.4f}'.format(interval))
+        pointsWithSldView.label_interval.setText('interval = {:.4f}\tnumber of points = {}'.format(interval, self.project.model.points_with_sld.shape[0]))
         self.ui.mdiArea.addSubWindow(pointsWithSldView)
         pointsWithSldView.show()
     def showSasCurve(self):
-        canvas = Figure_Canvas(figsize=(5,4))
+        canvas = Figure_Canvas()
         plotSasCurve(self.project.data.q, self.project.data.I, show=False, figure=canvas.figure)
         graphicScene = QtWidgets.QGraphicsScene()
         graphicScene.addWidget(canvas)
@@ -295,21 +292,27 @@ class mainwindowFunction:
         sasdataView.show()
 
 
-
     def genPoints(self):
         thisControlPanel = self.controlPanel
         grid_num = thisControlPanel.lineEdit_gridPointsNum.text()
         interval = thisControlPanel.lineEdit_interval.text()
+        self.consolePrint('Calculating points model...Please wait...')
+        self.setPushButtonEnable(False)
         if interval != '':
             interval = float(interval)
             self.project.genPoints(interval=interval)
         else:
             grid_num = int(grid_num)
             self.project.genPoints(grid_num=grid_num)
+        self.consolePrint('Points model generated')
+        self.setPushButtonEnable(True)
         self.showPointsWithSld()
 
-    # 目前这里异步还会报错，还未解决！
     def calcSas(self):
+        try:
+            self.project.model.points_with_sld
+        except:
+            self.genPoints()
         self.project.setupData()
         thisControlPanel = self.controlPanel
         qmin = float(thisControlPanel.lineEdit_qmin.text())
@@ -326,20 +329,35 @@ class mainwindowFunction:
             proc_num = int(proc_num)
         else:
             proc_num = None
+
+        self.setPushButtonEnable(False)
+        self.consolePrint('Calculating SAS curve...Please wait...')
         # 异步线程计算SAS
         points = self.project.data.points
-        sld = self.project.data.slds
-        thread_calcSas = Thread_calcSas(q, points, sld, lmax, parallel, cpu_usage, proc_num)
-        thread_calcSas.threadEnd.connect(self.processCalcSasThreadOutput)
-        thread_calcSas.start()
+        sld = self.project.data.sld
+        self.thread_calcSas = Thread_calcSas(q, points, sld, lmax, parallel, cpu_usage, proc_num)  # 这里的thread写成self.thread是为了防止start之后这个方法结束这个变量被回收了，会导致错误：QThread: Destroyed while thread is still running
+        self.thread_calcSas.threadEnd.connect(self.processCalcSasThreadOutput)
+        self.thread_calcSas.start()
     def processCalcSasThreadOutput(self, I):
+        self.setPushButtonEnable(True)
+
         self.project.data.I = I
         self.project.data.error = 0.001 * I  # 默认生成千分之一的误差，主要用于写文件的占位
         self.showSasCurve()
-
         
     def deleteModels(self):
-        print(self.controlPanel)
+        pass
+    
+
+    ####### some functions for GUI use ########
+    def consolePrint(self, string):
+        print('[{}] {}'.format(time.strftime('%Y-%m-%d %H:%M:%S'), string))
+
+    def setPushButtonEnable(self, true_or_false):
+        # 在某些计算过程中禁用一些按钮避免被疯狂点击
+        self.controlPanel.pushButton_genPoints.setEnabled(true_or_false)
+        self.controlPanel.pushButton_calcSas.setEnabled(true_or_false)
+    ###########################################
 
 
 

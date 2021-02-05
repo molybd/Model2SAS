@@ -43,7 +43,7 @@ def plotStlMeshes(mesh_list, label_list=None, show=True, figure=None):
     axes.auto_scale_xyz(scale, scale, scale)
 
     if use_legend:
-        plt.legend()
+        axes.legend()  # 在GUI里绘制图像应当避免使用plt的方法而是使用面向对象的绘图方式，否则plt画出来的东西在GUI中不显示
     if show:
         plt.show()
     return figure
@@ -82,7 +82,7 @@ def plotPointsWithSld(points_with_sld, colormap='viridis', show=True, figure=Non
     c = sld - sld.min()  # make all positive values
     cm = plt.get_cmap(colormap)
     sc = axes.scatter(x, y, z, c=c, cmap=cm)
-    plt.colorbar(sc)
+    figure.colorbar(sc)  # 在GUI里绘制图像应当避免使用plt的方法而是使用面向对象的绘图方式，否则plt画出来的东西在GUI中不显示
 
     scale = points_with_sld[:,:-1].flatten()
     axes.auto_scale_xyz(scale, scale, scale)
@@ -105,7 +105,7 @@ def plotSasCurve(q, I, label=None, show=True, figure=None):
     axes.set_yscale('log')
     axes.set_xlabel(r'Q $(\AA^{-1})$')
     axes.set_ylabel(r'Intensity (a.u.)')
-    axes.legend(frameon=False)
+    axes.legend(frameon=False)  # 在GUI里绘制图像应当避免使用plt的方法而是使用面向对象的绘图方式，否则plt画出来的东西在GUI中不显示
 
     if show:
         plt.show()

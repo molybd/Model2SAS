@@ -97,10 +97,6 @@ class Ui_controlPanel(object):
         self.label_8.setObjectName("label_8")
         self.gridLayout_2.addWidget(self.label_8, 5, 0, 1, 1)
         self.verticalLayout.addWidget(self.groupBox_calcSas)
-        self.progressBar = QtWidgets.QProgressBar(controlPanel)
-        self.progressBar.setProperty("value", 0)
-        self.progressBar.setObjectName("progressBar")
-        self.verticalLayout.addWidget(self.progressBar)
 
         self.retranslateUi(controlPanel)
         QtCore.QMetaObject.connectSlotsByName(controlPanel)
