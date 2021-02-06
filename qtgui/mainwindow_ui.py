@@ -74,6 +74,7 @@ class Ui_mainWindow(object):
         self.verticalLayout = QtWidgets.QVBoxLayout(self.dockWidgetContents_2)
         self.verticalLayout.setObjectName("verticalLayout")
         self.textEdit = QtWidgets.QTextEdit(self.dockWidgetContents_2)
+        self.textEdit.setReadOnly(True)
         self.textEdit.setObjectName("textEdit")
         self.verticalLayout.addWidget(self.textEdit)
         self.progressBar = QtWidgets.QProgressBar(self.dockWidgetContents_2)

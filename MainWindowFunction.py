@@ -35,15 +35,19 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 
 ''' 尚待解决的问题
+Bug:
+1. 模型点数太多的时候有时会报错
+2. 计算SAS曲线时q点数太少会报错
 主要功能：
 (solved) 1. 改变stl模型sld的功能
 2. 改变math模型参数的功能
 次要功能：
 1. 删除模型
+(solved) 2. 删除所有模型
 2. 保存project
 程序结构：
 (solved) 1. genPoints() 异步进行
-2. control panel 变成dock widget
+(solved) 2. control panel 变成dock widget
 '''
 
 
@@ -150,11 +154,11 @@ class mainwindowFunction:
         self.ui.pushButton_deleteModel.clicked.connect(self.deleteModels)
         self.ui.pushButton_genPoints.clicked.connect(self.genPoints)
         self.ui.pushButton_calcSas.clicked.connect(self.calcSas)
-
+        
         #下面将输出重定向到textEdit中
-        sys.stdout = EmittingStream(textWritten=self.outputWritten) 
-        sys.stderr = EmittingStream(textWritten=self.outputWritten)
-
+        #sys.stdout = EmittingStream(textWritten=self.outputWritten) 
+        #sys.stderr = EmittingStream(textWritten=self.outputWritten)
+        
         self.refreshTableViews()
         self.consolePrint('New project established with name: {}'.format(self.project.name))
 
@@ -321,38 +325,40 @@ class mainwindowFunction:
         try:
             self.project.model.points_with_sld
         except:
-            self.genPoints()
-        self.project.setupData()
-        qmin = float(self.ui.lineEdit_qmin.text())
-        qmax = float(self.ui.lineEdit_qmax.text())
-        qnum = int(self.ui.lineEdit_qnum.text())
-        lmax = int(self.ui.lineEdit_lmax.text())
-        q = self.project.data.genQ(qmin, qmax, qnum=qnum)
-        self.project.data.q = q
-        self.project.data.lmax = lmax
-        parallel = self.ui.checkBox_parallel.isChecked()
-        cpu_usage = float(self.ui.lineEdit_cpuUsage.text())
-        proc_num = self.ui.lineEdit_processNum.text()
-        if proc_num != '':
-            proc_num = int(proc_num)
+            self.consolePrint('(X) Please generate points first !')
         else:
-            proc_num = None
+            self.project.setupData()
+            qmin = float(self.ui.lineEdit_qmin.text())
+            qmax = float(self.ui.lineEdit_qmax.text())
+            qnum = int(self.ui.lineEdit_qnum.text())
+            lmax = int(self.ui.lineEdit_lmax.text())
+            q = self.project.data.genQ(qmin, qmax, qnum=qnum)
+            self.project.data.q = q
+            self.project.data.lmax = lmax
+            parallel = self.ui.checkBox_parallel.isChecked()
+            cpu_usage = float(self.ui.lineEdit_cpuUsage.text())
+            proc_num = self.ui.lineEdit_processNum.text()
+            if proc_num != '':
+                proc_num = int(proc_num)
+            else:
+                proc_num = None
 
-        self.setPushButtonEnable(False)
-        self.setProgressBarRolling(True)
-        self.consolePrint('Calculating SAS curve...Please wait...')
-        # 异步线程计算SAS
-        points = self.project.data.points
-        sld = self.project.data.sld
-        self.thread_calcSas = Thread_calcSas(q, points, sld, lmax, parallel, cpu_usage, proc_num)  # 这里的thread写成self.thread是为了防止start之后这个方法结束这个变量被回收了，会导致错误：QThread: Destroyed while thread is still running
-        self.thread_calcSas.threadEnd.connect(self.processCalcSasThreadOutput)
-        self.thread_calcSas.start()
+            self.setPushButtonEnable(False)
+            self.setProgressBarRolling(True)
+            self.consolePrint('Calculating SAS curve...Please wait...')
+            # 异步线程计算SAS
+            points = self.project.data.points
+            sld = self.project.data.sld
+            self.thread_calcSas = Thread_calcSas(q, points, sld, lmax, parallel, cpu_usage, proc_num)  # 这里的thread写成self.thread是为了防止start之后这个方法结束这个变量被回收了，会导致错误：QThread: Destroyed while thread is still running
+            self.thread_calcSas.threadEnd.connect(self.processCalcSasThreadOutput)
+            self.thread_calcSas.start()
     def processCalcSasThreadOutput(self, I):
         self.project.data.I = I
         self.project.data.error = 0.001 * I  # 默认生成千分之一的误差，主要用于写文件的占位
         self.showSasCurve()
         self.setPushButtonEnable(True)
         self.setProgressBarRolling(False)
+        self.consolePrint('SAS curve calculation finished')
         
     def deleteModels(self):
         pass
@@ -360,7 +366,9 @@ class mainwindowFunction:
 
     ####### some functions for GUI use ########
     def consolePrint(self, string):
-        print('[{}] {}'.format(time.strftime('%Y-%m-%d %H:%M:%S'), string))
+        console_str = '[{}] {}'.format(time.strftime('%Y-%m-%d %H:%M:%S'), string)
+        print(console_str)
+        self.ui.textEdit.append(console_str)
     def setPushButtonEnable(self, true_or_false):
         # 在某些计算过程中禁用一些按钮避免被疯狂点击
         self.ui.pushButton_genPoints.setEnabled(true_or_false)
