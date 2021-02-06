@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'mainwindow.ui'
+# Form implementation generated from reading ui file '.\mainwindow.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.2
 #
@@ -78,6 +78,11 @@ class Ui_mainWindow(object):
         self.textEdit = QtWidgets.QTextEdit(self.dockWidgetContents_2)
         self.textEdit.setObjectName("textEdit")
         self.verticalLayout.addWidget(self.textEdit)
+        self.progressBar = QtWidgets.QProgressBar(self.dockWidgetContents_2)
+        self.progressBar.setMaximum(100)
+        self.progressBar.setProperty("value", -1)
+        self.progressBar.setObjectName("progressBar")
+        self.verticalLayout.addWidget(self.progressBar)
         self.dockWidget_console.setWidget(self.dockWidgetContents_2)
         mainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(8), self.dockWidget_console)
         self.actionLoad = QtWidgets.QAction(mainWindow)

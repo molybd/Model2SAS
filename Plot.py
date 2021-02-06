@@ -79,9 +79,9 @@ def plotPointsWithSld(points_with_sld, colormap='viridis', show=True, figure=Non
 
     x, y, z, sld = points_with_sld[:, 0], points_with_sld[:, 1], points_with_sld[:, 2], points_with_sld[:, 3]
     x, y, z, sld = x.flatten(), y.flatten(), z.flatten(), sld.flatten()
-    c = sld - sld.min()  # make all positive values
+    #c = sld - sld.min()  # make all positive values...no need for positive values
     cm = plt.get_cmap(colormap)
-    sc = axes.scatter(x, y, z, c=c, cmap=cm)
+    sc = axes.scatter(x, y, z, c=sld, cmap=cm)
     figure.colorbar(sc)  # 在GUI里绘制图像应当避免使用plt的方法而是使用面向对象的绘图方式，否则plt画出来的东西在GUI中不显示
 
     scale = points_with_sld[:,:-1].flatten()

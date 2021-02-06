@@ -37,11 +37,13 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 ''' 尚待解决的问题
 主要功能：
-1. 改变stl模型sld的功能
+(solved) 1. 改变stl模型sld的功能
 2. 改变math模型参数的功能
 次要功能：
 1. 删除模型
 2. 保存project
+程序结构：
+(solved) 1. genPoints() 异步进行
 '''
 
 
@@ -93,7 +95,7 @@ class EmittingStream(QtCore.QObject):
         self.textWritten.emit(str(text))  
 
 class Thread_calcSas(QThread):
-    # 线程结束的signal，并且带有一个列表参数
+    # 线程结束的signal，并且带有一个ndarray参数
     threadEnd = pyqtSignal(np.ndarray)
     def __init__(self, q, points, sld, lmax, parallel, cpu_usage, proc_num):
         super(Thread_calcSas, self).__init__()
@@ -113,6 +115,21 @@ class Thread_calcSas(QThread):
             self.I = intensity_parallel(self.q, self.points, self.sld, self.lmax, proc_num=1)
             #I = I.tolist()
         self.threadEnd.emit(self.I)
+
+class Thread_genPoints(QThread):
+    threadEnd = pyqtSignal(object)
+    def __init__(self, project, grid_num=10000, interval=None):
+        super(Thread_genPoints, self).__init__()
+        self.temp_project = project
+        self.grid_num = grid_num
+        self.interval = interval
+    def run(self):
+        if self.interval:
+            self.temp_project.genPoints(interval=self.interval)
+        elif self.grid_num:
+            self.temp_project.genPoints(grid_num=self.grid_num)
+        self.threadEnd.emit(self.temp_project)
+        
 
 
 
@@ -139,7 +156,8 @@ class mainwindowFunction:
 
         #下面将输出重定向到textEdit中
         sys.stdout = EmittingStream(textWritten=self.outputWritten) 
-        sys.stderr = EmittingStream(textWritten=self.outputWritten)
+        #sys.stderr = EmittingStream(textWritten=self.outputWritten)
+
 
         self.consolePrint('New project established with name: {}'.format(self.project.name))
 
@@ -231,10 +249,15 @@ class mainwindowFunction:
             mathmodel = self.project.model.mathmodel_list[i]
             item1 = QStandardItem(mathmodel.name)
             self.tableModel_mathmodels.setItem(i, 0, item1)
-        
+    
+    def readStlmodelTableSld(self):
+        for i in range(len(self.project.model.stlmodel_list)):
+            sld = float(self.tableModel_stlmodels.index(i, 1).data())
+            self.project.model.stlmodel_list[i].sld = sld
 
     def showStlModels(self):
         try:
+            self.readStlmodelTableSld()
             indexes = self.ui.tableView_stlmodels.selectionModel().selectedRows()
             #self.consolePrint([index.row() for index in indexes])
             mesh_list, label_list = [], []
@@ -291,22 +314,29 @@ class mainwindowFunction:
         self.ui.mdiArea.addSubWindow(sasdataView)
         sasdataView.show()
 
-
     def genPoints(self):
+        self.readStlmodelTableSld()
         thisControlPanel = self.controlPanel
         grid_num = thisControlPanel.lineEdit_gridPointsNum.text()
         interval = thisControlPanel.lineEdit_interval.text()
         self.consolePrint('Calculating points model...Please wait...')
         self.setPushButtonEnable(False)
+        self.setProgressBarRolling(True)
+        # 异步线程genPoints
         if interval != '':
             interval = float(interval)
-            self.project.genPoints(interval=interval)
+            self.thread_genPoints = Thread_genPoints(self.project, interval=interval)
         else:
             grid_num = int(grid_num)
-            self.project.genPoints(grid_num=grid_num)
+            self.thread_genPoints = Thread_genPoints(self.project, grid_num=grid_num)
+        self.thread_genPoints.threadEnd.connect(self.processGenPointsThreadOutput)
+        self.thread_genPoints.start()
+    def processGenPointsThreadOutput(self, temp_project):
+        self.project = temp_project
         self.consolePrint('Points model generated')
-        self.setPushButtonEnable(True)
         self.showPointsWithSld()
+        self.setPushButtonEnable(True)
+        self.setProgressBarRolling(False)
 
     def calcSas(self):
         try:
@@ -331,6 +361,7 @@ class mainwindowFunction:
             proc_num = None
 
         self.setPushButtonEnable(False)
+        self.setProgressBarRolling(True)
         self.consolePrint('Calculating SAS curve...Please wait...')
         # 异步线程计算SAS
         points = self.project.data.points
@@ -339,11 +370,11 @@ class mainwindowFunction:
         self.thread_calcSas.threadEnd.connect(self.processCalcSasThreadOutput)
         self.thread_calcSas.start()
     def processCalcSasThreadOutput(self, I):
-        self.setPushButtonEnable(True)
-
         self.project.data.I = I
         self.project.data.error = 0.001 * I  # 默认生成千分之一的误差，主要用于写文件的占位
         self.showSasCurve()
+        self.setPushButtonEnable(True)
+        self.setProgressBarRolling(False)
         
     def deleteModels(self):
         pass
@@ -352,11 +383,19 @@ class mainwindowFunction:
     ####### some functions for GUI use ########
     def consolePrint(self, string):
         print('[{}] {}'.format(time.strftime('%Y-%m-%d %H:%M:%S'), string))
-
     def setPushButtonEnable(self, true_or_false):
         # 在某些计算过程中禁用一些按钮避免被疯狂点击
         self.controlPanel.pushButton_genPoints.setEnabled(true_or_false)
         self.controlPanel.pushButton_calcSas.setEnabled(true_or_false)
+    def setProgressBarRolling(self, true_or_false):
+        if true_or_false:
+            # progress bar 开始滚动
+            self.ui.progressBar.setMinimum(0)
+            self.ui.progressBar.setMaximum(0)
+        else:
+            # progress bar 停止滚动
+            self.ui.progressBar.setMinimum(0)
+            self.ui.progressBar.setMaximum(100)
     ###########################################
 
 

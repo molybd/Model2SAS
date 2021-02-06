@@ -156,14 +156,14 @@ class model:
 
         # combine all the model sections
         # !! ATTENTION !!
-        # I choose to use the higher sld value for the overlapped point
+        # I choose to use the sum(sld) value for the overlapped point
         sld_grid_index_list = []
         for stlmodel in stlmodel_list:
             sld_grid_index_list.append(stlmodel.sld_grid_index)
         for mathmodel in mathmodel_list:
             sld_grid_index_list.append(mathmodel.sld_grid_index)
         sld_grid_index_stack = np.vstack(sld_grid_index_list)
-        sld_grid_index = np.max(sld_grid_index_stack, axis=0)
+        sld_grid_index = np.sum(sld_grid_index_stack, axis=0)
 
         points = grid[np.where(sld_grid_index!=0)]
         sld = sld_grid_index[np.where(sld_grid_index!=0)]
@@ -223,21 +223,21 @@ class data:
 
 if __name__ == "__main__":
     test = model2sas('test_torus')
-    test.importFile('models\\torus.STL', sld=1)
+    test.importFile('models\\torus.STL', sld=-10)
     test.importFile('C:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
-    test.importFile('models\\new_hollow_sphere_model.py')
+    #test.importFile('models\\new_hollow_sphere_model.py')
     plotStlMeshes([stlmodel.mesh for stlmodel in test.model.stlmodel_list], label_list=[stlmodel.name for stlmodel in test.model.stlmodel_list])
     
-    plotPoints(test.model.mathmodel_list[0].sample_points)
-    plotPointsWithSld(test.model.mathmodel_list[0].sample_points_with_sld)
+    #plotPoints(test.model.mathmodel_list[0].sample_points)
+    #plotPointsWithSld(test.model.mathmodel_list[0].sample_points_with_sld)
     
     test.genPoints()
     plotPointsWithSld(test.model.points_with_sld, figure=plt.figure())
     # np.savetxt('test_points_with_sld.txt', test.points_with_sld)
-    
+    '''
     test.setupData()
     test.calcSas(0.01, 1, parallel=True)
     plotSasCurve(test.q, test.I)
-    
+    '''
 
     
