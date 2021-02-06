@@ -32,8 +32,6 @@ class Ui_mainWindow(object):
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setObjectName("menuFile")
-        self.menuView = QtWidgets.QMenu(self.menubar)
-        self.menuView.setObjectName("menuView")
         self.menuWindows = QtWidgets.QMenu(self.menubar)
         self.menuWindows.setObjectName("menuWindows")
         mainWindow.setMenuBar(self.menubar)
@@ -197,7 +195,6 @@ class Ui_mainWindow(object):
         self.menuWindows.addAction(self.actionCascade_2)
         self.menuWindows.addAction(self.actionTile_2)
         self.menubar.addAction(self.menuFile.menuAction())
-        self.menubar.addAction(self.menuView.menuAction())
         self.menubar.addAction(self.menuWindows.menuAction())
 
         self.retranslateUi(mainWindow)
@@ -207,7 +204,6 @@ class Ui_mainWindow(object):
         _translate = QtCore.QCoreApplication.translate
         mainWindow.setWindowTitle(_translate("mainWindow", "Model2SAS"))
         self.menuFile.setTitle(_translate("mainWindow", "File"))
-        self.menuView.setTitle(_translate("mainWindow", "View"))
         self.menuWindows.setTitle(_translate("mainWindow", "Windows"))
         self.dockWidget_explorer.setWindowTitle(_translate("mainWindow", "Model Explorer"))
         self.pushButton_importModels.setText(_translate("mainWindow", "import model(s)"))

@@ -45,11 +45,6 @@
     <addaction name="actionImport_model_s"/>
     <addaction name="actionDelete_all_models"/>
    </widget>
-   <widget class="QMenu" name="menuView">
-    <property name="title">
-     <string>View</string>
-    </property>
-   </widget>
    <widget class="QMenu" name="menuWindows">
     <property name="title">
      <string>Windows</string>
@@ -58,7 +53,6 @@
     <addaction name="actionTile_2"/>
    </widget>
    <addaction name="menuFile"/>
-   <addaction name="menuView"/>
    <addaction name="menuWindows"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>

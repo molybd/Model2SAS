@@ -139,6 +139,7 @@ class mainwindowFunction:
         self.ui = ui
         self.ui.actionNew_Project.triggered.connect(self.newProject)
         self.ui.actionImport_model_s.triggered.connect(self.importModels)
+        self.ui.actionDelete_all_models.triggered.connect(self.deleteAllModels)
         self.ui.actionCascade_2.triggered.connect(self.ui.mdiArea.cascadeSubWindows)
         self.ui.actionTile_2.triggered.connect(self.ui.mdiArea.tileSubWindows)
         
@@ -154,7 +155,7 @@ class mainwindowFunction:
         sys.stdout = EmittingStream(textWritten=self.outputWritten) 
         sys.stderr = EmittingStream(textWritten=self.outputWritten)
 
-
+        self.refreshTableViews()
         self.consolePrint('New project established with name: {}'.format(self.project.name))
 
     #接收信号str的信号槽
@@ -174,6 +175,12 @@ class mainwindowFunction:
             self.project = project
             self.ui.label_projectName.setText('Project: {}'.format(self.project.name))
             self.consolePrint('New project established with name: {}'.format(self.project.name))
+    
+    def deleteAllModels(self):
+        name = self.project.name
+        project = model2sas(name)
+        self.project = project
+        self.refreshTableViews()
 
     def importModels(self):
         filepath_list, filetype_list = QFileDialog.getOpenFileNames(None, 'Select Model File(s)', './', "All Files (*);;stl Files (*.stl);;math model Files (*.py)")
@@ -200,7 +207,7 @@ class mainwindowFunction:
         n_mathmodels = len(self.project.model.mathmodel_list)
 
         self.tableModel_stlmodels = QStandardItemModel(n_stlmodels, 2)
-        self.tableModel_stlmodels.setHorizontalHeaderLabels(['model', 'sld'])
+        self.tableModel_stlmodels.setHorizontalHeaderLabels(['stl model', 'sld'])
         self.ui.tableView_stlmodels.setModel(self.tableModel_stlmodels)
         #self.ui.tableView_stlmodels.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)  # 横向填满
         #self.ui.tableView_stlmodels.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)  # 纵向填满
@@ -213,7 +220,7 @@ class mainwindowFunction:
             self.tableModel_stlmodels.setItem(i, 1, item2)
 
         self.tableModel_mathmodels = QStandardItemModel(n_mathmodels, 1)
-        self.tableModel_mathmodels.setHorizontalHeaderLabels(['model'])
+        self.tableModel_mathmodels.setHorizontalHeaderLabels(['math model'])
         self.ui.tableView_mathmodels.setModel(self.tableModel_mathmodels)
         self.ui.tableView_mathmodels.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)  # 横向填满
         #self.ui.tableView_stlmodels.verticalHeader().setSectionResizeMode(QHeaderView.Stretch)  # 纵向填满
