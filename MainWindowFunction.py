@@ -25,7 +25,6 @@ from matplotlib.figure import Figure
 
 # my own qtgui files
 from qtgui.mainwindow_ui import Ui_mainWindow
-from qtgui.controlPanel_ui import Ui_controlPanel
 from qtgui.stlmodelView_ui import Ui_stlmodelView
 from qtgui.mathmodelView_ui import Ui_mathmodelView
 from qtgui.sasdataView_ui import Ui_sasdataView
@@ -44,13 +43,10 @@ from PyQt5.QtCore import QThread, pyqtSignal
 2. 保存project
 程序结构：
 (solved) 1. genPoints() 异步进行
+2. control panel 变成dock widget
 '''
 
 
-class ControlPanelWindow(QWidget, Ui_controlPanel):
-    def __init__(self, parent=None):
-        super(ControlPanelWindow, self).__init__(parent)
-        self.setupUi(self)
 class stlmodelViewWindow(QWidget, Ui_stlmodelView):
     def __init__(self, parent=None):
         super(stlmodelViewWindow, self).__init__(parent)
@@ -142,7 +138,6 @@ class mainwindowFunction:
 
         self.ui = ui
         self.ui.actionNew_Project.triggered.connect(self.newProject)
-        self.ui.actionControl_Panel.triggered.connect(self.showControlPanel)
         self.ui.actionImport_model_s.triggered.connect(self.importModels)
         self.ui.actionCascade_2.triggered.connect(self.ui.mdiArea.cascadeSubWindows)
         self.ui.actionTile_2.triggered.connect(self.ui.mdiArea.tileSubWindows)
@@ -152,11 +147,12 @@ class mainwindowFunction:
         self.ui.pushButton_showStlmodels.clicked.connect(self.showStlModels)
         self.ui.pushButton_showMathmodel.clicked.connect(self.showMathModel)
         self.ui.pushButton_deleteModel.clicked.connect(self.deleteModels)
-        self.initControlPanel()
+        self.ui.pushButton_genPoints.clicked.connect(self.genPoints)
+        self.ui.pushButton_calcSas.clicked.connect(self.calcSas)
 
         #下面将输出重定向到textEdit中
         sys.stdout = EmittingStream(textWritten=self.outputWritten) 
-        #sys.stderr = EmittingStream(textWritten=self.outputWritten)
+        sys.stderr = EmittingStream(textWritten=self.outputWritten)
 
 
         self.consolePrint('New project established with name: {}'.format(self.project.name))
@@ -167,30 +163,7 @@ class mainwindowFunction:
         cursor.movePosition(QtGui.QTextCursor.End)  
         cursor.insertText(text)
         self.ui.textEdit.setTextCursor(cursor)
-        self.ui.textEdit.ensureCursorVisible()   
-
-    def initControlPanel(self):
-        '''
-        widget = QWidget()
-        controlPanel = Ui_controlPanel()
-        controlPanel.setupUi(widget)
-        #controlPanel.setWindowFlags(QtCore.Qt.WindowMinimizeButtonHint)
-        QWidget.setWindowFlags(QtCore.Qt.WindowMinimizeButtonHint)
-        controlPanel.pushButton_genPoints.clicked.connect(self.genPoints)
-        controlPanel.pushButton_calcSas.clicked.connect(self.calcSas)
-        self.controlPanel = controlPanel
-        self.ui.mdiArea.addSubWindow(widget)
-        widget.show()
-        '''
-        controlPanel = ControlPanelWindow()
-        controlPanel.pushButton_genPoints.clicked.connect(self.genPoints)
-        controlPanel.pushButton_calcSas.clicked.connect(self.calcSas)
-        self.controlPanel = controlPanel
-        self.ui.mdiArea.addSubWindow(self.controlPanel)
-        self.controlPanel.show()
-
-    def showControlPanel(self):
-        self.initControlPanel()
+        self.ui.textEdit.ensureCursorVisible()
 
     def newProject(self):
         name, ok_pressed = QInputDialog.getText(None, 'New Project', 'Name: ')
@@ -316,9 +289,8 @@ class mainwindowFunction:
 
     def genPoints(self):
         self.readStlmodelTableSld()
-        thisControlPanel = self.controlPanel
-        grid_num = thisControlPanel.lineEdit_gridPointsNum.text()
-        interval = thisControlPanel.lineEdit_interval.text()
+        grid_num = self.ui.lineEdit_gridPointsNum.text()
+        interval = self.ui.lineEdit_interval.text()
         self.consolePrint('Calculating points model...Please wait...')
         self.setPushButtonEnable(False)
         self.setProgressBarRolling(True)
@@ -344,17 +316,16 @@ class mainwindowFunction:
         except:
             self.genPoints()
         self.project.setupData()
-        thisControlPanel = self.controlPanel
-        qmin = float(thisControlPanel.lineEdit_qmin.text())
-        qmax = float(thisControlPanel.lineEdit_qmax.text())
-        qnum = int(thisControlPanel.lineEdit_qnum.text())
-        lmax = int(thisControlPanel.lineEdit_lmax.text())
+        qmin = float(self.ui.lineEdit_qmin.text())
+        qmax = float(self.ui.lineEdit_qmax.text())
+        qnum = int(self.ui.lineEdit_qnum.text())
+        lmax = int(self.ui.lineEdit_lmax.text())
         q = self.project.data.genQ(qmin, qmax, qnum=qnum)
         self.project.data.q = q
         self.project.data.lmax = lmax
-        parallel = thisControlPanel.checkBox_parallel.isChecked()
-        cpu_usage = float(thisControlPanel.lineEdit_cpuUsage.text())
-        proc_num = thisControlPanel.lineEdit_processNum.text()
+        parallel = self.ui.checkBox_parallel.isChecked()
+        cpu_usage = float(self.ui.lineEdit_cpuUsage.text())
+        proc_num = self.ui.lineEdit_processNum.text()
         if proc_num != '':
             proc_num = int(proc_num)
         else:
@@ -385,8 +356,8 @@ class mainwindowFunction:
         print('[{}] {}'.format(time.strftime('%Y-%m-%d %H:%M:%S'), string))
     def setPushButtonEnable(self, true_or_false):
         # 在某些计算过程中禁用一些按钮避免被疯狂点击
-        self.controlPanel.pushButton_genPoints.setEnabled(true_or_false)
-        self.controlPanel.pushButton_calcSas.setEnabled(true_or_false)
+        self.ui.pushButton_genPoints.setEnabled(true_or_false)
+        self.ui.pushButton_calcSas.setEnabled(true_or_false)
     def setProgressBarRolling(self, true_or_false):
         if true_or_false:
             # progress bar 开始滚动
