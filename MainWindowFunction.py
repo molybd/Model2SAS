@@ -315,21 +315,24 @@ class mainwindowFunction:
         sasdataView.show()
 
     def genPoints(self):
-        self.readStlmodelTableSld()
-        grid_num = self.ui.lineEdit_gridPointsNum.text()
-        interval = self.ui.lineEdit_interval.text()
-        self.consolePrint('Calculating points model...Please wait...')
-        self.setPushButtonEnable(False)
-        self.setProgressBarRolling(True)
-        # 异步线程genPoints
-        if interval != '':
-            interval = float(interval)
-            self.thread_genPoints = Thread_genPoints(self.project, interval=interval)
+        if len(self.project.model.stlmodel_list)==0 and len(self.project.model.mathmodel_list)==0:
+            self.consolePrint('(X) Please import model(s) first !')
         else:
-            grid_num = int(grid_num)
-            self.thread_genPoints = Thread_genPoints(self.project, grid_num=grid_num)
-        self.thread_genPoints.threadEnd.connect(self.processGenPointsThreadOutput)
-        self.thread_genPoints.start()
+            self.readStlmodelTableSld()
+            grid_num = self.ui.lineEdit_gridPointsNum.text()
+            interval = self.ui.lineEdit_interval.text()
+            self.consolePrint('Calculating points model...Please wait...')
+            self.setPushButtonEnable(False)
+            self.setProgressBarRolling(True)
+            # 异步线程genPoints
+            if interval != '':
+                interval = float(interval)
+                self.thread_genPoints = Thread_genPoints(self.project, interval=interval)
+            else:
+                grid_num = int(grid_num)
+                self.thread_genPoints = Thread_genPoints(self.project, grid_num=grid_num)
+            self.thread_genPoints.threadEnd.connect(self.processGenPointsThreadOutput)
+            self.thread_genPoints.start()
     def processGenPointsThreadOutput(self, temp_project):
         self.project = temp_project
         self.consolePrint('Points model generated')
