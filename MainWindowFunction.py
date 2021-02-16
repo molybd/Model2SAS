@@ -40,11 +40,11 @@ Bug:
 2. 计算SAS曲线时q点数太少会报错
 主要功能：
 (solved) 1. 改变stl模型sld的功能
-2. 改变math模型参数的功能
+(shelved) 2. 改变math模型参数的功能
 次要功能：
-1. 删除模型
+(solved) 1. 删除模型
 (solved) 2. 删除所有模型
-2. 保存project
+3. 保存project
 程序结构：
 (solved) 1. genPoints() 异步进行
 (solved) 2. control panel 变成dock widget
@@ -149,6 +149,7 @@ class mainwindowFunction:
         
         self.ui.label_projectName.setText('Project: {}'.format(self.project.name))
         self.ui.pushButton_importModels.clicked.connect(self.importModels)
+        self.ui.pushButton_deleteModel.clicked.connect(self.deleteModel)
         self.ui.pushButton_showStlmodels.clicked.connect(self.showStlModels)
         self.ui.pushButton_showMathmodel.clicked.connect(self.showMathModel)
         self.ui.pushButton_deleteModel.clicked.connect(self.deleteModels)
@@ -201,9 +202,24 @@ class mainwindowFunction:
             self.project.importFile(filepath, sld=1)
             filetype = filepath.split('.')[-1].upper()
             if filetype == 'STL':
-                self.consolePrint('import {} models with path: {}'.format(filetype, filepath))
+                self.consolePrint('Import {} models with path: {}'.format(filetype, filepath))
             elif filetype == 'PY':
-                self.consolePrint('import {} models with path: {}'.format('MATH', filepath))
+                self.consolePrint('Import {} models with path: {}'.format('MATH', filepath))
+        self.refreshTableViews()
+
+    def deleteModel(self):
+        # delete selected stlmodel
+        indexes = self.ui.tableView_stlmodels.selectionModel().selectedRows()
+        if len(indexes) != 0:
+            i = indexes[0].row()  # 只删除选中的第一行
+            self.consolePrint('Delete STL model: {}'.format(self.project.model.stlmodel_list[i].name))
+            del self.project.model.stlmodel_list[i]
+        # delete selected mathmodel
+        indexes = self.ui.tableView_mathmodels.selectionModel().selectedRows()
+        if len(indexes) != 0:
+            i = indexes[0].row()  # 只删除选中的第一行
+            self.consolePrint('Delete MATH model: {}'.format(self.project.model.mathmodel_list[i].name))
+            del self.project.model.mathmodel_list[i]
         self.refreshTableViews()
 
     def refreshTableViews(self):
@@ -345,7 +361,7 @@ class mainwindowFunction:
 
             self.setPushButtonEnable(False)
             self.setProgressBarRolling(True)
-            self.consolePrint('Calculating SAS curve...Please wait...')
+            self.consolePrint('Calculating SAS curve...Please wait...See CLI for progress')
             # 异步线程计算SAS
             points = self.project.data.points
             sld = self.project.data.sld

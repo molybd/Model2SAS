@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'mathmodelView.ui'
+# Form implementation generated from reading ui file '.\mathmodelView.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.2
 #
@@ -14,27 +14,16 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_mathmodelView(object):
     def setupUi(self, mathmodelView):
         mathmodelView.setObjectName("mathmodelView")
-        mathmodelView.resize(644, 426)
+        mathmodelView.resize(614, 470)
         font = QtGui.QFont()
         font.setFamily("Arial")
         font.setPointSize(10)
         mathmodelView.setFont(font)
         self.gridLayout = QtWidgets.QGridLayout(mathmodelView)
         self.gridLayout.setObjectName("gridLayout")
-        self.groupBox = QtWidgets.QGroupBox(mathmodelView)
-        self.groupBox.setObjectName("groupBox")
-        self.verticalLayout = QtWidgets.QVBoxLayout(self.groupBox)
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.tableView = QtWidgets.QTableView(self.groupBox)
-        self.tableView.setObjectName("tableView")
-        self.verticalLayout.addWidget(self.tableView)
-        self.pushButton_useNewParams = QtWidgets.QPushButton(self.groupBox)
-        self.pushButton_useNewParams.setObjectName("pushButton_useNewParams")
-        self.verticalLayout.addWidget(self.pushButton_useNewParams)
-        self.gridLayout.addWidget(self.groupBox, 0, 0, 1, 1)
         self.graphicsView = QtWidgets.QGraphicsView(mathmodelView)
         self.graphicsView.setObjectName("graphicsView")
-        self.gridLayout.addWidget(self.graphicsView, 0, 1, 1, 1)
+        self.gridLayout.addWidget(self.graphicsView, 0, 0, 1, 1)
 
         self.retranslateUi(mathmodelView)
         QtCore.QMetaObject.connectSlotsByName(mathmodelView)
@@ -42,5 +31,3 @@ class Ui_mathmodelView(object):
     def retranslateUi(self, mathmodelView):
         _translate = QtCore.QCoreApplication.translate
         mathmodelView.setWindowTitle(_translate("mathmodelView", "math model view"))
-        self.groupBox.setTitle(_translate("mathmodelView", "Parameters"))
-        self.pushButton_useNewParams.setText(_translate("mathmodelView", "use new parameters"))
