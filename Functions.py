@@ -126,20 +126,33 @@ def intensity_parallel(q, points, f, lmax, cpu_usage=0.6, proc_num=None):
     else:
         proc_num = round(cpu_usage*cpu_count())
     # 确定切片的数目
-    slice_length = 10
-    k = round(q.size/slice_length/proc_num)
-    slice_num = k * proc_num
-    slice_length = np.ceil(q.size/slice_num)
-    
-    slice_num, slice_length = int(slice_num), int(slice_length)
-    slice_index_begin = [i*slice_length for i in range(slice_num)]
-    slice_index_end = [(i+1)*slice_length for i in range(slice_num)]
+    if proc_num == 1:
+        slice_num = 20 * proc_num
+    elif proc_num <= 3:
+        slice_num = 10 * proc_num
+    elif proc_num <= 6:
+        slice_num = 5 * proc_num
+    elif proc_num <= 9:
+        slice_num = 4 * proc_num
+    elif proc_num <= 12:
+        slice_num = 3 * proc_num
+    elif proc_num <= 20:
+        slice_num = 2 * proc_num
+    elif proc_num > 20:
+        slice_num = 1 * proc_num
+
+    slice_length = round(q.size/slice_num)
     q_list = []
-    for i in range(slice_num):
-        q_list.append(q[slice_index_begin[i]:slice_index_end[i]])
+    for i in range(slice_num-1):
+        q_list.append(q[i*slice_length:(i+1)*slice_length])
+    q_list.append(q[(slice_num-1)*slice_length:])
+    # 有时候最后几个是空的，得去掉不然会报错
+    while q_list[-1].size == 0:
+        q_list.pop()
+
     #这里使用p_tqdm库来实现多进程下的进度条
     I_list= p_map(intensity, q_list, [points]*slice_num, [f]*slice_num, [lmax]*slice_num, num_cpus=proc_num)
-    I = np.array(I_list, dtype='float32')
+    I = np.hstack(I_list)
     I = I.reshape(I.size)
     return I
 
@@ -239,7 +252,7 @@ if __name__ == "__main__":
     begintime = time.time()
     #print('{:^10}|{:^10}'.format('item', 'time/sec'))
     #I = intensity(q, points, f, lmax)
-    I = intensity_parallel(q, points, f, lmax, proc_num=1)
+    I = intensity_parallel(q, points, f, lmax, proc_num=13)
     endtime = time.time()
     print('total time: {} sec'.format(round(endtime-begintime, 2)))
     #print(I)
