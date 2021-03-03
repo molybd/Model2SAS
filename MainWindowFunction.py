@@ -111,9 +111,7 @@ class Thread_calcSas(QThread):
         if self.parallel:
             self.I = intensity_parallel(self.q, self.points, self.sld, self.lmax, cpu_usage=self.cpu_usage, proc_num=self.proc_num)
         else:
-            #I = intensity_parallel(self.q, self.points, self.sld, self.lmax, proc_num=1)
-            self.I = intensity_parallel(self.q, self.points, self.sld, self.lmax, proc_num=1)
-            #I = I.tolist()
+            self.I = intensity(self.q, self.points, self.sld, self.lmax)
         self.threadEnd.emit(self.I)
 
 class Thread_genPoints(QThread):
@@ -152,7 +150,6 @@ class mainwindowFunction:
         self.ui.pushButton_deleteModel.clicked.connect(self.deleteModel)
         self.ui.pushButton_showStlmodels.clicked.connect(self.showStlModels)
         self.ui.pushButton_showMathmodel.clicked.connect(self.showMathModel)
-        self.ui.pushButton_deleteModel.clicked.connect(self.deleteModels)
         self.ui.pushButton_genPoints.clicked.connect(self.genPoints)
         self.ui.pushButton_calcSas.clicked.connect(self.calcSas)
         
@@ -364,25 +361,24 @@ class mainwindowFunction:
 
             self.setPushButtonEnable(False)
             self.setProgressBarRolling(True)
-            self.consolePrint('Calculating SAS curve...Please wait...See CLI for progress')
+            self.consolePrint('Calculating SAS curve...Please wait...')
             # 异步线程计算SAS
             points = self.project.data.points
             sld = self.project.data.sld
             self.thread_calcSas = Thread_calcSas(q, points, sld, lmax, parallel, cpu_usage, proc_num)  # 这里的thread写成self.thread是为了防止start之后这个方法结束这个变量被回收了，会导致错误：QThread: Destroyed while thread is still running
             self.thread_calcSas.threadEnd.connect(self.processCalcSasThreadOutput)
+            self.begintime = time.time()
             self.thread_calcSas.start()
     def processCalcSasThreadOutput(self, I):
+        endtime = time.time()
         self.project.data.I = I
         self.project.data.error = 0.001 * I  # 默认生成千分之一的误差，主要用于写文件的占位
         self.showSasCurve()
         self.setPushButtonEnable(True)
         self.setProgressBarRolling(False)
-        self.consolePrint('SAS curve calculation finished')
-        
-    def deleteModels(self):
-        pass
-    
+        self.consolePrint('SAS curve calculation finished. Time consumed: {} sec'.format(round(endtime-self.begintime, 2)))
 
+    
     ####### some functions for GUI use ########
     def consolePrint(self, string):
         console_str = '[{}] {}'.format(time.strftime('%Y-%m-%d %H:%M:%S'), string)
