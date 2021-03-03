@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 
 import numpy as np
-from scipy.special import sph_harm, spherical_jn, jv
+from scipy.special import sph_harm, spherical_jn
 from multiprocessing import cpu_count
 from p_tqdm import p_map
 
@@ -15,32 +15,21 @@ def printTime(last_timestamp, item):
 
 def intensity(q, points, f, lmax):
 
-    def jl(q, r, l):
-        r_ext1 = np.stack([r]*n_l, axis=-1)  # (r,) -> (r, l)
-        r_ext1 = np.stack([r_ext1]*n_q, axis=-1)  # (r, l) -> (r, l, q)
-        q_ext1 = np.stack([q]*n_l, axis=0)  # (q,) -> (l, q)
-        q_ext1 = np.stack([q_ext1]*n_r, axis=0)  # (l, q) -> (r, l, q)
-        rq_ext1 = r_ext1 * q_ext1   # (r, l, q)
-        l_ext1 = np.stack([l]*n_r, axis=0)  # (l,) -> (r, l)
-        l_ext1 = np.stack([l_ext1]*n_q, axis=-1)  # (r, l) -> (r, l, q)
+    def calc_jl(q, r, l):
+        # use einsum instead
+        rq_ext1 = np.einsum('r,l,q->rlq', r, np.ones_like(l), q) # (r, l, q)
+        l_ext1 = np.einsum('r,l,q->rlq', np.ones_like(r, dtype='int16'), l, np.ones_like(q, dtype='int16')) # (r, l, q)
         jl = spherical_jn(l_ext1, rq_ext1)  # (r, l, q)
         return jl.astype('float32')  # (r, l, q)
 
-    def Ylm(l_ext, m, theta, phi):
-        theta_ext2 = np.stack([theta]*n_m, axis=-1)  # (r,) -> (r, m)
-        phi_ext2 = np.stack([phi]*n_m, axis=-1)  # (r,) -> (r, m)
-        l_ext2 = np.stack([l_ext]*n_r, axis=0)  # (m,) -> (r, m)
-        m_ext2 = np.stack([m]*n_r, axis=0)  # (m,) -> (r, m)
+    def calc_Ylm(l_ext, m, theta, phi):
+        theta_ext2 = np.einsum('r,m->rm', theta, np.ones_like(m, dtype='float32'))  # (r,) -> (r, m)
+        phi_ext2 = np.einsum('r,m->rm', phi, np.ones_like(m, dtype='float32'))  # (r,) -> (r, m)
+        l_ext2 = np.einsum('r,m->rm', np.ones_like(theta, dtype='int16'), l_ext)  # (m,) -> (r, m)
+        m_ext2 = np.einsum('r,m->rm', np.ones_like(theta, dtype='int16'), m)  # (m,) -> (r, m)
+
         Ylm = sph_harm(m_ext2, l_ext2, theta_ext2, phi_ext2)  # (r, m)
         return Ylm.astype('complex64')  # (r, m)
-
-    def Sigma(f_ext3, jl_ext3, Ylm_ext1):
-        Ylm_ext3 = np.stack([Ylm_ext1]*n_q, axis=-1)  #(r, m) -> (r, m, q)
-        #timestamp1 = printTime(timestamp, 'Ylm_ext3')
-        Sigma1 = f_ext3 * jl_ext3 * Ylm_ext3  # (r, m, q)
-        #timestamp1 = printTime(timestamp1, 'f_ext3')
-        return np.sum(Sigma1, axis=0)  # (m, q)
-
 
     q = q.astype('float32')
     q = q.reshape(q.size)  # (q,)
@@ -54,7 +43,7 @@ def intensity(q, points, f, lmax):
 
 
     # _ext means extended
-    # TIPS: use np.stack() to expand the dimension of array
+    # TIPS: use einsum() method
 
     #timestamp0 = time.time()
 
@@ -71,43 +60,31 @@ def intensity(q, points, f, lmax):
 
     n_r, n_l, n_m, n_q = r.size, l.size, m.size, q.size
 
-    jl_ext1 = jl(q, r, l)  # (r, l, q)
-    #timestamp = printTime(timestamp, 'jl_ext1')
+    jl = calc_jl(q, r, l)  # (r, l, q)
+    #timestamp = printTime(timestamp, 'jl')
 
-    Ylm_ext1 = Ylm(l_ext, m, theta, phi)  # (r, m)
-    #timestamp = printTime(timestamp, 'Ylm_ext1')
-
-    # 接下来把各个部分都扩展成 shape=(r, m, q)
-    # 尽量避免使用python循环嵌套，太慢了！！
-
-    # 这一步使用一个循环比使用np.dot快得多
-    f_ext3 = np.stack([f]*n_m, axis=-1)  # (r,) -> (r, m)
-    f_ext3 = np.stack([f_ext3]*n_q, axis=-1)  # (r, m) -> (r, m, q)
-    #timestamp = printTime(timestamp, 'f_ext3')
+    Ylm = calc_Ylm(l_ext, m, theta, phi)  # (r, m)
+    #timestamp = printTime(timestamp, 'Ylm')
 
     # (r, l, q) -> (r, m, q)
     jl_ext3 = []
     for i in range(n_r):
         temp = []
         for j in range(n_l):
-            temp += [ jl_ext1[i,j,:] ]*(2*j+1)  # (m, q)
+            temp += [ jl[i,j,:] ]*(2*j+1)  # (m, q)
         jl_ext3.append(temp)
     jl_ext3 = np.array(jl_ext3, dtype='float32')  # (r, m, q)
     #timestamp = printTime(timestamp, 'jl_ext3')
-
-    Sigma1 = Sigma(f_ext3, jl_ext3, Ylm_ext1)
-    #timestamp = printTime(timestamp, 'Sigma1')
 
     il = complex(0,1)**l  # (l,)
     il_ext4 = []
     for i in range(n_l):
         il_ext4 += [il[i]]*(2*i+1)
-    # il_ext4.shape == (m,)
-    il_ext5 = np.array([il_ext4_i*np.ones_like(q) for il_ext4_i in il_ext4], dtype='complex64')  # (m, q)
-    #timestamp = printTime(timestamp, 'il_ext5')
+    il_ext4 = np.array(il_ext4, dtype='complex64')  # (m,)
+    #timestamp = printTime(timestamp, 'il_ext4')
 
-    Alm = il_ext5 * Sigma1  # (m, q)
-    #timestamp = printTime(timestamp, 'Alm3')
+    Alm = np.einsum('m,r,rmq,rm->mq', il_ext4, f, jl_ext3, Ylm)  # (m, q)
+    #timestamp = printTime(timestamp, 'Alm')
     I = 16 * np.pi**2 * np.sum(np.absolute(Alm)**2, axis=0)  # (q,)
     #timestamp = printTime(timestamp, 'I')
 
@@ -115,38 +92,28 @@ def intensity(q, points, f, lmax):
 
 
 def intensity_parallel(q, points, f, lmax, cpu_usage=0.6, proc_num=None):
-    # 本来是每一个q一个进程，但是在这里我希望把q切的不那么细，这样的话就不至于在建立进程上开销太大
-    # 目前想的策略是切成并行进程数的4倍左右，但是每一个切片内q的数目在10~20比较好吧大概
-    # 太大了会占用太多内存，太小了又会在建立进程上开销太大
-    # 具体的值还得再试试
-
+    '''
+    使用einsum后单进程速度也加快了非常多，并且内存占用也没有那么大了，其实单进程就完全可用了。
+    但是为了以防万一需要更快速的计算，还是保留多进程。
+    不过现在切片太细之后建立进程的时间反倒比计算时间还长，得不偿失，因此建议减少并行度
+    '''
     # 确定proc_num
     if proc_num:
-        proc_num = int(proc_num)
+        if proc_num > cpu_count():
+            proc_num = cpu_count()
+        else:
+            proc_num = int(proc_num)
     else:
         proc_num = round(cpu_usage*cpu_count())
-    # 确定切片的数目
-    if proc_num == 1:
-        slice_num = 20 * proc_num
-    elif proc_num <= 3:
-        slice_num = 10 * proc_num
-    elif proc_num <= 6:
-        slice_num = 5 * proc_num
-    elif proc_num <= 9:
-        slice_num = 4 * proc_num
-    elif proc_num <= 12:
-        slice_num = 3 * proc_num
-    elif proc_num <= 20:
-        slice_num = 2 * proc_num
-    elif proc_num > 20:
-        slice_num = 1 * proc_num
+
+    slice_num = proc_num
 
     slice_length = round(q.size/slice_num)
     q_list = []
     for i in range(slice_num-1):
         q_list.append(q[i*slice_length:(i+1)*slice_length])
     q_list.append(q[(slice_num-1)*slice_length:])
-    # 有时候最后几个是空的，得去掉不然会报错
+    # 以防最后几个是空的，得去掉不然会报错
     while q_list[-1].size == 0:
         q_list.pop()
 
@@ -251,8 +218,8 @@ if __name__ == "__main__":
 
     begintime = time.time()
     #print('{:^10}|{:^10}'.format('item', 'time/sec'))
-    #I = intensity(q, points, f, lmax)
-    I = intensity_parallel(q, points, f, lmax, proc_num=13)
+    I = intensity(q, points, f, lmax)
+    #I = intensity_parallel(q, points, f, lmax, proc_num=1)
     endtime = time.time()
     print('total time: {} sec'.format(round(endtime-begintime, 2)))
     #print(I)
