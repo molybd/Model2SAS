@@ -140,6 +140,9 @@ class mainwindowFunction:
 
         self.ui = ui
         self.ui.actionNew_Project.triggered.connect(self.newProject)
+        self.ui.actionSave_project.triggered.connect(self.saveProject)
+        self.ui.actionSave_points_model.triggered.connect(self.savePointsModel)
+        self.ui.actionSave_SAS_curve.triggered.connect(self.saveSasCurve)
         self.ui.actionImport_model_s.triggered.connect(self.importModels)
         self.ui.actionDelete_all_models.triggered.connect(self.deleteAllModels)
         self.ui.actionCascade_2.triggered.connect(self.ui.mdiArea.cascadeSubWindows)
@@ -177,6 +180,15 @@ class mainwindowFunction:
             self.project = project
             self.ui.label_projectName.setText('Project: {}'.format(self.project.name))
             self.consolePrint('New project established with name: {}'.format(self.project.name))
+
+    def saveProject(self):
+        pass
+    def savePointsModel(self):
+        pass
+    def saveSasCurve(self):
+        q, I = self.project.data.q, self.project.data.I
+        data = np.vstack((q,I)).T
+        np.savetxt('models/sas_data.dat', data, header='q\tI')
     
     def deleteAllModels(self):
         name = self.project.name

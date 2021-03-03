@@ -40,7 +40,9 @@
      <string>File</string>
     </property>
     <addaction name="actionNew_Project"/>
-    <addaction name="actionSave"/>
+    <addaction name="actionSave_project"/>
+    <addaction name="actionSave_points_model"/>
+    <addaction name="actionSave_SAS_curve"/>
     <addaction name="separator"/>
     <addaction name="actionImport_model_s"/>
     <addaction name="actionDelete_all_models"/>
@@ -316,9 +318,9 @@
     <string>Load Project</string>
    </property>
   </action>
-  <action name="actionSave">
+  <action name="actionSave_project">
    <property name="text">
-    <string>Save Project</string>
+    <string>Save project</string>
    </property>
   </action>
   <action name="actionImport_model_s">
@@ -353,12 +355,22 @@
   </action>
   <action name="actionNew_Project">
    <property name="text">
-    <string>New Project</string>
+    <string>New project</string>
    </property>
   </action>
   <action name="actionDelete_all_models">
    <property name="text">
     <string>Delete all models</string>
+   </property>
+  </action>
+  <action name="actionSave_points_model">
+   <property name="text">
+    <string>Save points model</string>
+   </property>
+  </action>
+  <action name="actionSave_SAS_curve">
+   <property name="text">
+    <string>Save SAS curve</string>
    </property>
   </action>
   <zorder>dockWidget_controlPanel</zorder>
