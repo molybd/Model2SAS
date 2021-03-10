@@ -23,16 +23,7 @@ class model2sas:
     def __init__(self, name):
         ''' Make project folder: dir/name
         '''
-        '''
-        # 改结构，不在一开始就建立文件夹了
-        path = os.path.abspath(os.path.join(dir, name))
-        try:
-            os.mkdir(path)
-        except FileExistsError:
-            print('path already exists')
-        finally:
-            print('project dir: {}'.format(path))
-        '''
+        
         self.name = name
         self.setupModel()
 
@@ -42,13 +33,6 @@ class model2sas:
     def importFile(self, filepath, sld=1):
         filepath = os.path.abspath(filepath)
         basename = os.path.basename(filepath)
-        '''
-        destination_path = os.path.join(self.path, basename)
-        try:
-            copyfile(filepath, destination_path)
-        except:
-            print('file already exists, using existed model file')
-        '''
         filetype = filepath.split('.')[-1].lower()
         if filetype == 'stl':
             self.model.importStlFile(filepath, sld)
@@ -66,7 +50,7 @@ class model2sas:
     def setupData(self):
         self.data = data(self.model.points_with_sld)
 
-    def calcSas(self, qmin, qmax, qnum=200, logq=False, lmax=50, parallel=True, cpu_usage=0.6):
+    def calcSas(self, qmin, qmax, qnum=200, logq=False, lmax=50, parallel=False, cpu_usage=0.6):
         q = self.data.genQ(qmin, qmax, qnum=qnum, logq=logq)
         self.data.calcSas(q, lmax=lmax, parallel=parallel, cpu_usage=cpu_usage)
         self.q = self.data.q
@@ -75,7 +59,7 @@ class model2sas:
 
     def saveSasData(self, filename):
         header = 'q\tI\tpseudo error(I/1000)'
-        data = np.vstack((self.q, self.I, self.data.error)).T
+        data = np.vstack((self.data.q, self.data.I, self.data.error)).T
         np.savetxt(filename, data, header=header)
 
 
@@ -207,13 +191,13 @@ class data:
             q = np.linspace(qmin, qmax, num=qnum, dtype='float32')
         return q
 
-    def calcSas(self, q, lmax=50, parallel=True, cpu_usage=0.6):
+    def calcSas(self, q, lmax=50, parallel=False, cpu_usage=0.6):
         points = self.points
         sld = self.sld
         if parallel:
             I = intensity_parallel(q, points, sld, lmax, cpu_usage=cpu_usage)
         else:
-            I = intensity_parallel(q, points, sld, lmax, proc_num=1)
+            I = intensity(q, points, sld, lmax)
 
         self.q = q
         self.I = I
@@ -222,22 +206,22 @@ class data:
 
 
 if __name__ == "__main__":
-    test = model2sas('test_torus')
-    test.importFile('models\\torus.STL', sld=-10)
-    test.importFile('C:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
-    #test.importFile('models\\new_hollow_sphere_model.py')
-    plotStlMeshes([stlmodel.mesh for stlmodel in test.model.stlmodel_list], label_list=[stlmodel.name for stlmodel in test.model.stlmodel_list])
+    project = model2sas('test_torus')
+    project.importFile('models\\torus.STL', sld=-10)
+    project.importFile('C:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
+    #project.importFile('models\\new_hollow_sphere_model.py')
+    plotStlMeshes([stlmodel.mesh for stlmodel in project.model.stlmodel_list], label_list=[stlmodel.name for stlmodel in project.model.stlmodel_list])
     
-    #plotPoints(test.model.mathmodel_list[0].sample_points)
-    #plotPointsWithSld(test.model.mathmodel_list[0].sample_points_with_sld)
+    #plotPoints(project.model.mathmodel_list[0].sample_points)
+    #plotPointsWithSld(project.model.mathmodel_list[0].sample_points_with_sld)
     
-    test.genPoints()
-    plotPointsWithSld(test.model.points_with_sld, figure=plt.figure())
-    # np.savetxt('test_points_with_sld.txt', test.points_with_sld)
+    project.genPoints()
+    plotPointsWithSld(project.model.points_with_sld, figure=plt.figure())
+    # np.savetxt('project_points_with_sld.txt', project.points_with_sld)
     '''
-    test.setupData()
-    test.calcSas(0.01, 1, parallel=True)
-    plotSasCurve(test.q, test.I)
+    project.setupData()
+    project.calcSas(0.01, 1, parallel=True)
+    plotSasCurve(project.q, project.I)
     '''
 
     

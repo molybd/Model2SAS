@@ -1,6 +1,8 @@
 # -*- coding: UTF-8 -*-
 
 import os
+import shutil
+import zipfile
 import time
 import numpy as np
 from stl import mesh
@@ -140,6 +142,7 @@ class mainwindowFunction:
 
         self.ui = ui
         self.ui.actionNew_Project.triggered.connect(self.newProject)
+        self.ui.actionLoad_project.triggered.connect(self.loadProject)
         self.ui.actionSave_project.triggered.connect(self.saveProject)
         self.ui.actionSave_points_model.triggered.connect(self.savePointsModel)
         self.ui.actionSave_SAS_curve.triggered.connect(self.saveSasCurve)
@@ -181,14 +184,58 @@ class mainwindowFunction:
             self.ui.label_projectName.setText('Project: {}'.format(self.project.name))
             self.consolePrint('New project established with name: {}'.format(self.project.name))
 
+    def loadProject(self):
+        self.consolePrint('Sorry, this function is still under development.')
+
     def saveProject(self):
-        pass
+        try:
+            self.project.points_with_sld
+            self.project.data.I
+        except:
+            self.consolePrint('(X) Project not completed...')
+        else:
+            folder = QFileDialog.getExistingDirectory(None, 'Select project saving directory', './')
+            project_name = self.project.name
+            filelist = []
+            for stlmodel in self.project.model.stlmodel_list:
+                filelist.append(stlmodel.filepath)
+            for mathmodel in self.project.model.mathmodel_list:
+                filelist.append(mathmodel.filepath)
+            
+            temp_folder = './.TEMP_Model2SAS'
+            if not os.path.exists(temp_folder):
+                os.mkdir(temp_folder)
+            filepath_points_model = '{}/PointsModel.txt'.format(temp_folder)
+            filepath_sas_curve = '{}/SasCurve.dat'.format(temp_folder)
+            self.project.savePointsWithSld(filepath_points_model)
+            self.project.saveSasData(filepath_sas_curve)
+            filelist.append(filepath_points_model)
+            filelist.append(filepath_sas_curve)
+            filepath_zip = '{}/{}.zip'.format(folder, project_name)
+            with zipfile.ZipFile(filepath_zip, mode='w', compression=zipfile.ZIP_STORED) as z:
+                for filepath in filelist:
+                    z.write(filepath, arcname=os.path.basename(filepath))
+            self.consolePrint('Project saved in {}'.format(os.path.abspath(filepath_zip)))
     def savePointsModel(self):
-        pass
+        try:
+            self.project.points_with_sld
+        except:
+            self.consolePrint('(X) There is no points model to save...')
+        else:
+            filename, filetype = QFileDialog.getSaveFileName(None, 'Save points model file', './', "txt Files (*.txt)")
+            if filename:
+                self.project.savePointsWithSld(filename)
+                self.consolePrint('Points model saved in {}'.format(filename))
     def saveSasCurve(self):
-        q, I = self.project.data.q, self.project.data.I
-        data = np.vstack((q,I)).T
-        np.savetxt('models/sas_data.dat', data, header='q\tI')
+        try:
+            self.project.data.I
+        except:
+            self.consolePrint('(X) There is no data to save...')
+        else:
+            filename, filetype = QFileDialog.getSaveFileName(None, 'Save SAS data file', './', "data Files (*.dat)")
+            if filename:
+                self.project.saveSasData(filename)
+                self.consolePrint('SAS data saved in {}'.format(filename))
     
     def deleteAllModels(self):
         name = self.project.name

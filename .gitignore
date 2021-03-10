@@ -153,3 +153,6 @@ models/
 
 # documents
 doc/
+
+# temp folder
+.TEMP_Model2SAS/
