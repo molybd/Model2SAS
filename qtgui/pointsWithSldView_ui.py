@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'pointsWithSldView.ui'
+# Form implementation generated from reading ui file '.\pointsWithSldView.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.2
 #
@@ -15,14 +15,17 @@ class Ui_pointsWithSldView(object):
     def setupUi(self, pointsWithSldView):
         pointsWithSldView.setObjectName("pointsWithSldView")
         pointsWithSldView.resize(400, 300)
-        self.verticalLayout = QtWidgets.QVBoxLayout(pointsWithSldView)
-        self.verticalLayout.setObjectName("verticalLayout")
+        self.gridLayout = QtWidgets.QGridLayout(pointsWithSldView)
+        self.gridLayout.setObjectName("gridLayout")
         self.graphicsView = QtWidgets.QGraphicsView(pointsWithSldView)
         self.graphicsView.setObjectName("graphicsView")
-        self.verticalLayout.addWidget(self.graphicsView)
+        self.gridLayout.addWidget(self.graphicsView, 0, 0, 1, 3)
         self.label_interval = QtWidgets.QLabel(pointsWithSldView)
         self.label_interval.setObjectName("label_interval")
-        self.verticalLayout.addWidget(self.label_interval)
+        self.gridLayout.addWidget(self.label_interval, 1, 0, 1, 1)
+        self.pushButton_saveFigure = QtWidgets.QPushButton(pointsWithSldView)
+        self.pushButton_saveFigure.setObjectName("pushButton_saveFigure")
+        self.gridLayout.addWidget(self.pushButton_saveFigure, 1, 2, 1, 1)
 
         self.retranslateUi(pointsWithSldView)
         QtCore.QMetaObject.connectSlotsByName(pointsWithSldView)
@@ -31,3 +34,4 @@ class Ui_pointsWithSldView(object):
         _translate = QtCore.QCoreApplication.translate
         pointsWithSldView.setWindowTitle(_translate("pointsWithSldView", "All Points with SLD"))
         self.label_interval.setText(_translate("pointsWithSldView", "interval = "))
+        self.pushButton_saveFigure.setText(_translate("pointsWithSldView", "Save figure"))

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'stlmodelView.ui'
+# Form implementation generated from reading ui file '.\stlmodelView.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.2
 #
@@ -19,11 +19,16 @@ class Ui_stlmodelView(object):
         font.setFamily("Arial")
         font.setPointSize(10)
         stlmodelView.setFont(font)
-        self.verticalLayout = QtWidgets.QVBoxLayout(stlmodelView)
-        self.verticalLayout.setObjectName("verticalLayout")
+        self.gridLayout = QtWidgets.QGridLayout(stlmodelView)
+        self.gridLayout.setObjectName("gridLayout")
         self.graphicsView = QtWidgets.QGraphicsView(stlmodelView)
         self.graphicsView.setObjectName("graphicsView")
-        self.verticalLayout.addWidget(self.graphicsView)
+        self.gridLayout.addWidget(self.graphicsView, 0, 0, 1, 2)
+        spacerItem = QtWidgets.QSpacerItem(355, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.gridLayout.addItem(spacerItem, 1, 0, 1, 1)
+        self.pushButton_saveFigure = QtWidgets.QPushButton(stlmodelView)
+        self.pushButton_saveFigure.setObjectName("pushButton_saveFigure")
+        self.gridLayout.addWidget(self.pushButton_saveFigure, 1, 1, 1, 1)
 
         self.retranslateUi(stlmodelView)
         QtCore.QMetaObject.connectSlotsByName(stlmodelView)
@@ -31,3 +36,4 @@ class Ui_stlmodelView(object):
     def retranslateUi(self, stlmodelView):
         _translate = QtCore.QCoreApplication.translate
         stlmodelView.setWindowTitle(_translate("stlmodelView", "stl model view"))
+        self.pushButton_saveFigure.setText(_translate("stlmodelView", "Save figure"))

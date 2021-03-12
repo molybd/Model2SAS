@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'sasdataView.ui'
+# Form implementation generated from reading ui file '.\sasdataView.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.2
 #
@@ -19,11 +19,16 @@ class Ui_sasdataView(object):
         font.setFamily("Arial")
         font.setPointSize(10)
         sasdataView.setFont(font)
-        self.verticalLayout = QtWidgets.QVBoxLayout(sasdataView)
-        self.verticalLayout.setObjectName("verticalLayout")
+        self.gridLayout = QtWidgets.QGridLayout(sasdataView)
+        self.gridLayout.setObjectName("gridLayout")
         self.graphicsView = QtWidgets.QGraphicsView(sasdataView)
         self.graphicsView.setObjectName("graphicsView")
-        self.verticalLayout.addWidget(self.graphicsView)
+        self.gridLayout.addWidget(self.graphicsView, 0, 0, 1, 2)
+        spacerItem = QtWidgets.QSpacerItem(298, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.gridLayout.addItem(spacerItem, 1, 0, 1, 1)
+        self.pushButton_saveFigure = QtWidgets.QPushButton(sasdataView)
+        self.pushButton_saveFigure.setObjectName("pushButton_saveFigure")
+        self.gridLayout.addWidget(self.pushButton_saveFigure, 1, 1, 1, 1)
 
         self.retranslateUi(sasdataView)
         QtCore.QMetaObject.connectSlotsByName(sasdataView)
@@ -31,3 +36,4 @@ class Ui_sasdataView(object):
     def retranslateUi(self, sasdataView):
         _translate = QtCore.QCoreApplication.translate
         sasdataView.setWindowTitle(_translate("sasdataView", "SAS data view"))
+        self.pushButton_saveFigure.setText(_translate("sasdataView", "Save figure"))

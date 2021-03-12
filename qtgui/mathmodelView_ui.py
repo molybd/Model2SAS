@@ -23,7 +23,12 @@ class Ui_mathmodelView(object):
         self.gridLayout.setObjectName("gridLayout")
         self.graphicsView = QtWidgets.QGraphicsView(mathmodelView)
         self.graphicsView.setObjectName("graphicsView")
-        self.gridLayout.addWidget(self.graphicsView, 0, 0, 1, 1)
+        self.gridLayout.addWidget(self.graphicsView, 0, 0, 1, 2)
+        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.gridLayout.addItem(spacerItem, 1, 0, 1, 1)
+        self.pushButton_saveFigure = QtWidgets.QPushButton(mathmodelView)
+        self.pushButton_saveFigure.setObjectName("pushButton_saveFigure")
+        self.gridLayout.addWidget(self.pushButton_saveFigure, 1, 1, 1, 1)
 
         self.retranslateUi(mathmodelView)
         QtCore.QMetaObject.connectSlotsByName(mathmodelView)
@@ -31,3 +36,4 @@ class Ui_mathmodelView(object):
     def retranslateUi(self, mathmodelView):
         _translate = QtCore.QCoreApplication.translate
         mathmodelView.setWindowTitle(_translate("mathmodelView", "math model view"))
+        self.pushButton_saveFigure.setText(_translate("mathmodelView", "Save figure"))

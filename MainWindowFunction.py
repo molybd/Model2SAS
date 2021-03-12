@@ -18,7 +18,7 @@ from Functions import intensity_parallel, intensity
 import sys
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import  QWidget, QApplication, QMainWindow, QMdiSubWindow, QFileDialog, QDialog, QInputDialog, QHeaderView, QAbstractItemView
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
+from PyQt5.QtGui import QStandardItemModel, QStandardItem, QImage, QPainter
 
 # needed for plot
 import matplotlib
@@ -47,7 +47,7 @@ Bug:
 次要功能：
 (solved) 1. 删除模型
 (solved) 2. 删除所有模型
-3. 保存project
+(solved) 3. 保存project
 程序结构：
 (solved) 1. genPoints() 异步进行
 (solved) 2. control panel 变成dock widget
@@ -58,18 +58,38 @@ class stlmodelViewWindow(QWidget, Ui_stlmodelView):
     def __init__(self, parent=None):
         super(stlmodelViewWindow, self).__init__(parent)
         self.setupUi(self)
+        self.pushButton_saveFigure.clicked.connect(self.saveFigure)
+    def saveFigure(self):
+        filename, filetype = QFileDialog.getSaveFileName(None, 'Save figure', './', "PNG Image (*.png);;JPEG Image (*.jpg);;TIFF Image (*.tif);;SVG Image (*.svg)")
+        if filename:
+            self.figure.savefig(filename)
 class mathmodelViewWindow(QWidget, Ui_mathmodelView):
     def __init__(self, parent=None):
         super(mathmodelViewWindow, self).__init__(parent)
         self.setupUi(self)
+        self.pushButton_saveFigure.clicked.connect(self.saveFigure)
+    def saveFigure(self):
+        filename, filetype = QFileDialog.getSaveFileName(None, 'Save figure', './', "PNG Image (*.png);;JPEG Image (*.jpg);;TIFF Image (*.tif);;SVG Image (*.svg)")
+        if filename:
+            self.figure.savefig(filename)
 class pointsWithSldViewWindow(QWidget, Ui_pointsWithSldView):
     def __init__(self, parent=None):
         super(pointsWithSldViewWindow, self).__init__(parent)
         self.setupUi(self)
+        self.pushButton_saveFigure.clicked.connect(self.saveFigure)
+    def saveFigure(self):
+        filename, filetype = QFileDialog.getSaveFileName(None, 'Save figure', './', "PNG Image (*.png);;JPEG Image (*.jpg);;TIFF Image (*.tif);;SVG Image (*.svg)")
+        if filename:
+            self.figure.savefig(filename)
 class sasdataViewWindow(QWidget, Ui_sasdataView):
     def __init__(self, parent=None):
         super(sasdataViewWindow, self).__init__(parent)
         self.setupUi(self)
+        self.pushButton_saveFigure.clicked.connect(self.saveFigure)
+    def saveFigure(self):
+        filename, filetype = QFileDialog.getSaveFileName(None, 'Save figure', './', "PNG Image (*.png);;JPEG Image (*.jpg);;TIFF Image (*.tif);;SVG Image (*.svg)")
+        if filename:
+            self.figure.savefig(filename)
 
 
 # 通过继承FigureCanvas类，使得该类既是一个PyQt5的Qwidget，又是一个matplotlib的FigureCanvas，这是连接pyqt5与matplotlib的关键！
@@ -165,6 +185,8 @@ class mainwindowFunction:
         #sys.stderr = EmittingStream(textWritten=self.outputWritten)
         
         self.temp_folder = './.TEMP_Model2SAS'
+        if not os.path.exists(self.temp_folder):
+            os.mkdir(self.temp_folder)
         
         self.refreshTableViews()
         self.consolePrint('New project established with name: {}'.format(self.project.name))
@@ -252,8 +274,6 @@ class mainwindowFunction:
                 filelist.append(mathmodel.filepath)
             
             temp_folder = self.temp_folder
-            if not os.path.exists(temp_folder):
-                os.mkdir(temp_folder)
             filepath_points_model = os.path.join(temp_folder, 'PointsModel.txt')
             filepath_sas_curve = os.path.join(temp_folder, 'SasCurve.dat')
             self.project.savePointsWithSld(filepath_points_model)
@@ -403,6 +423,7 @@ class mainwindowFunction:
             graphicScene = QtWidgets.QGraphicsScene()
             graphicScene.addWidget(canvas)
             stlmodelView = stlmodelViewWindow()
+            stlmodelView.figure = canvas.figure   # 便于保存图片用
             stlmodelView.graphicsView.setScene(graphicScene)
             self.ui.mdiArea.addSubWindow(stlmodelView)
             stlmodelView.show()
@@ -417,6 +438,7 @@ class mainwindowFunction:
             graphicScene = QtWidgets.QGraphicsScene()
             graphicScene.addWidget(canvas)
             mathmodelView = mathmodelViewWindow()
+            mathmodelView.figure = canvas.figure   # 便于保存图片用
             mathmodelView.graphicsView.setScene(graphicScene)
             self.ui.mdiArea.addSubWindow(mathmodelView)
             mathmodelView.show()
@@ -428,6 +450,7 @@ class mainwindowFunction:
         graphicScene = QtWidgets.QGraphicsScene()
         graphicScene.addWidget(canvas)
         pointsWithSldView = pointsWithSldViewWindow()
+        pointsWithSldView.figure = canvas.figure  # 便于保存图片用
         pointsWithSldView.graphicsView.setScene(graphicScene)
         interval = self.project.model.interval
         pointsWithSldView.label_interval.setText('interval = {:.4f}\tnumber of points = {}'.format(interval, self.project.model.points_with_sld.shape[0]))
@@ -439,6 +462,7 @@ class mainwindowFunction:
         graphicScene = QtWidgets.QGraphicsScene()
         graphicScene.addWidget(canvas)
         sasdataView = sasdataViewWindow()
+        sasdataView.figure = canvas.figure   # 便于保存图片用
         sasdataView.graphicsView.setScene(graphicScene)
         self.ui.mdiArea.addSubWindow(sasdataView)
         sasdataView.show()
