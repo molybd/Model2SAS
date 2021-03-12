@@ -59,7 +59,7 @@ def plotPoints(points, show=True, figure=None):
 
     x, y, z = points[:, 0], points[:, 1], points[:, 2]
     x, y, z = x.flatten(), y.flatten(), z.flatten()
-    axes.scatter(x, y, z, color='k')
+    axes.scatter(x, y, z, color='k', edgecolors='k')
 
     scale = points[:,:].flatten()
     axes.auto_scale_xyz(scale, scale, scale)
@@ -81,7 +81,7 @@ def plotPointsWithSld(points_with_sld, colormap='viridis', show=True, figure=Non
     x, y, z, sld = x.flatten(), y.flatten(), z.flatten(), sld.flatten()
     #c = sld - sld.min()  # make all positive values...no need for positive values
     cm = plt.get_cmap(colormap)
-    sc = axes.scatter(x, y, z, c=sld, cmap=cm)
+    sc = axes.scatter(x, y, z, c=sld, cmap=cm, edgecolors='k')
     figure.colorbar(sc)  # 在GUI里绘制图像应当避免使用plt的方法而是使用面向对象的绘图方式，否则plt画出来的东西在GUI中不显示
 
     scale = points_with_sld[:,:-1].flatten()

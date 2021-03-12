@@ -206,16 +206,15 @@ class data:
 
 
 if __name__ == "__main__":
-    project = model2sas('test_torus')
-    project.importFile('models\\torus.STL', sld=-10)
-    project.importFile('C:\Research\My_program\Model2SAS\models\SAXSholder.stl', sld=8)
-    #project.importFile('models\\new_hollow_sphere_model.py')
-    plotStlMeshes([stlmodel.mesh for stlmodel in project.model.stlmodel_list], label_list=[stlmodel.name for stlmodel in project.model.stlmodel_list])
+    project = model2sas('test')
+    project.importFile('models\CrescentEllipticalTorus.py')
+    project.importFile('models\porous_shell.py')
+    #plotStlMeshes([stlmodel.mesh for stlmodel in project.model.stlmodel_list], label_list=[stlmodel.name for stlmodel in project.model.stlmodel_list])
     
     #plotPoints(project.model.mathmodel_list[0].sample_points)
     #plotPointsWithSld(project.model.mathmodel_list[0].sample_points_with_sld)
     
-    project.genPoints()
+    project.genPoints(grid_num=20000)
     plotPointsWithSld(project.model.points_with_sld, figure=plt.figure())
     # np.savetxt('project_points_with_sld.txt', project.points_with_sld)
     '''
