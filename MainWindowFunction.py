@@ -28,10 +28,7 @@ from matplotlib.figure import Figure
 
 # my own qtgui files
 from qtgui.mainwindow_ui import Ui_mainWindow
-from qtgui.stlmodelView_ui import Ui_stlmodelView
-from qtgui.mathmodelView_ui import Ui_mathmodelView
-from qtgui.sasdataView_ui import Ui_sasdataView
-from qtgui.pointsWithSldView_ui import Ui_pointsWithSldView
+from qtgui.plotView_ui import Ui_plotView
 
 # needed for multithread
 from PyQt5.QtCore import QThread, pyqtSignal
@@ -53,44 +50,16 @@ Bug:
 (solved) 2. control panel 变成dock widget
 '''
 
-
-class stlmodelViewWindow(QWidget, Ui_stlmodelView):
+# 通过多重继承来实现，方便完全的ui和功能分离
+class plotViewWindow(QWidget, Ui_plotView):
     def __init__(self, parent=None):
-        super(stlmodelViewWindow, self).__init__(parent)
+        super(plotViewWindow, self).__init__(parent)
         self.setupUi(self)
         self.pushButton_saveFigure.clicked.connect(self.saveFigure)
     def saveFigure(self):
         filename, filetype = QFileDialog.getSaveFileName(None, 'Save figure', './', "PNG Image (*.png);;JPEG Image (*.jpg);;TIFF Image (*.tif);;SVG Image (*.svg)")
         if filename:
             self.figure.savefig(filename)
-class mathmodelViewWindow(QWidget, Ui_mathmodelView):
-    def __init__(self, parent=None):
-        super(mathmodelViewWindow, self).__init__(parent)
-        self.setupUi(self)
-        self.pushButton_saveFigure.clicked.connect(self.saveFigure)
-    def saveFigure(self):
-        filename, filetype = QFileDialog.getSaveFileName(None, 'Save figure', './', "PNG Image (*.png);;JPEG Image (*.jpg);;TIFF Image (*.tif);;SVG Image (*.svg)")
-        if filename:
-            self.figure.savefig(filename)
-class pointsWithSldViewWindow(QWidget, Ui_pointsWithSldView):
-    def __init__(self, parent=None):
-        super(pointsWithSldViewWindow, self).__init__(parent)
-        self.setupUi(self)
-        self.pushButton_saveFigure.clicked.connect(self.saveFigure)
-    def saveFigure(self):
-        filename, filetype = QFileDialog.getSaveFileName(None, 'Save figure', './', "PNG Image (*.png);;JPEG Image (*.jpg);;TIFF Image (*.tif);;SVG Image (*.svg)")
-        if filename:
-            self.figure.savefig(filename)
-class sasdataViewWindow(QWidget, Ui_sasdataView):
-    def __init__(self, parent=None):
-        super(sasdataViewWindow, self).__init__(parent)
-        self.setupUi(self)
-        self.pushButton_saveFigure.clicked.connect(self.saveFigure)
-    def saveFigure(self):
-        filename, filetype = QFileDialog.getSaveFileName(None, 'Save figure', './', "PNG Image (*.png);;JPEG Image (*.jpg);;TIFF Image (*.tif);;SVG Image (*.svg)")
-        if filename:
-            self.figure.savefig(filename)
-
 
 # 通过继承FigureCanvas类，使得该类既是一个PyQt5的Qwidget，又是一个matplotlib的FigureCanvas，这是连接pyqt5与matplotlib的关键！
 # 这样就可以把 matplotlib 画的图嵌入到pyqt的GUI窗口中了
@@ -420,13 +389,7 @@ class mainwindowFunction:
             #self.consolePrint(label_list)
             canvas = Figure_Canvas()
             plotStlMeshes(mesh_list, label_list=label_list, show=False, figure=canvas.figure)
-            graphicScene = QtWidgets.QGraphicsScene()
-            graphicScene.addWidget(canvas)
-            stlmodelView = stlmodelViewWindow()
-            stlmodelView.figure = canvas.figure   # 便于保存图片用
-            stlmodelView.graphicsView.setScene(graphicScene)
-            self.ui.mdiArea.addSubWindow(stlmodelView)
-            stlmodelView.show()
+            self.showPlotViewWindow('STL model view', canvas, '')
         except:
             self.consolePrint('(X) There is no model to show...')
     def showMathModel(self):
@@ -435,37 +398,31 @@ class mainwindowFunction:
             i = index.row()
             canvas = Figure_Canvas()
             plotPointsWithSld(self.project.model.mathmodel_list[i].sample_points_with_sld, show=False, figure=canvas.figure)
-            graphicScene = QtWidgets.QGraphicsScene()
-            graphicScene.addWidget(canvas)
-            mathmodelView = mathmodelViewWindow()
-            mathmodelView.figure = canvas.figure   # 便于保存图片用
-            mathmodelView.graphicsView.setScene(graphicScene)
-            self.ui.mdiArea.addSubWindow(mathmodelView)
-            mathmodelView.show()
+            self.showPlotViewWindow('Math model view', canvas, '')
         except:
             self.consolePrint('(X) There is no model to show...')
     def showPointsWithSld(self):
         canvas = Figure_Canvas()
         plotPointsWithSld(self.project.points_with_sld, show=False, figure=canvas.figure)
-        graphicScene = QtWidgets.QGraphicsScene()
-        graphicScene.addWidget(canvas)
-        pointsWithSldView = pointsWithSldViewWindow()
-        pointsWithSldView.figure = canvas.figure  # 便于保存图片用
-        pointsWithSldView.graphicsView.setScene(graphicScene)
         interval = self.project.model.interval
-        pointsWithSldView.label_interval.setText('interval = {:.4f}\tnumber of points = {}'.format(interval, self.project.model.points_with_sld.shape[0]))
-        self.ui.mdiArea.addSubWindow(pointsWithSldView)
-        pointsWithSldView.show()
+        text = 'interval = {:.4f}\tnumber of points = {}'.format(interval, self.project.model.points_with_sld.shape[0])
+        self.showPlotViewWindow('Points with SLD view', canvas, text)
     def showSasCurve(self):
         canvas = Figure_Canvas()
         plotSasCurve(self.project.data.q, self.project.data.I, show=False, figure=canvas.figure)
+        self.showPlotViewWindow('SAS curve view', canvas, '')
+
+    def showPlotViewWindow(self, window_title, canvas, text):
         graphicScene = QtWidgets.QGraphicsScene()
         graphicScene.addWidget(canvas)
-        sasdataView = sasdataViewWindow()
-        sasdataView.figure = canvas.figure   # 便于保存图片用
-        sasdataView.graphicsView.setScene(graphicScene)
-        self.ui.mdiArea.addSubWindow(sasdataView)
-        sasdataView.show()
+        plotView = plotViewWindow()
+        plotView.figure = canvas.figure  # 便于保存图片用
+        plotView.graphicsView.setScene(graphicScene)
+        plotView.setWindowTitle(window_title)
+        plotView.label_text.setText(text)
+        self.ui.mdiArea.addSubWindow(plotView)
+        plotView.show()
+
 
     def genPoints(self):
         if len(self.project.model.stlmodel_list)==0 and len(self.project.model.mathmodel_list)==0:
