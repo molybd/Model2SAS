@@ -1,14 +1,10 @@
 # -*- coding: UTF-8 -*-
 
 import os
-import shutil
 import zipfile
 import json
 import time
 import numpy as np
-from stl import mesh
-from mpl_toolkits import mplot3d
-import matplotlib.pyplot as plt
 
 from Model2SAS import *
 from Plot import *
