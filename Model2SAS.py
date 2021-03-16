@@ -50,9 +50,9 @@ class model2sas:
     def setupData(self):
         self.data = data(self.model.points_with_sld)
 
-    def calcSas(self, qmin, qmax, qnum=200, logq=False, lmax=50, parallel=False, cpu_usage=0.6):
+    def calcSas(self, qmin, qmax, qnum=200, logq=False, lmax=50, parallel=False, core_num=2, proc_num=4):
         q = self.data.genQ(qmin, qmax, qnum=qnum, logq=logq)
-        self.data.calcSas(q, lmax=lmax, parallel=parallel, cpu_usage=cpu_usage)
+        self.data.calcSas(q, lmax=lmax, parallel=parallel, core_num=core_num, proc_num=proc_num)
         self.q = self.data.q
         self.I = self.data.I
         #self.saveSasData()
@@ -191,11 +191,11 @@ class data:
             q = np.linspace(qmin, qmax, num=qnum, dtype='float32')
         return q
 
-    def calcSas(self, q, lmax=50, parallel=False, cpu_usage=0.6):
+    def calcSas(self, q, lmax=50, parallel=False, core_num=2, proc_num=4):
         points = self.points
         sld = self.sld
         if parallel:
-            I = intensity_parallel(q, points, sld, lmax, cpu_usage=cpu_usage)
+            I = intensity_parallel(q, points, sld, lmax, core_num=core_num, proc_num=proc_num)
         else:
             I = intensity(q, points, sld, lmax)
 

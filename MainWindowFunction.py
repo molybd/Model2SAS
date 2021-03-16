@@ -85,19 +85,19 @@ class EmittingStream(QtCore.QObject):
 class Thread_calcSas(QThread):
     # 线程结束的signal，并且带有一个ndarray参数
     threadEnd = pyqtSignal(np.ndarray)
-    def __init__(self, q, points, sld, lmax, parallel, cpu_usage, proc_num):
+    def __init__(self, q, points, sld, lmax, parallel, core_num, proc_num):
         super(Thread_calcSas, self).__init__()
         self.q = q
         self.points = points
         self.sld = sld
         self.lmax = lmax
         self.parallel = parallel
-        self.cpu_usage = cpu_usage
+        self.core_num = core_num
         self.proc_num = proc_num
     def run(self):
         # 线程所需要执行的代码
         if self.parallel:
-            self.I = intensity_parallel(self.q, self.points, self.sld, self.lmax, cpu_usage=self.cpu_usage, proc_num=self.proc_num)
+            self.I = intensity_parallel(self.q, self.points, self.sld, self.lmax, core_num=self.core_num, proc_num=self.proc_num)
         else:
             self.I = intensity(self.q, self.points, self.sld, self.lmax)
         self.threadEnd.emit(self.I)
@@ -461,20 +461,26 @@ class mainwindowFunction:
             self.project.data.q = q
             self.project.data.lmax = lmax
             parallel = self.ui.checkBox_parallel.isChecked()
-            cpu_usage = float(self.ui.lineEdit_cpuUsage.text())
-            proc_num = self.ui.lineEdit_processNum.text()
-            if proc_num != '':
-                proc_num = int(proc_num)
-            else:
-                proc_num = None
+            core_num_text = self.ui.lineEdit_coreNum.text()
+            proc_num_text = self.ui.lineEdit_processNum.text()
+            try:
+                core_num = int(core_num_text)
+            except:
+                core_num = 2
+                self.ui.lineEdit_coreNum.setText('2')
+            try:
+                proc_num = int(proc_num_text)
+            except:
+                proc_num = 4
+                self.ui.lineEdit_progressNum.setText('4')
 
             self.setPushButtonEnable(False)
             self.setProgressBarRolling(True)
-            self.consolePrint('Calculating SAS curve...Please wait...')
+            self.consolePrint('Calculating SAS curve...See CLI for progress...')
             # 异步线程计算SAS
             points = self.project.data.points
             sld = self.project.data.sld
-            self.thread_calcSas = Thread_calcSas(q, points, sld, lmax, parallel, cpu_usage, proc_num)  # 这里的thread写成self.thread是为了防止start之后这个方法结束这个变量被回收了，会导致错误：QThread: Destroyed while thread is still running
+            self.thread_calcSas = Thread_calcSas(q, points, sld, lmax, parallel, core_num, proc_num)  # 这里的thread写成self.thread是为了防止start之后这个方法结束这个变量被回收了，会导致错误：QThread: Destroyed while thread is still running
             self.thread_calcSas.threadEnd.connect(self.processCalcSasThreadOutput)
             self.begintime = time.time()
             self.thread_calcSas.start()

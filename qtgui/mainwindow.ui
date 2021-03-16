@@ -153,8 +153,14 @@
     <layout class="QVBoxLayout" name="verticalLayout_2">
      <item>
       <widget class="QGroupBox" name="groupBox_genPoints">
+       <property name="font">
+        <font>
+         <weight>50</weight>
+         <bold>false</bold>
+        </font>
+       </property>
        <property name="title">
-        <string>generate points model</string>
+        <string>Generate points model</string>
        </property>
        <layout class="QGridLayout" name="gridLayout_2">
         <item row="2" column="2">
@@ -200,20 +206,13 @@
         </font>
        </property>
        <property name="title">
-        <string>calculate SAS data</string>
+        <string>Calculate SAS data</string>
        </property>
        <layout class="QGridLayout" name="gridLayout_3">
         <item row="2" column="1" colspan="2">
          <widget class="QLineEdit" name="lineEdit_lmax">
           <property name="text">
            <string>50</string>
-          </property>
-         </widget>
-        </item>
-        <item row="6" column="0">
-         <widget class="QLabel" name="label_6">
-          <property name="text">
-           <string>CPU usage</string>
           </property>
          </widget>
         </item>
@@ -259,13 +258,6 @@
           </property>
          </widget>
         </item>
-        <item row="7" column="0">
-         <widget class="QLabel" name="label_7">
-          <property name="text">
-           <string>OR process num</string>
-          </property>
-         </widget>
-        </item>
         <item row="4" column="0">
          <widget class="QCheckBox" name="checkBox_parallel">
           <property name="enabled">
@@ -286,16 +278,6 @@
           </property>
          </widget>
         </item>
-        <item row="6" column="1">
-         <widget class="QLineEdit" name="lineEdit_cpuUsage">
-          <property name="text">
-           <string>0.4</string>
-          </property>
-         </widget>
-        </item>
-        <item row="7" column="1">
-         <widget class="QLineEdit" name="lineEdit_processNum"/>
-        </item>
         <item row="5" column="0">
          <widget class="QLabel" name="label_8">
           <property name="font">
@@ -306,6 +288,34 @@
           </property>
           <property name="text">
            <string>Parallel Control</string>
+          </property>
+         </widget>
+        </item>
+        <item row="6" column="2">
+         <widget class="QLineEdit" name="lineEdit_coreNum">
+          <property name="text">
+           <string>2</string>
+          </property>
+         </widget>
+        </item>
+        <item row="6" column="0" colspan="2">
+         <widget class="QLabel" name="label_6">
+          <property name="text">
+           <string>CPU core number for calculation</string>
+          </property>
+         </widget>
+        </item>
+        <item row="7" column="2">
+         <widget class="QLineEdit" name="lineEdit_processNum">
+          <property name="text">
+           <string>4</string>
+          </property>
+         </widget>
+        </item>
+        <item row="7" column="0" colspan="2">
+         <widget class="QLabel" name="label_7">
+          <property name="text">
+           <string>Total process number</string>
           </property>
          </widget>
         </item>
