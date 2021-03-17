@@ -2,8 +2,7 @@
 
 import numpy as np
 from scipy.special import sph_harm, spherical_jn
-from multiprocessing import cpu_count
-from p_tqdm import p_map
+from multiprocessing import cpu_count, Pool
 from tqdm import tqdm
 
 
@@ -121,11 +120,15 @@ def intensity_parallel(q, points, f, lmax, core_num=2, proc_num=4):
     # 以防最后几个是空的，得去掉不然会报错
     while q_list[-1].size == 0:
         q_list.pop()
+    slice_num = len(q_list)
 
-    #这里使用p_tqdm库来实现多进程下的进度条
-    I_list= p_map(intensity, q_list, [points]*slice_num, [f]*slice_num, [lmax]*slice_num, num_cpus=core_num)
-    I = np.hstack(I_list)
-    I = I.reshape(I.size)
+    pool = Pool(core_num)
+    args = zip(q_list, [points]*slice_num, [f]*slice_num, [lmax]*slice_num)
+    result = pool.starmap_async(intensity, args)
+    pool.close()
+    pool.join()
+    I = np.array(result.get()).flatten()
+
     return I
 
 
