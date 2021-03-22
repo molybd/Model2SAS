@@ -141,16 +141,21 @@ class model:
         # combine all the model sections
         # !! ATTENTION !!
         # I choose to use the sum(sld) value for the overlapped point
+        in_model_grid_index_list = []
         sld_grid_index_list = []
         for stlmodel in stlmodel_list:
+            in_model_grid_index_list.append(stlmodel.in_model_grid_index)
             sld_grid_index_list.append(stlmodel.sld_grid_index)
         for mathmodel in mathmodel_list:
+            in_model_grid_index_list.append(mathmodel.in_model_grid_index)
             sld_grid_index_list.append(mathmodel.sld_grid_index)
+        in_model_grid_index_stack = np.vstack(in_model_grid_index_list)
+        in_model_grid_index = np.sign(np.sum(in_model_grid_index_stack, axis=0))
         sld_grid_index_stack = np.vstack(sld_grid_index_list)
         sld_grid_index = np.sum(sld_grid_index_stack, axis=0)
 
-        points = grid[np.where(sld_grid_index!=0)]
-        sld = sld_grid_index[np.where(sld_grid_index!=0)]
+        points = grid[np.where(in_model_grid_index!=0)]
+        sld = sld_grid_index[np.where(in_model_grid_index!=0)]  # 用 in_model_grid_index 的原因是有可能出现sld=0但是实际在模型内的点
         sld = sld.reshape((sld.size,1))
         points_with_sld = np.hstack((points, sld))
 
@@ -207,14 +212,13 @@ class data:
 
 if __name__ == "__main__":
     project = model2sas('test')
-    project.importFile('models\CrescentEllipticalTorus.py')
-    project.importFile('models\porous_shell.py')
+    project.importFile('models\cylinder.py')
     #plotStlMeshes([stlmodel.mesh for stlmodel in project.model.stlmodel_list], label_list=[stlmodel.name for stlmodel in project.model.stlmodel_list])
     
     #plotPoints(project.model.mathmodel_list[0].sample_points)
     #plotPointsWithSld(project.model.mathmodel_list[0].sample_points_with_sld)
     
-    project.genPoints(grid_num=20000)
+    project.genPoints(grid_num=100000)
     plotPointsWithSld(project.model.points_with_sld, figure=plt.figure())
     # np.savetxt('project_points_with_sld.txt', project.points_with_sld)
     '''

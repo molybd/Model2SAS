@@ -144,7 +144,7 @@ class mathmodel:
         in_model_grid_index = specific_mathmodel.shape(grid_in_coord)
         sld_grid_index = specific_mathmodel.sld()
         points = grid[np.where(in_model_grid_index != 0)] # screen points in model
-        sld = sld_grid_index[np.where(sld_grid_index != 0)]
+        sld = sld_grid_index[np.where(in_model_grid_index != 0)]  # 用 in_model_grid_index 的原因是有可能出现sld=0但是实际在模型内的点
         sld = sld.reshape((sld.size, 1))
         points_with_sld = np.hstack((points, sld))
 
