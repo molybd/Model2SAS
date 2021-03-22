@@ -178,49 +178,50 @@ class mainwindowFunction:
         self.clearTempFolder()
         temp_folder = self.temp_folder
         filename, filetype = QFileDialog.getOpenFileName(None, 'Load project file', './', "zip Files (*.zip)")
-        project_name = os.path.splitext(os.path.basename(filename))[0]
-        self.project = model2sas(project_name)
-        self.ui.label_projectName.setText('Project: {}'.format(self.project.name))
-        with zipfile.ZipFile(filename, mode='r') as z:
-            z.extractall(path=temp_folder)
+        if filename:
+            project_name = os.path.splitext(os.path.basename(filename))[0]
+            self.project = model2sas(project_name)
+            self.ui.label_projectName.setText('Project: {}'.format(self.project.name))
+            with zipfile.ZipFile(filename, mode='r') as z:
+                z.extractall(path=temp_folder)
 
-        modelfile_list = []
-        for file in os.listdir(temp_folder):
-            filepath = os.path.join(temp_folder, file)
-            extension = file.split('.')[-1].lower()
-            if extension == 'stl' or extension == 'py':
-                modelfile_list.append(filepath)
-            elif extension == 'txt':
-                filepath_points_with_sld = filepath
-            elif extension == 'json':
-                filepath_info = filepath
-            elif extension == 'dat':
-                filepath_data = filepath
+            modelfile_list = []
+            for file in os.listdir(temp_folder):
+                filepath = os.path.join(temp_folder, file)
+                extension = file.split('.')[-1].lower()
+                if extension == 'stl' or extension == 'py':
+                    modelfile_list.append(filepath)
+                elif extension == 'txt':
+                    filepath_points_with_sld = filepath
+                elif extension == 'json':
+                    filepath_info = filepath
+                elif extension == 'dat':
+                    filepath_data = filepath
 
-        for filepath in modelfile_list:
-            self.project.importFile(filepath, sld=1)
+            for filepath in modelfile_list:
+                self.project.importFile(filepath, sld=1)
 
-        self.project.model.points_with_sld = np.loadtxt(filepath_points_with_sld)
-        self.project.points_with_sld = self.project.model.points_with_sld
-        self.project.setupData()
+            self.project.model.points_with_sld = np.loadtxt(filepath_points_with_sld)
+            self.project.points_with_sld = self.project.model.points_with_sld
+            self.project.setupData()
 
-        with open(filepath_info, 'r') as f:
-            info_dict = json.load(f)
-        self.project.model.interval = float(info_dict['interval'])
-        self.project.data.lmax = int(info_dict['lmax'])
+            with open(filepath_info, 'r') as f:
+                info_dict = json.load(f)
+            self.project.model.interval = float(info_dict['interval'])
+            self.project.data.lmax = int(info_dict['lmax'])
 
-        data = np.loadtxt(filepath_data)
-        q, I, error = data[:,0].flatten(), data[:,1].flatten(), data[:,2].flatten()
-        self.project.data.q, self.project.data.I, self.project.data.error = q, I, error
-        self.project.data.q, self.project.data.I = q, I
+            data = np.loadtxt(filepath_data)
+            q, I, error = data[:,0].flatten(), data[:,1].flatten(), data[:,2].flatten()
+            self.project.data.q, self.project.data.I, self.project.data.error = q, I, error
+            self.project.data.q, self.project.data.I = q, I
 
-        self.ui.lineEdit_interval.setText(str(self.project.model.interval))
-        self.ui.lineEdit_lmax.setText(str(self.project.data.lmax))
-        self.refreshTableViews()
-        self.showPointsWithSld()
-        self.showSasCurve()
-        self.clearTempFolder()
-        self.consolePrint('Load project file {}'.format(filename))
+            self.ui.lineEdit_interval.setText(str(self.project.model.interval))
+            self.ui.lineEdit_lmax.setText(str(self.project.data.lmax))
+            self.refreshTableViews()
+            self.showPointsWithSld()
+            self.showSasCurve()
+            self.clearTempFolder()
+            self.consolePrint('Load project file {}'.format(filename))
 
     def saveProject(self):
         self.clearTempFolder()
@@ -231,36 +232,37 @@ class mainwindowFunction:
             self.consolePrint('(X) Project not completed...')
         else:
             folder = QFileDialog.getExistingDirectory(None, 'Select project saving directory', './')
-            project_name = self.project.name
-            filelist = []
-            for stlmodel in self.project.model.stlmodel_list:
-                filelist.append(stlmodel.filepath)
-            for mathmodel in self.project.model.mathmodel_list:
-                filelist.append(mathmodel.filepath)
-            
-            temp_folder = self.temp_folder
-            filepath_points_model = os.path.join(temp_folder, 'PointsModel.txt')
-            filepath_sas_curve = os.path.join(temp_folder, 'SasCurve.dat')
-            self.project.savePointsWithSld(filepath_points_model)
-            self.project.saveSasData(filepath_sas_curve)
-            filelist.append(filepath_points_model)
-            filelist.append(filepath_sas_curve)
+            if folder:
+                project_name = self.project.name
+                filelist = []
+                for stlmodel in self.project.model.stlmodel_list:
+                    filelist.append(stlmodel.filepath)
+                for mathmodel in self.project.model.mathmodel_list:
+                    filelist.append(mathmodel.filepath)
+                
+                temp_folder = self.temp_folder
+                filepath_points_model = os.path.join(temp_folder, 'PointsModel.txt')
+                filepath_sas_curve = os.path.join(temp_folder, 'SasCurve.dat')
+                self.project.savePointsWithSld(filepath_points_model)
+                self.project.saveSasData(filepath_sas_curve)
+                filelist.append(filepath_points_model)
+                filelist.append(filepath_sas_curve)
 
-            info_dict = {
-                'interval': self.project.model.interval,
-                'lmax': self.project.data.lmax
-            }
-            filepath_info = os.path.join(temp_folder, 'info.json')
-            with open(filepath_info, 'w') as f:
-                json.dump(info_dict, f)
-            filelist.append(filepath_info)
+                info_dict = {
+                    'interval': self.project.model.interval,
+                    'lmax': self.project.data.lmax
+                }
+                filepath_info = os.path.join(temp_folder, 'info.json')
+                with open(filepath_info, 'w') as f:
+                    json.dump(info_dict, f)
+                filelist.append(filepath_info)
 
-            filepath_zip = os.path.join(folder, '{}.zip'.format(project_name))
-            with zipfile.ZipFile(filepath_zip, mode='w', compression=zipfile.ZIP_STORED) as z:
-                for filepath in filelist:
-                    z.write(filepath, arcname=os.path.basename(filepath))
-            self.consolePrint('Project saved in {}'.format(os.path.abspath(filepath_zip)))
-            self.clearTempFolder()
+                filepath_zip = os.path.join(folder, '{}.zip'.format(project_name))
+                with zipfile.ZipFile(filepath_zip, mode='w', compression=zipfile.ZIP_STORED) as z:
+                    for filepath in filelist:
+                        z.write(filepath, arcname=os.path.basename(filepath))
+                self.consolePrint('Project saved in {}'.format(os.path.abspath(filepath_zip)))
+                self.clearTempFolder()
     def savePointsModel(self):
         try:
             self.project.points_with_sld
