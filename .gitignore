@@ -151,8 +151,8 @@ discarded design/
 # models
 models/
 
-# documents
-doc/
+# unfinished documents
+doc_temp/
 
 # temp folder
 .TEMP_Model2SAS/
