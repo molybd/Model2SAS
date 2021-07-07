@@ -156,3 +156,6 @@ doc_temp/
 
 # temp folder
 .TEMP_Model2SAS/
+
+# batch script
+*.bat
