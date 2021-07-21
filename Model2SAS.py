@@ -212,15 +212,16 @@ class data:
 
 if __name__ == "__main__":
     project = model2sas('test')
-    project.importFile('models\cylinder.py')
+    project.importFile('models\sphere.py')
     #plotStlMeshes([stlmodel.mesh for stlmodel in project.model.stlmodel_list], label_list=[stlmodel.name for stlmodel in project.model.stlmodel_list])
     
     #plotPoints(project.model.mathmodel_list[0].sample_points)
     #plotPointsWithSld(project.model.mathmodel_list[0].sample_points_with_sld)
     
-    project.genPoints(grid_num=100000)
-    plotPointsWithSld(project.model.points_with_sld, figure=plt.figure())
-    # np.savetxt('project_points_with_sld.txt', project.points_with_sld)
+    project.genPoints(grid_num=20000)
+    print(project.points_with_sld.shape[0])
+    #plotPointsWithSld(project.model.points_with_sld, figure=plt.figure())
+    np.savetxt('test_points_with_sld2.txt', project.points_with_sld)
     '''
     project.setupData()
     project.calcSas(0.01, 1, parallel=True)

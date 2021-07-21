@@ -26,6 +26,7 @@ class specific_mathmodel:
         self.boundary_min = -self.params['R2']*np.ones(3)
         self.boundary_max = self.params['R2']*np.ones(3)
         self.coord = 'sph'  # 'xyz' or 'sph' or 'cyl'
+        # must have these 4 attributes
 
     def shape(self, grid_in_coord):
         points_sph = grid_in_coord
@@ -39,7 +40,7 @@ class specific_mathmodel:
         in_model_grid_index = np.sign(r-R1_array) * np.sign(R2_array-r)
         in_model_grid_index = np.sign(in_model_grid_index+1)
         self.in_model_grid_index = in_model_grid_index
-        return self.in_model_grid_index
+        return self.in_model_grid_index  # must return in_model_grid_index
 
     def sld(self):
-        return 15 * self.in_model_grid_index
+        return 15 * self.in_model_grid_index  # must return sld index
