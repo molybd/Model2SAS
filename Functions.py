@@ -1,114 +1,147 @@
 # -*- coding: UTF-8 -*-
 
 import numpy as np
+from numpy.core.numerictypes import maximum_sctype
 from scipy.special import sph_harm, spherical_jn
 from multiprocessing import cpu_count, Pool
-from torch._C import dtype
 from tqdm import tqdm
+import psutil
+import time
+
+##### 下一步计划 #####
+# 根据机器的内存和显存自动切片，防止爆内存或显存
+####################
 
 
 def printTime(last_timestamp, item):
     now = time.time()
-    print('{:>10} {:^10}'.format(item, round(now-last_timestamp, 4)))
+    print('{:>20} {:^10}'.format(item, round(now-last_timestamp, 4)))
     timestamp = time.time()
     return timestamp
 
 
-def intensity(q, points, f, lmax):
+def _intensity(q, points, f, lmax):
+    import torch
 
-    with tqdm(total=100) as pbar:
+    q = q.astype('float32')
+    q = q.reshape(q.size)  # (q,)
+    points_sph = xyz2sph(points)
+    r, theta, phi = points_sph[:,0], points_sph[:,1], points_sph[:,2]
+    r, theta, phi = r.astype('float32'), theta.astype('float32'), phi.astype('float32')  # (r,)
+    r, theta, phi = r.reshape(r.size), theta.reshape(theta.size), phi.reshape(phi.size)
 
-        q = q.astype('float32')
-        q = q.reshape(q.size)  # (q,)
-        points_sph = xyz2sph(points)
-        r, theta, phi = points_sph[:,0], points_sph[:,1], points_sph[:,2]
-        r, theta, phi = r.astype('float32'), theta.astype('float32'), phi.astype('float32')  # (r,)
-        r, theta, phi = r.reshape(r.size), theta.reshape(theta.size), phi.reshape(phi.size)
+    f = f.astype('float32')
+    f = f.reshape(f.size)   # (r,)
 
-        f = f.astype('float32')
-        f = f.reshape(f.size)   # (r,)
+    # _ext means extended
+    # TIPS: use einsum() method
 
-        # _ext means extended
-        # TIPS: use einsum() method
+    lmax = int(lmax)
+    l = np.linspace(0, lmax, num=lmax+1, endpoint=True, dtype='int16')  # (l,)
+    l_ext, m = [], []
+    for li in l:
+        for mi in range(-li, li+1):
+            l_ext.append(li)
+            m.append(mi)
+    l_ext = np.array(l_ext, dtype='int16')  # (m,)
+    m = np.array(m, dtype='int16')  # (m,)
 
-        timestamp0 = time.time()
+    n_r, n_l, n_m, n_q = r.size, l.size, m.size, q.size
 
-        lmax = int(lmax)
-        l = np.linspace(0, lmax, num=lmax+1, endpoint=True, dtype='int16')  # (l,)
-        l_ext, m = [], []
-        for li in l:
-            for mi in range(-li, li+1):
-                l_ext.append(li)
-                m.append(mi)
-        l_ext = np.array(l_ext, dtype='int16')  # (m,)
-        m = np.array(m, dtype='int16')  # (m,)
-        timestamp = printTime(timestamp0, 'l&l_ext&m')
+    timestamp0 = time.time()
 
-        n_r, n_l, n_m, n_q = r.size, l.size, m.size, q.size
+    ##### calculate jl #####
+    # 使用l计算，然后再扩充，直接计算会特别慢
+    rq = np.einsum('r,q->rq', r, q)  #(r, q)
+    rq = np.reshape(rq, (n_r, 1, n_q))  # (r, 1, q)
+    l_ext1 = np.reshape(l, (1, n_l, 1))  # (1, l, 1)
+    jl_ext1 = spherical_jn(l_ext1, rq)  # broadcast to (r, l, q)
+    timestamp = printTime(timestamp0, 'jl')
+    # (r, l, q) -> (r, m, q)
+    jl_ext1 = jl_ext1.astype(np.float32)
 
-        ##### calculate jl #####
-        # 使用l计算，然后再扩充，直接计算会特别慢
-        rq = np.einsum('r,q->rq', r, q)  #(r, q)
-        rq = np.reshape(rq, (n_r, 1, n_q))  # (r, 1, q)
-        l_ext1 = np.reshape(l, (1, n_l, 1))  # (1, l, 1)
-        jl_ext1 = spherical_jn(l_ext1, rq)  # broadcast to (r, l, q)
-        timestamp = printTime(timestamp0, 'jl')
-        # (r, l, q) -> (r, m, q)
-        jl_ext1 = jl_ext1.astype(np.float32)
+    # 目前最快的方法
+    jl = []
+    for j in range(n_l):
+        jl += [jl_ext1[:,j,:]]*(2*j+1)
+    jl = np.array(jl, dtype=np.float32)
+    jl = np.swapaxes(jl, 0, 1)  # (r, m, q)
+    del rq, jl_ext1
+    '''
+    # 用下面的方法不管是用numpy还是torch都是最慢的！
+    jl = jl_ext1[:,0,:].reshape((n_r,1,n_q))
+    for j in range(1, n_l):
+        t = jl_ext1[:,j,:].reshape((n_r,1,n_q))
+        jl = np.concatenate([jl]+[t]*(2*j+1), axis=1)
 
-        # 目前最快的方法
-        jl = []
+    # 下面的方法比上面的方法快不少，但是不是最快的
+    jl = []
+    for k in range(n_r):
+        temp = []
         for j in range(n_l):
-            jl += [jl_ext1[:,j,:]]*(2*j+1)
-        jl = np.array(jl, dtype=np.float32)
-        jl = np.swapaxes(jl, 0, 1)  # (r, m, q)
-        '''
-        # 用下面的方法不管是用numpy还是torch都是最慢的！
-        jl = jl_ext1[:,0,:].reshape((n_r,1,n_q))
-        for j in range(1, n_l):
-            t = jl_ext1[:,j,:].reshape((n_r,1,n_q))
-            jl = np.concatenate([jl]+[t]*(2*j+1), axis=1)
+            temp += [ jl_ext1[k,j,:] ]*(2*j+1)  # (m, q)
+        jl.append(temp)
+    jl = torch.from_numpy(np.array(jl))  # (r, m, q)
+    '''
+    timestamp = printTime(timestamp, 'jl_rlq->rmq')
+    #########################
 
-        # 下面的方法比上面的方法快不少，但是不是最快的
-        jl = []
-        for k in range(n_r):
-            temp = []
-            for j in range(n_l):
-                temp += [ jl_ext1[k,j,:] ]*(2*j+1)  # (m, q)
-            jl.append(temp)
-        jl = torch.from_numpy(np.array(jl))  # (r, m, q)
-        '''
-        timestamp = printTime(timestamp, 'jl_rlq->rmq')
-        #########################
-
-        ##### calculate Ylm #####
-        theta_ext2 = np.reshape(theta, (n_r, 1))  # (r,) -> (r, 1)
-        phi_ext2 = np.reshape(phi, (n_r, 1))  # (r,) -> (r, 1)
-        l_ext2 = np.reshape(l_ext, (1, n_m))  # (m,) -> (1, m)
-        m_ext2 = np.reshape(m, (1, n_m))  # (m,) -> (1, m)
-        timestamp = printTime(timestamp, 'Ylm preparation')
-        Ylm = sph_harm(m_ext2, l_ext2, theta_ext2, phi_ext2).astype(np.complex64)  # broadcast to (r, m) float64
-        timestamp = printTime(timestamp, 'Ylm')
-        #########################
+    ##### calculate Ylm #####
+    theta_ext2 = np.reshape(theta, (n_r, 1))  # (r,) -> (r, 1)
+    phi_ext2 = np.reshape(phi, (n_r, 1))  # (r,) -> (r, 1)
+    l_ext2 = np.reshape(l_ext, (1, n_m))  # (m,) -> (1, m)
+    m_ext2 = np.reshape(m, (1, n_m))  # (m,) -> (1, m)
+    timestamp = printTime(timestamp, 'Ylm preparation')
+    Ylm = sph_harm(m_ext2, l_ext2, theta_ext2, phi_ext2).astype(np.complex64)  # broadcast to (r, m) float64
+    del theta_ext2, phi_ext2, l_ext2, m_ext2
+    timestamp = printTime(timestamp, 'Ylm')
+    #########################
 
 
-        il = complex(0,1)**l  # (l,)
-        il_list = []
-        for i in range(n_l):
-            il_list += [il[i]]*(2*i+1)
-        il = np.array(il_list, dtype='complex64')  # (m,)
-        timestamp = printTime(timestamp, 'il')
+    il = complex(0,1)**l  # (l,)
+    il_list = []
+    for i in range(n_l):
+        il_list += [il[i]]*(2*i+1)
+    il = np.array(il_list, dtype='complex64')  # (m,)
+    timestamp = printTime(timestamp, 'il')
 
-        Alm0_without_jl = np.einsum('m,r,rm->rm', il, f, Ylm)
-        Alm = np.einsum('rm,rmq->mq', Alm0_without_jl, jl)  # (m, q)
-        timestamp = printTime(timestamp, 'Alm')
-        #pbar.update(43)
+    Alm0_without_jl = np.einsum('m,r,rm->rm', il, f, Ylm)
+    timestamp = printTime(timestamp, 'Alm0')
+    del il, Ylm
 
-        I = 16 * np.pi**2 * np.sum(np.absolute(Alm)**2, axis=0)  # (q,)
-        #timestamp = printTime(timestamp, 'I')
-        #pbar.update(1)
+    
+    Alm0_without_jl_torch = torch.from_numpy(Alm0_without_jl)
+    jl_torch = torch.from_numpy(jl).type(torch.complex64)
+    Alm = torch.einsum('rm,rmq->mq', Alm0_without_jl_torch, jl_torch)
+    Alm = Alm.numpy()
+    
+    #Alm = np.einsum('rm,rmq->mq', Alm0_without_jl, jl)  # (m, q)
+
+    del Alm0_without_jl, jl
+    timestamp = printTime(timestamp, 'Alm')
+
+    I = 16 * np.pi**2 * np.sum(np.absolute(Alm)**2, axis=0)  # (q,)
+    #timestamp = printTime(timestamp, 'I')
 
     return I
+
+
+def intensity(q, points, f, lmax):
+    # 主要是为了防止爆内存，切片会变慢的
+    free_memory = psutil.virtual_memory().free
+    max_size = q.shape[0] * points.shape[0] * (lmax+1)**2 * 4  # 使用float32，每个数字4byte
+    slice_num = int(max_size/(0.9*free_memory)) + 1
+    slice_length = q.size // slice_num + 1
+    I_list = []
+    for i in range(slice_num):
+        index_begin = i * slice_length
+        index_end = (i+1) * slice_length
+        qi = q[index_begin:index_end]
+        Ii = _intensity(qi, points, f, lmax)
+        I_list.append(Ii)
+    I = np.hstack(I_list)
+    return I
+
 
 
 def intensity_parallel(q, points, f, lmax, core_num=2, proc_num=4):
@@ -136,7 +169,7 @@ def intensity_parallel(q, points, f, lmax, core_num=2, proc_num=4):
 
     pool = Pool(core_num)
     args = zip(q_list, [points]*slice_num, [f]*slice_num, [lmax]*slice_num)
-    result = pool.starmap_async(intensity, args)
+    result = pool.starmap_async(_intensity, args)
     pool.close()
     pool.join()
     I = np.array(result.get()).flatten()
@@ -147,7 +180,7 @@ def intensity_parallel(q, points, f, lmax, core_num=2, proc_num=4):
 def intensity_gpu(q, points, f, lmax, num_slice=10):
     '''calculate intensity using GPU by pytorch, Nvidia GPU only
     to prevent the error caused by insufficient video memory,
-    the whole process is sliced into num_slice parts
+    the last process is sliced into num_slice parts
     '''
     import torch
     # _ext means extended
@@ -244,12 +277,10 @@ def intensity_gpu(q, points, f, lmax, num_slice=10):
     # 需要切片不然爆显存
     Alm0_without_jl = torch.einsum('m,r,rm->rm', il, f, Ylm)
     timestamp = printTime(timestamp, 'Alm0')
-    jl = jl.type(torch.complex64)  # 使用einsum时尽量保证数据类型都一样，所以在这里先做一个转换
 
     slice_length = int(n_q/num_slice)
     Alm_list = []
     for i in range(num_slice):
-        timestamp0 = time.time()
 
         ##### slice #####
         index_begin = i*slice_length
@@ -258,7 +289,8 @@ def intensity_gpu(q, points, f, lmax, num_slice=10):
         else:
             index_end = (i+1)*slice_length
 
-        Almi = torch.einsum('rm,rmq->mq', Alm0_without_jl, jl[:,:,index_begin:index_end])  # (m, qi)
+        jl_slice = jl[:,:,index_begin:index_end].type(torch.complex64) # 使用torch.einsum时尽量保证数据类型都一样，所以在这里先做一个转换
+        Almi = torch.einsum('rm,rmq->mq', Alm0_without_jl, jl_slice)  # (m, qi)
         # 分步进行
         #Almi = torch.einsum('rmq,rm->rmq', jl, Ylm)  #(r, m, qi)
         #Almi = torch.einsum('r,rmq->mq', f, Almi)  #(m, qi)
@@ -356,7 +388,6 @@ def coordConvert(points, source_coord, target_coord):
     
 
 if __name__ == "__main__":
-    import time
     
     points_with_sld = np.loadtxt('test_points_with_sld2.txt')
     points, f = points_with_sld[:,:3], points_with_sld[:,3]
@@ -369,11 +400,30 @@ if __name__ == "__main__":
     #print('{:^10}|{:^10}'.format('item', 'time/sec'))
     I = intensity(q, points, f, lmax)
     #I = intensity_parallel(q, points, f, lmax, core_num=2, proc_num=4)
-    #I = intensity_gpu(q, points, f, lmax, num_slice=10)
+    #I = intensity_gpu(q, points, f, lmax, num_slice=5)
     endtime = time.time()
     print('total time: {} sec'.format(round(endtime-begintime, 2)))
     #print(I)
     from Plot import plotSasCurve
     plotSasCurve(q, I)
 
-    
+    '''
+    使用10000点左右的 test_points_with_sld2.txt
+    CPU time
+                  jl  29.6523
+         jl_rlq->rmq   7.7975  
+     Ylm preparation    0.0
+                 Ylm   15.439  
+                  il   0.001
+                 Alm  23.9121  
+    total time: 78.0 sec
+
+    GPU time
+                  jl  29.6806  
+         jl_rlq->rmq   7.2073  
+     Ylm preparation    0.0
+                 Ylm  15.3467  
+                  il    0.0
+                Alm0   0.069   
+                 Alm  68.6485  
+    '''
