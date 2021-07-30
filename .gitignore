@@ -159,3 +159,6 @@ doc_temp/
 
 # batch script
 *.bat
+
+# qt file
+.qt_for_python/
