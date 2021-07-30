@@ -21,6 +21,7 @@ import matplotlib
 matplotlib.use("Qt5Agg")  # 声明使用QT5
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 # my own qtgui files
 from qtgui.mainwindow_ui import Ui_mainWindow
@@ -45,35 +46,6 @@ Bug:
 (solved) 1. genPoints() 异步进行
 (solved) 2. control panel 变成dock widget
 '''
-
-# 通过多重继承来实现，方便完全的ui和功能分离
-class plotViewWindow(QWidget, Ui_plotView):
-    def __init__(self, parent=None):
-        super(plotViewWindow, self).__init__(parent)
-        self.setupUi(self)
-        self.pushButton_saveFigure.clicked.connect(self.saveFigure)
-    def saveFigure(self):
-        filename, filetype = QFileDialog.getSaveFileName(None, 'Save figure', './', "PNG Image (*.png);;JPEG Image (*.jpg);;TIFF Image (*.tif);;SVG Image (*.svg)")
-        if filename:
-            self.figure.savefig(filename)
-
-# 通过继承FigureCanvas类，使得该类既是一个PyQt5的Qwidget，又是一个matplotlib的FigureCanvas，这是连接pyqt5与matplotlib的关键！
-# 这样就可以把 matplotlib 画的图嵌入到pyqt的GUI窗口中了
-# 并且可以实现画的三维图可动
-class Figure_Canvas(FigureCanvas):
-    '''Usage
-    canvas = Figure_Canvas(figsize=(8,4))
-    plotStlMeshes(mesh_list, show=False, figure=canvas.figure)
-    # 创建一个QGraphicsScene，因为加载的图形（FigureCanvas）不能直接放到graphicview控件中，必须先放到graphicScene，然后再把graphicscene放到graphicview中
-    graphicScene = QtWidgets.QGraphicsScene()
-    # 把图形放到QGraphicsScene中，注意：图形是作为一个QWidget放到QGraphicsScene中的
-    graphicScene.addWidget(canvas)
-    stlmodelView.graphicsView.setScene(graphicScene)
-    '''
-    def __init__(self, parent=None, **kwargs):
-        self.figure = Figure(**kwargs)  # 创建一个Figure，注意：该Figure为matplotlib下的figure，不是matplotlib.pyplot下面的figure
-        FigureCanvas.__init__(self, self.figure) # 初始化父类
-        self.setParent(parent)
 
 class EmittingStream(QtCore.QObject):
     '''写一个信号，用来发射标准输出作为信号，为了在console中显示print的值和错误信息
@@ -385,41 +357,43 @@ class mainwindowFunction:
                 mesh_list = [stlmodel.mesh for stlmodel in self.project.model.stlmodel_list]
                 label_list = [stlmodel.name for stlmodel in self.project.model.stlmodel_list]
             #self.consolePrint(label_list)
-            canvas = Figure_Canvas()
-            plotStlMeshes(mesh_list, label_list=label_list, show=False, figure=canvas.figure)
-            self.showPlotViewWindow('STL model view', canvas, '')
+            
+            window = Ui_plotView()
+            plotStlMeshes(mesh_list, label_list=label_list, show=False, figure=window.canvas.fig)
+            window.setWindowTitle('STL model view')
+            window.label_text.setText('')
+            self.ui.mdiArea.addSubWindow(window)
+            window.show()
         except:
             self.consolePrint('(X) There is no model to show...')
     def showMathModel(self):
         try:
             index = self.ui.tableView_mathmodels.currentIndex()
             i = index.row()
-            canvas = Figure_Canvas()
-            plotPointsWithSld(self.project.model.mathmodel_list[i].sample_points_with_sld, show=False, figure=canvas.figure)
-            self.showPlotViewWindow('Math model view', canvas, '')
+            window = Ui_plotView()
+            plotPointsWithSld(self.project.model.mathmodel_list[i].sample_points_with_sld, show=False, figure=window.canvas.fig)
+            window.setWindowTitle('Math model view')
+            window.label_text.setText('')
+            self.ui.mdiArea.addSubWindow(window)
+            window.show()
         except:
             self.consolePrint('(X) There is no model to show...')
     def showPointsWithSld(self):
-        canvas = Figure_Canvas()
-        plotPointsWithSld(self.project.points_with_sld, show=False, figure=canvas.figure)
+        window = Ui_plotView()
+        plotPointsWithSld(self.project.points_with_sld, show=False, figure=window.canvas.fig)
+        window.setWindowTitle('Points with SLD view')
         interval = self.project.model.interval
         text = 'interval = {:.4f}\tnumber of points = {}'.format(interval, self.project.model.points_with_sld.shape[0])
-        self.showPlotViewWindow('Points with SLD view', canvas, text)
+        window.label_text.setText(text)
+        self.ui.mdiArea.addSubWindow(window)
+        window.show()
     def showSasCurve(self):
-        canvas = Figure_Canvas()
-        plotSasCurve(self.project.data.q, self.project.data.I, show=False, figure=canvas.figure)
-        self.showPlotViewWindow('SAS curve view', canvas, '')
-
-    def showPlotViewWindow(self, window_title, canvas, text):
-        graphicScene = QtWidgets.QGraphicsScene()
-        graphicScene.addWidget(canvas)
-        plotView = plotViewWindow()
-        plotView.figure = canvas.figure  # 便于保存图片用
-        plotView.graphicsView.setScene(graphicScene)
-        plotView.setWindowTitle(window_title)
-        plotView.label_text.setText(text)
-        self.ui.mdiArea.addSubWindow(plotView)
-        plotView.show()
+        window = Ui_plotView()
+        plotSasCurve(self.project.data.q, self.project.data.I, show=False, figure=window.canvas.fig)
+        window.setWindowTitle('SAS curve view')
+        window.label_text.setText('')
+        self.ui.mdiArea.addSubWindow(window)
+        window.show()
 
 
     def genPoints(self):
