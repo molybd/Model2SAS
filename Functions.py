@@ -1,8 +1,6 @@
 # -*- coding: UTF-8 -*-
 
-from sys import float_repr_style
 import numpy as np
-from numpy.core.numerictypes import maximum_sctype
 from scipy.special import sph_harm, spherical_jn
 from multiprocessing import cpu_count, Pool
 #from tqdm import tqdm
@@ -265,9 +263,8 @@ def intensity_gpu(q, points, f, lmax, slice_num=None):
 
 def intensity_parallel(q, points, f, lmax, core_num=2, proc_num=4):
     '''
-    使用einsum后单进程速度也加快了非常多，并且内存占用也没有那么大了，其实单进程就完全可用了。
-    但是为了以防万一需要更快速的计算，或者点数太多爆内存，还是需要保留多进程计算
-    不过有时候切片太细之后建立进程的时间反倒比计算时间还长，得不偿失，因此干脆单进程就好了
+    目前来看主要的瓶颈是内存不够，而不是CPU，因此其实意义不大
+    但是以防有些有巨大内存的需要更快的计算速度，因此还是先保留
     未来也许会把这个方法删除
     '''
     if core_num > cpu_count():
@@ -289,7 +286,7 @@ def intensity_parallel(q, points, f, lmax, core_num=2, proc_num=4):
 
     pool = Pool(core_num)
     args = zip(q_list, [points]*slice_num, [f]*slice_num, [lmax]*slice_num)
-    result = pool.starmap_async(_intensity, args)
+    result = pool.starmap_async(intensity, args)
     pool.close()
     pool.join()
     I = np.array(result.get()).flatten()
@@ -380,7 +377,7 @@ def coordConvert(points, source_coord, target_coord):
 
 if __name__ == "__main__":
     
-    points_with_sld = np.loadtxt('test_points_with_sld.txt')
+    points_with_sld = np.loadtxt('test_points_with_sld2.txt')
     points, f = points_with_sld[:,:3], points_with_sld[:,3]
     f = f.reshape(f.size)
     
