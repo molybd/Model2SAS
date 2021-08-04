@@ -212,7 +212,7 @@ class data:
 
 if __name__ == "__main__":
     project = model2sas('test')
-    project.importFile('models\sphere.py')
+    project.importFile('models\\shell.STL')
     #plotStlMeshes([stlmodel.mesh for stlmodel in project.model.stlmodel_list], label_list=[stlmodel.name for stlmodel in project.model.stlmodel_list])
     
     #plotPoints(project.model.mathmodel_list[0].sample_points)

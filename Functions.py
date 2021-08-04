@@ -386,32 +386,11 @@ if __name__ == "__main__":
 
     begintime = time.time()
     #print('{:^10}|{:^10}'.format('item', 'time/sec'))
-    #I = intensity(q, points, f, lmax)
-    I = intensity_gpu(q, points, f, lmax)
+    I = intensity(q, points, f, lmax)
+    #I = intensity_gpu(q, points, f, lmax)
     #I = intensity_parallel(q, points, f, lmax, core_num=2, proc_num=4)
     endtime = time.time()
-    print('total time: {} sec'.format(round(endtime-begintime, 2)))
+    print('total time: {:.2f} sec'.format(endtime-begintime))
     #print(I)
     from Plot import plotSasCurve
     plotSasCurve(q, I)
-
-    '''
-    使用10000点左右的 test_points_with_sld2.txt
-    CPU time
-                  jl  29.6523
-         jl_rlq->rmq   7.7975  
-     Ylm preparation    0.0
-                 Ylm   15.439  
-                  il   0.001
-                 Alm  23.9121  
-    total time: 78.0 sec
-
-    GPU time
-                  jl  29.6806  
-         jl_rlq->rmq   7.2073  
-     Ylm preparation    0.0
-                 Ylm  15.3467  
-                  il    0.0
-                Alm0   0.069   
-                 Alm  68.6485  
-    '''

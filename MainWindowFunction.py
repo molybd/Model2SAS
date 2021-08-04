@@ -414,13 +414,15 @@ class mainwindowFunction:
                 grid_num = int(grid_num)
                 self.thread_genPoints = Thread_genPoints(self.project, grid_num=grid_num)
             self.thread_genPoints.threadEnd.connect(self.processGenPointsThreadOutput)
+            self.begintime = time.time()
             self.thread_genPoints.start()
     def processGenPointsThreadOutput(self, temp_project):
+        endtime = time.time()
         self.project = temp_project
-        self.consolePrint('Points model generated')
         self.showPointsWithSld()
         self.setPushButtonEnable(True)
         self.setProgressBarRolling(False)
+        self.consolePrint('Points model generation finished. Time consumed: {} sec'.format(round(endtime-self.begintime, 2)))
 
     def calcSas(self):
         try:
