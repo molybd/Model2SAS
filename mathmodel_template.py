@@ -16,6 +16,7 @@ coord is
 # Don't change the class name, attributes name or method name !
 class specific_mathmodel:
     '''A template of hollow sphere math model
+    with various sld equal to the radius of certain point
     '''
 
     def __init__(self):
@@ -30,17 +31,16 @@ class specific_mathmodel:
 
     def shape(self, grid_in_coord):
         points_sph = grid_in_coord
+        self.points_sph = points_sph  # for usage in self.sld()
         R1 = self.params['R1']
         R2 = self.params['R2']
 
-        in_model_grid_index = np.zeros(points_sph.shape[0])
         r = points_sph[:, 0]
-        R1_array = R1 * np.ones_like(r)
-        R2_array = R2 * np.ones_like(r)
-        in_model_grid_index = np.sign(r-R1_array) * np.sign(R2_array-r)
-        in_model_grid_index = np.sign(in_model_grid_index+1)
+        in_model_grid_index = np.zeros_like(r)
+        in_model_grid_index[(r>=R1) & (r<=R2)] = 1
         self.in_model_grid_index = in_model_grid_index
         return self.in_model_grid_index  # must return in_model_grid_index
 
     def sld(self):
-        return 15 * self.in_model_grid_index  # must return sld index
+        r = self.points_sph[:, 0]
+        return r * self.in_model_grid_index  # must return sld index
