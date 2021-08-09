@@ -15,6 +15,20 @@ class stlmodel:
         self.sld = sld
         self.mesh = mesh.Mesh.from_file(filepath)
 
+    def rotate(self, axis, theta, point=None):
+        '''Parameters:	
+            axis (numpy.array) – Axis to rotate over (x, y, z)
+            theta (float) – Rotation angle in radians, use math.radians to convert degrees to radians if needed.
+            point (numpy.array) – Rotation point so manual translation is not required
+        '''
+        self.mesh.rotate(axis, theta, point=point)
+
+    def translate(self, translation):
+        '''Parameters:
+            translation (numpy.array) – Translation vector (x, y, z)
+        '''
+        self.mesh.translate(translation)
+
     def getBoundaryPoints(self):
         vectors = self.mesh.vectors
         xmin, xmax, ymin, ymax, zmin, zmax = np.min(vectors[:,:,0]), np.max(vectors[:,:,0]), np.min(vectors[:,:,1]), np.max(vectors[:,:,1]), np.min(vectors[:,:,2]), np.max(vectors[:,:,2])
@@ -28,8 +42,9 @@ class stlmodel:
         vectors = self.mesh.vectors
 
         # determine whether points inside the model
-        #ray = np.random.rand(3) + 0.01     # in case that all coordinates are 0, which is almost impossible
-        ray = np.array([1., 1., 1.])
+        ray = np.random.rand(3).astype(np.float32)    # use random ray. use ray like [1,1,1] may cause some misjudge
+        if np.sum(ray) <= np.finfo(np.float32).eps:  # in case that all coordinates are 0 so add 0.01, which is almost impossible
+            ray = np.array([0.23782647, 0.90581098, 0.34623647], dtype=np.float32)
         
         intersect_count = np.zeros(grid.shape[0])
         for triangle in vectors:
@@ -112,7 +127,7 @@ class stlmodel:
         return in_model_grid_index  # shape == (n,)
         
 
-    # 下面是完全数组化重写的结果，结果耗时差不多，而且会很占内存，效果不好
+    # 下面是完全向量化重写的结果，结果耗时差不多，而且会很占内存，效果不好
     def _countIntersect(self, origins, ray, triangles):
         \'''Calculate all the points intersect with all triangles
         using Möller–Trumbore intersection algorithm
@@ -170,11 +185,128 @@ class mathmodel:
         mathmodel_module = __import__(module_name)
         mathmodel_object = mathmodel_module.specific_mathmodel()
         self.specific_mathmodel = mathmodel_object
+        self.transform_list = []
+        self.grid_transform_list = []
         self.genSamplePoints()
+
+    def translate(self, translation):
+        '''Realized by transform grid, so reversed value
+        Parameters:
+            translation (numpy.array) – Translation vector (x, y, z)
+        '''
+        translation = np.array(translation)  
+        args = tuple([translation])
+        grid_args = tuple([-1*translation])  # Realized by transform grid, so reversed value
+        function = self._translate
+        self.transform_list.append((function, args))
+        self.grid_transform_list.insert(0, (function, grid_args))
+
+    def _translate(self, points, translation):
+        '''Parameters:
+            points (numpy.array) – points to be translated, shape==(n, 3)
+            others see translate method
+        '''
+        return points + translation
+
+    def rotate(self, axis, theta, point=None):
+        '''Parameters:	
+            axis (numpy.array) – Axis to rotate over (x, y, z)
+            theta (float) – Rotation angle in radians, use math.radians to convert degrees to radians if needed.
+            point (numpy.array) – Rotation point so manual translation is not required
+        '''
+        axis, theta = np.array(axis), np.array(theta)
+        if point:
+            point = np.array(point)
+        else:
+            point = np.array([0, 0, 0])
+        args = (axis, theta, point)
+        grid_args = (axis, -1*theta, -1*point)  # Realized by transform grid, so reversed theta and point value
+        function = self._rotate
+        self.transform_list.append((function, args))
+        self.grid_transform_list.insert(0, (function, grid_args))
+
+    def _rotate(self, points, axis, theta, point):
+        '''Uses the Euler-Rodrigues formula for fast rotations.
+            see https://en.wikipedia.org/wiki/Euler%E2%80%93Rodrigues_formula
+        Parameters:
+            points (numpy.array) – points to be rotated, shape==(n, 3)
+            others see rotate method
+        '''
+        # prepare rotation matrix
+        axis = axis / np.sqrt(np.sum(axis**2)) # make axis unit vector
+        kx, ky, kz = axis[0], axis[1], axis[2]
+        a, b, c, d = np.cos(theta/2), kx*np.sin(theta/2), ky*np.sin(theta/2), kz*np.sin(theta/2)
+        rotation_matrix = np.array([
+            [a**2 + b**2 - c**2 - d**2, 2*(b*c - a*d), 2*(b*d + a*c)],
+            [2*(b*c + a*d), a**2 + c**2 - b**2 - d**2, 2*(c*d - a*b)],
+            [2*(b*d - a*c), 2*(c*d + a*b), a**2 + d**2 - b**2 - c**2]
+        ])
+
+        # make points the origin and than rotate, then translate back
+        points = self._translate(points, -point)
+        points = np.einsum('ij,nj->ni', rotation_matrix, points)
+        points = self._translate(points, point)
+        return points
+
+    def applyTransform(self, points):
+        '''Parameters:
+            points: numpy array, shape == (n, 3) or (3,)
+        '''
+        if len(points.shape) == 1:  # single point case
+            points = points.reshape((1, points.size))
+            for function, args in self.transform_list:
+                points = function(points, *args)
+            points = points.reshape(points.size)
+        else:
+            for function, args in self.transform_list:
+                points = function(points, *args)
+        return points
+
+    def applyTranslate(self, points):
+        '''Only apply translation, no rotation
+        Parameters:
+            points: numpy array, shape == (n, 3) or (3,)
+        '''
+        if len(points.shape) == 1:  # single point case
+            points = points.reshape((1, points.size))
+            for function, args in self.transform_list:
+                if function.__name__ == '_translate':
+                    points = function(points, *args)
+            points = points.reshape(points.size)
+        else:
+            for function, args in self.transform_list:
+                if function.__name__ == '_translate':
+                    points = function(points, *args)
+        return points
+
+    def applyGridTransform(self, grid_points):
+        '''Apply transform, but realized by tranform grid instead of model
+        Parameters:
+            grid_points: numpy array, shape == (n, 3) or (3,)
+        '''
+        if len(grid_points.shape) == 1:  # single point case
+            grid_points = grid_points.reshape((1, grid_points.size))
+            for function, grid_args in self.grid_transform_list:
+                grid_points = function(grid_points, *grid_args)
+            grid_points = grid_points.reshape(grid_points.size)
+        else:
+            for function, grid_args in self.grid_transform_list:
+                grid_points = function(grid_points, *grid_args)
+        return grid_points
 
     def getBoundaryPoints(self):
         boundary_min = self.specific_mathmodel.boundary_min
         boundary_max = self.specific_mathmodel.boundary_max
+
+        # in case that rotation needed, so expand the boundary
+        center = (boundary_max + boundary_min)/2
+        radius = np.sqrt(np.sum((boundary_max - boundary_min)**2))/2
+        boundary_min = center - radius
+        boundary_max = center + radius
+
+        # translate the boundary to contain translated model
+        boundary_min = self.applyTranslate(boundary_min)
+        boundary_max = self.applyTranslate(boundary_max)
         return boundary_min, boundary_max
 
     def importGrid(self, grid):
@@ -182,11 +314,12 @@ class mathmodel:
 
     def calcInModelGridIndex(self):
         grid = self.grid
+        grid_transformed = self.applyGridTransform(grid)
         specific_mathmodel = self.specific_mathmodel
 
         # change grid coords (xyz) to destination coords
         coord = specific_mathmodel.coord
-        grid_in_coord = coordConvert(grid, 'xyz', coord)
+        grid_in_coord = coordConvert(grid_transformed, 'xyz', coord)
 
         in_model_grid_index = specific_mathmodel.shape(grid_in_coord)
         sld_grid_index = specific_mathmodel.sld()
@@ -200,8 +333,7 @@ class mathmodel:
     def genSamplePoints(self, interval=None, grid_num=10000):
         specific_mathmodel = self.specific_mathmodel
         # generate grid for sample points
-        boundary_min = self.specific_mathmodel.boundary_min
-        boundary_max = self.specific_mathmodel.boundary_max
+        boundary_min, boundary_max = self.getBoundaryPoints()
         # determine interval for sample points
         if interval:
             interval = interval
@@ -210,6 +342,7 @@ class mathmodel:
             # grid_num defauld is 10000
             interval = (scale[0]*scale[1]*scale[2] / grid_num)**(1/3)
 
+        # generate grid
         xmin, ymin, zmin = boundary_min[0], boundary_min[1], boundary_min[2]
         xmax, ymax, zmax = boundary_max[0], boundary_max[1], boundary_max[2]
         xscale = np.linspace(xmin, xmax, num=int((xmax-xmin)/interval+1))
@@ -218,10 +351,13 @@ class mathmodel:
         x, y, z = np.meshgrid(xscale, yscale, zscale)
         x, y, z = x.reshape(x.size,1), y.reshape(y.size,1), z.reshape(z.size,1)
         grid = np.hstack((x, y, z))
+        
+        # transform grid
+        grid_transformed = self.applyGridTransform(grid)
 
         # change grid coords (xyz) to destination coords
         coord = specific_mathmodel.coord
-        grid_in_coord = coordConvert(grid, 'xyz', coord)
+        grid_in_coord = coordConvert(grid_transformed, 'xyz', coord)
 
         in_model_grid_index = specific_mathmodel.shape(grid_in_coord)
         sld_grid_index = specific_mathmodel.sld()
@@ -266,10 +402,3 @@ if __name__ == '__main__':
     from Plot import plotPoints
     plotPoints(points)
 
-
-
-
-    '''
-    从STL文件生成点阵模型的算法优化工作
-    针对 models\shell_12_large_hole.STL 文件，使用100000点的grid，耗时 62.56 s
-    '''
