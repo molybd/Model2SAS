@@ -44,7 +44,7 @@ def plotStlMeshes(mesh_list, label_list=None, show=True, figure=None):
 
     if use_legend:
         axes.legend()  # 在GUI里绘制图像应当避免使用plt的方法而是使用面向对象的绘图方式，否则plt画出来的东西在GUI中不显示
-    plt.tight_layout()
+    # plt.tight_layout()  # 三维图似乎与tight_layout()不兼容
     if show:
         plt.show()
     return figure
@@ -65,7 +65,7 @@ def plotPoints(points, show=True, figure=None):
     scale = points[:,:].flatten()
     axes.auto_scale_xyz(scale, scale, scale)
     
-    plt.tight_layout()
+    #plt.tight_layout()  # 三维图似乎与tight_layout()不兼容
     if show:
         plt.show()
     return figure
@@ -89,7 +89,7 @@ def plotPointsWithSld(points_with_sld, colormap='viridis', show=True, figure=Non
     scale = points_with_sld[:,:-1].flatten()
     axes.auto_scale_xyz(scale, scale, scale)
 
-    plt.tight_layout()
+    #plt.tight_layout()  # 三维图似乎与tight_layout()不兼容
     if show:
         plt.show()
     return figure
