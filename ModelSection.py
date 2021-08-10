@@ -15,6 +15,9 @@ class stlmodel:
         self.sld = sld
         self.mesh = mesh.Mesh.from_file(filepath)
 
+    def setSld(self, sld):
+        self.sld = sld
+
     def rotate(self, axis, theta, point=None):
         '''Parameters:	
             axis (numpy.array) – Axis to rotate over (x, y, z)
@@ -200,6 +203,7 @@ class mathmodel:
         function = self._translate
         self.transform_list.append((function, args))
         self.grid_transform_list.insert(0, (function, grid_args))
+        self.genSamplePoints()
 
     def _translate(self, points, translation):
         '''Parameters:
@@ -224,6 +228,7 @@ class mathmodel:
         function = self._rotate
         self.transform_list.append((function, args))
         self.grid_transform_list.insert(0, (function, grid_args))
+        self.genSamplePoints()
 
     def _rotate(self, points, axis, theta, point):
         '''Uses the Euler-Rodrigues formula for fast rotations.
@@ -330,7 +335,7 @@ class mathmodel:
         self.points = points
         return in_model_grid_index  # shape == (n,)
 
-    def genSamplePoints(self, interval=None, grid_num=10000):
+    def genSamplePoints(self, interval=None, grid_num=50000):
         specific_mathmodel = self.specific_mathmodel
         # generate grid for sample points
         boundary_min, boundary_max = self.getBoundaryPoints()

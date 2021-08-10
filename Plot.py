@@ -3,6 +3,7 @@
 import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
+import matplotlib
 
 def genRgb(i, colormap='tab10', discrete_colormap=True):
     colors = eval('plt.cm.{}.colors'.format(colormap))
@@ -44,13 +45,13 @@ def plotStlMeshes(mesh_list, label_list=None, show=True, figure=None):
 
     if use_legend:
         axes.legend()  # 在GUI里绘制图像应当避免使用plt的方法而是使用面向对象的绘图方式，否则plt画出来的东西在GUI中不显示
-    # plt.tight_layout()  # 三维图似乎与tight_layout()不兼容
+    #figure.set_tight_layout(True)  # 三维图似乎与tight_layout()不兼容
     if show:
         plt.show()
     return figure
         
 
-def plotPoints(points, show=True, figure=None):
+def plotPoints(points, label=None, show=True, figure=None):
     # Create a new figure
     if figure:
         pass
@@ -60,12 +61,42 @@ def plotPoints(points, show=True, figure=None):
 
     x, y, z = points[:, 0], points[:, 1], points[:, 2]
     x, y, z = x.flatten(), y.flatten(), z.flatten()
-    axes.scatter(x, y, z, color='k', edgecolors='k')
+    axes.scatter(x, y, z, color='k', edgecolors='k', label=label)
 
     scale = points[:,:].flatten()
     axes.auto_scale_xyz(scale, scale, scale)
     
-    #plt.tight_layout()  # 三维图似乎与tight_layout()不兼容
+    axes.legend()
+    #figure.set_tight_layout(True)  # 三维图似乎与tight_layout()不兼容
+    if show:
+        plt.show()
+    return figure
+
+def plotMultiplePoints(points_list, label_list=None, show=True, figure=None):
+    # Create a new figure
+    if figure:
+        pass
+    else:
+        figure = plt.figure()
+
+    if label_list:
+        use_legend = True
+    else:
+        use_legend = False
+        label_list = [''] * len(points_list)
+    axes = mplot3d.Axes3D(figure)
+
+    for points, label in zip(points_list, label_list):
+        x, y, z = points[:, 0], points[:, 1], points[:, 2]
+        x, y, z = x.flatten(), y.flatten(), z.flatten()
+        axes.scatter(x, y, z, label=label)
+
+    scale = np.vstack(points_list).flatten()
+    axes.auto_scale_xyz(scale, scale, scale)
+    
+    if use_legend:
+        axes.legend()
+    #figure.set_tight_layout(True)  # 三维图似乎与tight_layout()不兼容
     if show:
         plt.show()
     return figure
@@ -89,7 +120,7 @@ def plotPointsWithSld(points_with_sld, colormap='viridis', show=True, figure=Non
     scale = points_with_sld[:,:-1].flatten()
     axes.auto_scale_xyz(scale, scale, scale)
 
-    #plt.tight_layout()  # 三维图似乎与tight_layout()不兼容
+    #figure.set_tight_layout(True)  # 三维图似乎与tight_layout()不兼容
     if show:
         plt.show()
     return figure
@@ -110,7 +141,13 @@ def plotSasCurve(q, I, label=None, show=True, figure=None):
     axes.set_ylabel(r'Intensity (a.u.)')
     axes.legend(frameon=False)  # 在GUI里绘制图像应当避免使用plt的方法而是使用面向对象的绘图方式，否则plt画出来的东西在GUI中不显示
 
-    plt.tight_layout()
+    figure.set_tight_layout(True)
     if show:
         plt.show()
     return figure
+
+if __name__ == '__main__':
+    fig = plt.figure()
+    axes = fig.add_subplot(111)
+    axes.plot([1,2,3,4,5], [1,3,5,2,4])
+    plt.show()
