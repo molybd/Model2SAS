@@ -5,6 +5,7 @@ from qtgui.modelModifyWindow_ui import Ui_modelModifyWindow
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtCore import Qt
 
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -18,6 +19,46 @@ class MplCanvas(FigureCanvasQTAgg):
     def __init__(self, width=5, height=4, dpi=100):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         super().__init__(self.fig)
+
+
+class TableModel(QtCore.QAbstractTableModel):
+    # for display mathmodel params 
+    def __init__(self, header, data=None):
+        super().__init__()
+        self._data = data or []
+        self.header = header
+    def data(self, index, role=Qt.DisplayRole):
+        if index.isValid():
+            if role == Qt.DisplayRole or role == Qt.EditRole:
+                value = self._data[index.row()][index.column()]
+                return str(value)
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        # set header for the table view
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+            return self.header[section]
+    def rowCount(self, index):
+        # The length of the list.
+        # only rows in ListModel
+        return len(self._data)
+    def columnCount(self, index):
+        return len(self._data[0])
+    def flags(self, index):  
+        # 使TableView中数据可编辑必须实现的接口方法
+        if index.column() == 1:  # 只有参数的值（第二列）可修改，参数名称不可修改
+            return Qt.ItemFlags(
+                    QtCore.QAbstractTableModel.flags(self, index)|
+                    Qt.ItemIsEnabled | Qt.ItemIsEditable | Qt.ItemIsSelectable
+                    )
+        else:
+            return Qt.ItemFlags(
+                    QtCore.QAbstractTableModel.flags(self, index)|
+                    Qt.ItemIsEnabled | Qt.ItemIsSelectable
+                    )
+    def setData(self, index, value, role):  
+        # 连接Qt显示与背后的数据结构的方法，使数据改变和显示的改变，以及编辑的数据能够双向及时更新
+        if role == Qt.EditRole:
+            self._data[index.row()][index.column()] = value
+            return True
 
 
 class modelModifyWindow(QMainWindow, Ui_modelModifyWindow):
@@ -39,6 +80,8 @@ class modelModifyWindow(QMainWindow, Ui_modelModifyWindow):
         self.comboBox_models.currentIndexChanged.connect(self.modelSelected)
         self.pushButton_translate.clicked.connect(self.translateModel)
         self.pushButton_rotate.clicked.connect(self.rotateModel)
+        self.pushButton_clearTransform.clicked.connect(self.clearTransform)
+        self.pushButton_applyParams.clicked.connect(self.applyParams)
 
 
     def setModelComboBox(self):
@@ -62,6 +105,7 @@ class modelModifyWindow(QMainWindow, Ui_modelModifyWindow):
             self.model_type = 'PY'
         self.label_modelType.setText('model type: {}'.format(self.model_type))
         self.showModel()
+        self.showParmas()
 
     def showModel(self):
         #axes = self.canvas.fig.gca()
@@ -74,6 +118,30 @@ class modelModifyWindow(QMainWindow, Ui_modelModifyWindow):
         elif self.model_type == 'PY':
             plotPointsWithSld(self.model.sample_points_with_sld, show=False, figure=self.canvas.fig)
         
+    def showParmas(self):
+        params_list = []
+        if self.model_type == 'STL':
+            params_list.append(['SLD', self.model.sld])
+        elif self.model_type == 'PY':
+            params_dict = self.model.specific_mathmodel.params
+            for key, value in params_dict.items():
+                params_list.append([key, value])
+        self.tableModel_params = TableModel(['parameter', 'value'], data=params_list)
+        self.tableView_params.setModel(self.tableModel_params)
+        self.tableView_params.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch) 
+    
+    def applyParams(self):
+        if self.model_type == 'STL':
+            self.model.sld = float(self.tableModel_params._data[0][1])
+        elif self.model_type == 'PY':
+            params_list = self.tableModel_params._data
+            for param in params_list:
+                name, value = str(param[0]), float(param[1])
+                self.model.specific_mathmodel.params[name] = value
+            self.model.specific_mathmodel.getBoundary()
+            self.model.genSamplePoints()
+            self.showModel()
+
     def translateModel(self):
         x = float(self.lineEdit_translateX.text())
         y = float(self.lineEdit_translateY.text())
@@ -92,6 +160,10 @@ class modelModifyWindow(QMainWindow, Ui_modelModifyWindow):
         axis = [axis_x, axis_y, axis_z]
         center = [center_x, center_y, center_z]
         self.model.rotate(axis, angle, point=center)
+        self.showModel()
+
+    def clearTransform(self):
+        self.model.clearTransform()
         self.showModel()
 
 

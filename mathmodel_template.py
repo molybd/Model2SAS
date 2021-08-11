@@ -29,6 +29,12 @@ class specific_mathmodel:
         self.coord = 'sph'  # 'xyz' or 'sph' or 'cyl'
         # must have these 4 attributes
 
+    def getBoundary(self):
+        # re-generate boundary in case that params are altered in software
+        self.boundary_min = -self.params['R2']*np.ones(3)
+        self.boundary_max = self.params['R2']*np.ones(3)
+        return self.boundary_min, self.boundary_max
+
     def shape(self, grid_in_coord):
         points_sph = grid_in_coord
         self.points_sph = points_sph  # for usage in self.sld()

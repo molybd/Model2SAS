@@ -60,6 +60,29 @@
           <string>TRANSFORM</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
+          <item row="5" column="0" colspan="4">
+           <widget class="QLabel" name="label_6">
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>20</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>Rotate</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item row="8" column="1">
+           <widget class="QLineEdit" name="lineEdit_centerX">
+            <property name="text">
+             <string>0</string>
+            </property>
+           </widget>
+          </item>
           <item row="2" column="2">
            <widget class="QLineEdit" name="lineEdit_translateY">
             <property name="text">
@@ -67,85 +90,8 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="3">
-           <widget class="QLineEdit" name="lineEdit_translateZ">
-            <property name="text">
-             <string>0</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="1">
-           <widget class="QLineEdit" name="lineEdit_translateX">
-            <property name="text">
-             <string>0</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="3">
-           <widget class="QPushButton" name="pushButton_translate">
-            <property name="text">
-             <string>translate</string>
-            </property>
-           </widget>
-          </item>
-          <item row="8" column="3">
-           <widget class="QLineEdit" name="lineEdit_centerZ">
-            <property name="text">
-             <string>0</string>
-            </property>
-           </widget>
-          </item>
-          <item row="6" column="0">
-           <widget class="QLabel" name="label_8">
-            <property name="text">
-             <string>axis</string>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="0" colspan="4">
-           <widget class="Line" name="line">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-           </widget>
-          </item>
           <item row="6" column="2">
            <widget class="QLineEdit" name="lineEdit_axisY">
-            <property name="text">
-             <string>0</string>
-            </property>
-           </widget>
-          </item>
-          <item row="8" column="2">
-           <widget class="QLineEdit" name="lineEdit_centerY">
-            <property name="text">
-             <string>0</string>
-            </property>
-           </widget>
-          </item>
-          <item row="8" column="0">
-           <widget class="QLabel" name="label_10">
-            <property name="text">
-             <string>center</string>
-            </property>
-           </widget>
-          </item>
-          <item row="6" column="3">
-           <widget class="QLineEdit" name="lineEdit_axisZ">
-            <property name="text">
-             <string>1</string>
-            </property>
-           </widget>
-          </item>
-          <item row="6" column="1">
-           <widget class="QLineEdit" name="lineEdit_axisX">
-            <property name="text">
-             <string>0</string>
-            </property>
-           </widget>
-          </item>
-          <item row="8" column="1">
-           <widget class="QLineEdit" name="lineEdit_centerX">
             <property name="text">
              <string>0</string>
             </property>
@@ -158,13 +104,6 @@
             </property>
            </widget>
           </item>
-          <item row="9" column="3">
-           <widget class="QPushButton" name="pushButton_rotate">
-            <property name="text">
-             <string>rotate</string>
-            </property>
-           </widget>
-          </item>
           <item row="2" column="0">
            <widget class="QLabel" name="label_7">
             <property name="text">
@@ -172,10 +111,24 @@
             </property>
            </widget>
           </item>
-          <item row="7" column="1">
-           <widget class="QLineEdit" name="lineEdit_angle">
+          <item row="8" column="0">
+           <widget class="QLabel" name="label_10">
             <property name="text">
-             <string>90</string>
+             <string>center</string>
+            </property>
+           </widget>
+          </item>
+          <item row="7" column="2">
+           <widget class="QLabel" name="label_11">
+            <property name="text">
+             <string>degree</string>
+            </property>
+           </widget>
+          </item>
+          <item row="8" column="3">
+           <widget class="QLineEdit" name="lineEdit_centerZ">
+            <property name="text">
+             <string>0</string>
             </property>
            </widget>
           </item>
@@ -195,26 +148,80 @@
             </property>
            </widget>
           </item>
-          <item row="7" column="2">
-           <widget class="QLabel" name="label_11">
+          <item row="6" column="3">
+           <widget class="QLineEdit" name="lineEdit_axisZ">
             <property name="text">
-             <string>degree</string>
+             <string>0</string>
             </property>
            </widget>
           </item>
-          <item row="5" column="0" colspan="4">
-           <widget class="QLabel" name="label_6">
-            <property name="maximumSize">
-             <size>
-              <width>16777215</width>
-              <height>20</height>
-             </size>
-            </property>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="lineEdit_translateX">
             <property name="text">
-             <string>Rotate</string>
+             <string>0</string>
             </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+           </widget>
+          </item>
+          <item row="2" column="3">
+           <widget class="QLineEdit" name="lineEdit_translateZ">
+            <property name="text">
+             <string>0</string>
+            </property>
+           </widget>
+          </item>
+          <item row="7" column="1">
+           <widget class="QLineEdit" name="lineEdit_angle">
+            <property name="text">
+             <string>90</string>
+            </property>
+           </widget>
+          </item>
+          <item row="8" column="2">
+           <widget class="QLineEdit" name="lineEdit_centerY">
+            <property name="text">
+             <string>0</string>
+            </property>
+           </widget>
+          </item>
+          <item row="6" column="1">
+           <widget class="QLineEdit" name="lineEdit_axisX">
+            <property name="text">
+             <string>1</string>
+            </property>
+           </widget>
+          </item>
+          <item row="6" column="0">
+           <widget class="QLabel" name="label_8">
+            <property name="text">
+             <string>axis</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0" colspan="4">
+           <widget class="Line" name="line">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </widget>
+          </item>
+          <item row="9" column="3">
+           <widget class="QPushButton" name="pushButton_rotate">
+            <property name="text">
+             <string>rotate</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="3">
+           <widget class="QPushButton" name="pushButton_translate">
+            <property name="text">
+             <string>translate</string>
+            </property>
+           </widget>
+          </item>
+          <item row="10" column="0" colspan="4">
+           <widget class="QPushButton" name="pushButton_clearTransform">
+            <property name="text">
+             <string>clear all transform</string>
             </property>
            </widget>
           </item>
@@ -251,7 +258,7 @@
            <widget class="QTableView" name="tableView_params"/>
           </item>
           <item row="1" column="0">
-           <widget class="QPushButton" name="pushButton_apply">
+           <widget class="QPushButton" name="pushButton_applyParams">
             <property name="maximumSize">
              <size>
               <width>16777215</width>
@@ -262,7 +269,7 @@
              <enum>Qt::RightToLeft</enum>
             </property>
             <property name="text">
-             <string>Apply</string>
+             <string>apply</string>
             </property>
            </widget>
           </item>

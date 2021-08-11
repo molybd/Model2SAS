@@ -1,6 +1,5 @@
 # -*- coding: UTF-8 -*-
 
-from qtgui.modelModifyWindow_ui import Ui_modelModifyWindow
 from ModelModifyWindow import modelModifyWindow
 import os
 #import zipfile

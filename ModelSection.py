@@ -3,8 +3,14 @@
 import numpy as np
 from stl import mesh
 import os, sys
+import copy
 
 from Functions import coordConvert
+
+########## 目前还存在的问题 ###########
+# 1. mathmodel 旋转
+#    如果旋转中心不在模型正中心，那么旋转后的boundary point圈定的boundary可能不能包含完整模型
+####################################
 
 
 class stlmodel:
@@ -14,6 +20,7 @@ class stlmodel:
         self.name = os.path.basename(filepath)
         self.sld = sld
         self.mesh = mesh.Mesh.from_file(filepath)
+        self.mesh_original = copy.deepcopy(self.mesh)
 
     def setSld(self, sld):
         self.sld = sld
@@ -31,6 +38,9 @@ class stlmodel:
             translation (numpy.array) – Translation vector (x, y, z)
         '''
         self.mesh.translate(translation)
+
+    def clearTransform(self):
+        self.mesh = copy.deepcopy(self.mesh_original)
 
     def getBoundaryPoints(self):
         vectors = self.mesh.vectors
@@ -267,23 +277,6 @@ class mathmodel:
                 points = function(points, *args)
         return points
 
-    def applyTranslate(self, points):
-        '''Only apply translation, no rotation
-        Parameters:
-            points: numpy array, shape == (n, 3) or (3,)
-        '''
-        if len(points.shape) == 1:  # single point case
-            points = points.reshape((1, points.size))
-            for function, args in self.transform_list:
-                if function.__name__ == '_translate':
-                    points = function(points, *args)
-            points = points.reshape(points.size)
-        else:
-            for function, args in self.transform_list:
-                if function.__name__ == '_translate':
-                    points = function(points, *args)
-        return points
-
     def applyGridTransform(self, grid_points):
         '''Apply transform, but realized by tranform grid instead of model
         Parameters:
@@ -299,19 +292,25 @@ class mathmodel:
                 grid_points = function(grid_points, *grid_args)
         return grid_points
 
+    def clearTransform(self):
+        self.transform_list = []
+        self.grid_transform_list = []
+        self.genSamplePoints()
+
     def getBoundaryPoints(self):
         boundary_min = self.specific_mathmodel.boundary_min
         boundary_max = self.specific_mathmodel.boundary_max
 
-        # in case that rotation needed, so expand the boundary
+        # in case that rotation needed, so expand the boundary to a sphere
         center = (boundary_max + boundary_min)/2
         radius = np.sqrt(np.sum((boundary_max - boundary_min)**2))/2
+
+        # transform the boundary to contain transformed model
+        center = self.applyTransform(center)
+
         boundary_min = center - radius
         boundary_max = center + radius
 
-        # translate the boundary to contain translated model
-        boundary_min = self.applyTranslate(boundary_min)
-        boundary_max = self.applyTranslate(boundary_max)
         return boundary_min, boundary_max
 
     def importGrid(self, grid):
