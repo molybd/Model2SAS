@@ -47,7 +47,7 @@
     <addaction name="action_loadProject"/>
     <addaction name="separator"/>
     <addaction name="action_saveProject"/>
-    <addaction name="action_savePointsModel"/>
+    <addaction name="action_saveLatticeModel"/>
     <addaction name="action_saveSasCurve"/>
     <addaction name="separator"/>
     <addaction name="action_importModels"/>
@@ -57,6 +57,9 @@
     <property name="title">
      <string>Windows</string>
     </property>
+    <addaction name="action_showLatticeModel"/>
+    <addaction name="action_showSasCurve"/>
+    <addaction name="separator"/>
     <addaction name="action_Cascade"/>
     <addaction name="action_Tile"/>
    </widget>
@@ -64,7 +67,7 @@
     <property name="title">
      <string>Options</string>
     </property>
-    <addaction name="action_advancedOptions"/>
+    <addaction name="action_configureGpu"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuOptions"/>
@@ -159,8 +162,8 @@
   <widget class="QDockWidget" name="dockWidget_controlPanel">
    <property name="minimumSize">
     <size>
-     <width>264</width>
-     <height>200</height>
+     <width>300</width>
+     <height>377</height>
     </size>
    </property>
    <property name="maximumSize">
@@ -191,34 +194,38 @@
         <string>Generate lattice model</string>
        </property>
        <layout class="QGridLayout" name="gridLayout_2">
-        <item row="2" column="2">
+        <item row="3" column="1" colspan="2">
+         <widget class="QLineEdit" name="lineEdit_interval">
+          <property name="text">
+           <string>1.0</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="2">
          <widget class="QPushButton" name="pushButton_genLatticeModel">
           <property name="text">
            <string>generate</string>
           </property>
          </widget>
         </item>
-        <item row="1" column="1" colspan="2">
-         <widget class="QLineEdit" name="lineEdit_interval"/>
-        </item>
-        <item row="0" column="2">
+        <item row="2" column="2">
          <widget class="QLineEdit" name="lineEdit_gridPointsNum">
           <property name="text">
            <string>10000</string>
           </property>
          </widget>
         </item>
-        <item row="0" column="0" colspan="2">
-         <widget class="QLabel" name="label">
+        <item row="2" column="0">
+         <widget class="QRadioButton" name="radioButton_gridPointsNum">
           <property name="text">
            <string>grid points number</string>
           </property>
          </widget>
         </item>
-        <item row="1" column="0">
-         <widget class="QLabel" name="label_2">
+        <item row="3" column="0">
+         <widget class="QRadioButton" name="radioButton_interval">
           <property name="text">
-           <string>OR interval</string>
+           <string>interval</string>
           </property>
          </widget>
         </item>
@@ -295,6 +302,13 @@
           </property>
          </widget>
         </item>
+        <item row="8" column="2">
+         <widget class="QCheckBox" name="checkBox_useGpu">
+          <property name="text">
+           <string>use GPU</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
      </item>
@@ -361,9 +375,9 @@
     <string>Delete all models</string>
    </property>
   </action>
-  <action name="action_savePointsModel">
+  <action name="action_saveLatticeModel">
    <property name="text">
-    <string>Save points model</string>
+    <string>Save lattice model</string>
    </property>
   </action>
   <action name="action_saveSasCurve">
@@ -376,9 +390,19 @@
     <string>Load project</string>
    </property>
   </action>
-  <action name="action_advancedOptions">
+  <action name="action_configureGpu">
    <property name="text">
-    <string>Advanced options</string>
+    <string>Configure GPU</string>
+   </property>
+  </action>
+  <action name="action_showLatticeModel">
+   <property name="text">
+    <string>Show lattice model</string>
+   </property>
+  </action>
+  <action name="action_showSasCurve">
+   <property name="text">
+    <string>Show SAS curve</string>
    </property>
   </action>
   <zorder>dockWidget_controlPanel</zorder>

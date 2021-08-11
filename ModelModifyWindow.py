@@ -138,7 +138,7 @@ class modelModifyWindow(QMainWindow, Ui_modelModifyWindow):
             for param in params_list:
                 name, value = str(param[0]), float(param[1])
                 self.model.specific_mathmodel.params[name] = value
-            self.model.specific_mathmodel.getBoundary()
+            self.model.specific_mathmodel.genBoundary()
             self.model.genSamplePoints()
             self.showModel()
 

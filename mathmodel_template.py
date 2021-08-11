@@ -29,7 +29,7 @@ class specific_mathmodel:
         self.coord = 'sph'  # 'xyz' or 'sph' or 'cyl'
         # must have these 4 attributes
 
-    def getBoundary(self):
+    def genBoundary(self):
         # re-generate boundary in case that params are altered in software
         self.boundary_min = -self.params['R2']*np.ones(3)
         self.boundary_max = self.params['R2']*np.ones(3)

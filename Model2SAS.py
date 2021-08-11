@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from shutil import copyfile
 
 from ModelSection import stlmodel, mathmodel
-from Functions import intensity, xyz2sph, intensity_parallel
+from Functions import intensity_cpu, intensity_gpu, intensity_cpu_parallel, xyz2sph
 from Plot import *
 
 
@@ -50,16 +50,16 @@ class model2sas:
     def setupData(self):
         self.data = data(self.model.points_with_sld)
 
-    def calcSas(self, qmin, qmax, qnum=200, logq=False, lmax=50, parallel=False, core_num=2, proc_num=4):
-        q = self.data.genQ(qmin, qmax, qnum=qnum, logq=logq)
-        self.data.calcSas(q, lmax=lmax, parallel=parallel, core_num=core_num, proc_num=proc_num)
+    def calcSas(self, qmin, qmax, qnum=200, logq=False, lmax=50, use_gpu=False, parallel=False, slice_num=None):
+        self.data.genQ(qmin, qmax, qnum=qnum, logq=logq)
+        self.data.calcSas(lmax=lmax, use_gpu=use_gpu, parallel=parallel, slice_num=slice_num)
         self.q = self.data.q
         self.I = self.data.I
         #self.saveSasData()
 
     def saveSasData(self, filename):
         header = 'q\tI\tpseudo error(I/1000)'
-        data = np.vstack((self.data.q, self.data.I, self.data.error)).T
+        data = np.vstack((self.data.q, self.data.I, self.data.pseudo_error)).T
         np.savetxt(filename, data, header=header)
 
 
@@ -194,19 +194,23 @@ class data:
             q = np.logspace(np.log10(qmin), np.log10(qmax), num=qnum, base=10, dtype='float32')
         else:
             q = np.linspace(qmin, qmax, num=qnum, dtype='float32')
+        self.q = q
         return q
 
-    def calcSas(self, q, lmax=50, parallel=False, core_num=2, proc_num=4):
+    def calcSas(self, q=None, lmax=50, use_gpu=False, parallel=False, slice_num=None):
+        q = q or self.q
         points = self.points
         sld = self.sld
-        if parallel:
-            I = intensity_parallel(q, points, sld, lmax, core_num=core_num, proc_num=proc_num)
+        if use_gpu:
+            I = intensity_gpu(q, points, sld, lmax, slice_num=slice_num)
+        elif parallel:
+            I = intensity_cpu_parallel(q, points, sld, lmax, core_num=slice_num, proc_num=slice_num)
         else:
-            I = intensity(q, points, sld, lmax)
-
+            I = intensity_cpu(q, points, sld, lmax, slice_num=slice_num)
+     
         self.q = q
         self.I = I
-        self.error = 0.001 * I   # 默认生成千分之一的误差，主要用于写文件的占位
+        self.pseudo_error = 0.001 * I   # 默认生成千分之一的误差，主要用于写文件的占位
         self.lmax = lmax
 
 

@@ -16,10 +16,9 @@ def printTime(last_timestamp, item):
     now = time.time()
     print('{:>20} {:^10}'.format(item, round(now-last_timestamp, 4)))
     timestamp = time.time()
-    return timestamp
+    return timestamp        
 
-
-def intensity(q, points, f, lmax, slice_num=None):
+def intensity_cpu(q, points, f, lmax, slice_num=None):
 
     q = q.astype('float32')
     q = q.reshape(q.size)  # (q,)
@@ -53,7 +52,7 @@ def intensity(q, points, f, lmax, slice_num=None):
     phi_ext2 = np.reshape(phi, (n_r, 1))  # (r,) -> (r, 1)
     l_ext2 = np.reshape(l_ext, (1, n_m))  # (m,) -> (1, m)
     m_ext2 = np.reshape(m, (1, n_m))  # (m,) -> (1, m)
-    timestamp = printTime(timestamp, 'Ylm preparation')
+    #timestamp = printTime(timestamp, 'Ylm preparation')
     Ylm = sph_harm(m_ext2, l_ext2, theta_ext2, phi_ext2).astype(np.complex64)  # broadcast to (r, m) float64
     del theta_ext2, phi_ext2, l_ext2, m_ext2
     timestamp = printTime(timestamp, 'Ylm')
@@ -65,10 +64,10 @@ def intensity(q, points, f, lmax, slice_num=None):
     for i in range(n_l):
         il_list += [il[i]]*(2*i+1)
     il = np.array(il_list, dtype='complex64')  # (m,)
-    timestamp = printTime(timestamp, 'il')
+    #timestamp = printTime(timestamp, 'il')
 
     Alm0_without_jl = np.einsum('m,r,rm->rm', il, f, Ylm)
-    timestamp = printTime(timestamp, 'Alm0')
+    #timestamp = printTime(timestamp, 'Alm0')
     del il, Ylm
     ############################
 
@@ -130,7 +129,7 @@ def intensity(q, points, f, lmax, slice_num=None):
 
         Ii = 16 * np.pi**2 * np.sum(np.absolute(Alm)**2, axis=0)  # (q,)
         I_list.append(Ii)
-        timestamp = printTime(timestamp, 'I_i')
+        #timestamp = printTime(timestamp, 'I_i')
         del jl, Alm  # 即时垃圾回收，不然内存会不够
         timestamp = printTime(timestamp, 'gc')
 
@@ -175,7 +174,7 @@ def intensity_gpu(q, points, f, lmax, slice_num=None):
     phi_ext2 = np.reshape(phi, (n_r, 1))  # (r,) -> (r, 1)
     l_ext2 = np.reshape(l_ext, (1, n_m))  # (m,) -> (1, m)
     m_ext2 = np.reshape(m, (1, n_m))  # (m,) -> (1, m)
-    timestamp = printTime(timestamp, 'Ylm preparation')
+    #timestamp = printTime(timestamp, 'Ylm preparation')
     Ylm = sph_harm(m_ext2, l_ext2, theta_ext2, phi_ext2).astype(np.complex64)  # broadcast to (r, m) float64
     del theta_ext2, phi_ext2, l_ext2, m_ext2
     timestamp = printTime(timestamp, 'Ylm')
@@ -187,10 +186,10 @@ def intensity_gpu(q, points, f, lmax, slice_num=None):
     for i in range(n_l):
         il_list += [il[i]]*(2*i+1)
     il = np.array(il_list, dtype='complex64')  # (m,)
-    timestamp = printTime(timestamp, 'il')
+    #timestamp = printTime(timestamp, 'il')
 
     Alm0_without_jl = np.einsum('m,r,rm->rm', il, f, Ylm)
-    timestamp = printTime(timestamp, 'Alm0')
+    #timestamp = printTime(timestamp, 'Alm0')
     del il, Ylm
     ############################
 
@@ -250,7 +249,7 @@ def intensity_gpu(q, points, f, lmax, slice_num=None):
 
         Ii = 16 * np.pi**2 * np.sum(np.absolute(Alm)**2, axis=0)  # (q,)
         I_list.append(Ii)
-        timestamp = printTime(timestamp, 'I_i')
+        #timestamp = printTime(timestamp, 'I_i')
         del jl, jl_tensor, Alm  # 即时垃圾回收，不然下一个循环内存会不够
         timestamp = printTime(timestamp, 'gc')
 
@@ -259,9 +258,7 @@ def intensity_gpu(q, points, f, lmax, slice_num=None):
 
     return I
 
-
-
-def intensity_parallel(q, points, f, lmax, core_num=2, proc_num=4):
+def intensity_cpu_parallel(q, points, f, lmax, core_num=2, proc_num=4):
     '''
     目前来看主要的瓶颈是内存不够，而不是CPU，因此其实意义不大
     但是以防有些有巨大内存的需要更快的计算速度，因此还是先保留
@@ -286,7 +283,7 @@ def intensity_parallel(q, points, f, lmax, core_num=2, proc_num=4):
 
     pool = Pool(core_num)
     args = zip(q_list, [points]*slice_num, [f]*slice_num, [lmax]*slice_num)
-    result = pool.starmap_async(intensity, args)
+    result = pool.starmap_async(intensity_cpu, args)
     pool.close()
     pool.join()
     I = np.array(result.get()).flatten()
@@ -386,9 +383,9 @@ if __name__ == "__main__":
 
     begintime = time.time()
     #print('{:^10}|{:^10}'.format('item', 'time/sec'))
-    I = intensity(q, points, f, lmax)
+    I = intensity_cpu(q, points, f, lmax)
     #I = intensity_gpu(q, points, f, lmax)
-    #I = intensity_parallel(q, points, f, lmax, core_num=2, proc_num=4)
+    #I = intensity_cpu_parallel(q, points, f, lmax, core_num=2, proc_num=4)
     endtime = time.time()
     print('total time: {:.2f} sec'.format(endtime-begintime))
     #print(I)
