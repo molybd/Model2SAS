@@ -57,6 +57,8 @@
     <property name="title">
      <string>Windows</string>
     </property>
+    <addaction name="action_showAllModels"/>
+    <addaction name="action_showSelectedModels"/>
     <addaction name="action_showLatticeModel"/>
     <addaction name="action_showSasCurve"/>
     <addaction name="separator"/>
@@ -75,6 +77,12 @@
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QDockWidget" name="dockWidget_explorer">
+   <property name="minimumSize">
+    <size>
+     <width>275</width>
+     <height>300</height>
+    </size>
+   </property>
    <property name="maximumSize">
     <size>
      <width>524287</width>
@@ -89,8 +97,19 @@
    </attribute>
    <widget class="QWidget" name="dockWidgetContents">
     <layout class="QGridLayout" name="gridLayout">
-     <item row="4" column="0" colspan="2">
-      <widget class="QTableView" name="tableView_stlModels"/>
+     <item row="6" column="1">
+      <widget class="QPushButton" name="pushButton_modifyModel">
+       <property name="text">
+        <string>modify model</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="1">
+      <widget class="QPushButton" name="pushButton_showSelectedModels">
+       <property name="text">
+        <string>show selected model(s)</string>
+       </property>
+      </widget>
      </item>
      <item row="2" column="0">
       <widget class="QPushButton" name="pushButton_importModels">
@@ -99,15 +118,12 @@
        </property>
       </widget>
      </item>
-     <item row="7" column="1">
-      <widget class="QPushButton" name="pushButton_modifyModel">
+     <item row="3" column="0">
+      <widget class="QPushButton" name="pushButton_showAllModels">
        <property name="text">
-        <string>modify model</string>
+        <string>show all models</string>
        </property>
       </widget>
-     </item>
-     <item row="5" column="0" colspan="2">
-      <widget class="QTableView" name="tableView_mathModels"/>
      </item>
      <item row="2" column="1">
       <widget class="QPushButton" name="pushButton_deleteModels">
@@ -123,19 +139,8 @@
        </property>
       </widget>
      </item>
-     <item row="3" column="0">
-      <widget class="QPushButton" name="pushButton_showAllModels">
-       <property name="text">
-        <string>show all models</string>
-       </property>
-      </widget>
-     </item>
-     <item row="3" column="1">
-      <widget class="QPushButton" name="pushButton_showSelectedModels">
-       <property name="text">
-        <string>show selected model(s)</string>
-       </property>
-      </widget>
+     <item row="4" column="0" rowspan="2" colspan="2">
+      <widget class="QTableView" name="tableView_models"/>
      </item>
     </layout>
    </widget>
@@ -392,7 +397,7 @@
   </action>
   <action name="action_configureGpu">
    <property name="text">
-    <string>Configure GPU</string>
+    <string>Configure GPU with PyTorch</string>
    </property>
   </action>
   <action name="action_showLatticeModel">
@@ -403,6 +408,16 @@
   <action name="action_showSasCurve">
    <property name="text">
     <string>Show SAS curve</string>
+   </property>
+  </action>
+  <action name="action_showAllModels">
+   <property name="text">
+    <string>Show all models</string>
+   </property>
+  </action>
+  <action name="action_showSelectedModels">
+   <property name="text">
+    <string>Show selected model(s)</string>
    </property>
   </action>
   <zorder>dockWidget_controlPanel</zorder>

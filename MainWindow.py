@@ -1,12 +1,13 @@
 # -*- coding: UTF-8 -*-
 
-from posixpath import basename
+from numpy import pi
 from ModelModifyWindow import modelModifyWindow
 import os
 import zipfile
 import json
 import pickle
 import time
+import shutil
 
 from Model2SAS import model2sas
 from Plot import *
@@ -15,12 +16,12 @@ from Plot import *
 import sys
 
 from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QFileDialog, QMessageBox, QInputDialog
 from PyQt5.QtCore import QThread, Qt, pyqtSignal
 
 # my own qtgui files
-from qtgui.mainwindow_ui import Ui_mainWindow
-from qtgui.plotView_ui import Ui_plotView
+from qtgui.MainWindow_ui import Ui_mainWindow
+from qtgui.PlotView_ui import Ui_plotView
 from ModelModifyWindow import modelModifyWindow
 
 ''' 尚待解决的问题 & 待加入的功能
@@ -84,36 +85,23 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
         super().__init__()
         self.setupUi(self)
 
-        self.params = {
-            'project name': 'New Project',
-            'model list': [],
-            'grid points num': 10000,
-            'interval': 1.0,
-            'use grid points num': True,
-            'use interval': False,
-            'q min': 0.001,
-            'q max': 1,
-            'q num': 200,
-            'l max': 50
-        }  # 记录所有参数，供保存和加载project用
         self.temp_folder = './.TEMP_Model2SAS/'
         if not os.path.exists(self.temp_folder):
             os.mkdir(self.temp_folder)
         self.clearTempFolder()
 
-        defalult_name = 'New Project'
-        self.project = model2sas(defalult_name)
-        self.label_projectName.setText('Project: {}'.format(self.project.name))
+        self.default_params_json = 'default_params.json'
+        self.setParamsFromJson(self.default_params_json)
 
-        self.tableModel_stlModels = TableModel(['STL model'])
-        self.tableModel_mathModels = TableModel(['MATH model'])
-        self.tableView_stlModels.setModel(self.tableModel_stlModels)
-        self.tableView_mathModels.setModel(self.tableModel_mathModels)
-        self.tableView_stlModels.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)  # 横向填满
-        self.tableView_mathModels.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)  # 横向填满
+        self.project = model2sas(self.params['project name'])
+        self.consolePrint('New project established with name: {}'.format(self.project.name))
 
+        self.tableModel_models = TableModel(['Models'])
+        self.tableView_models.setModel(self.tableModel_models)
+        self.tableView_models.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)  # 横向填满
+        
         self.checkBox_useGpu.setEnabled(False)  # 不配置GPU前不可用
-        self.radioButton_gridPointsNum.setChecked(True)
+        self.radioButton_gridPointsNum.setChecked(True)  # 默认使用grid num
 
         self.pushButton_importModels.clicked.connect(self.importModels)
         self.pushButton_deleteModels.clicked.connect(self.deleteSelectedModels)
@@ -123,52 +111,49 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
         self.pushButton_showAllModels.clicked.connect(self.showAllModels)
         self.pushButton_modifyModel.clicked.connect(self.showModelModifyWindow)
 
-        self.action_deleteAllModels.triggered.connect(self.deleteAllModels)
-        self.action_configureGpu.triggered.connect(self.configureGpu)
-        self.action_Cascade.triggered.connect(self.mdiArea.cascadeSubWindows)
-        self.action_Tile.triggered.connect(self.mdiArea.tileSubWindows)
+        self.action_newProject.triggered.connect(self.newProject)
+        self.action_loadProject.triggered.connect(self.loadProject)
+        self.action_saveProject.triggered.connect(self.saveProject)
         self.action_saveLatticeModel.triggered.connect(self.saveLatticeModel)
         self.action_saveSasCurve.triggered.connect(self.saveSasCurve)
-        self.action_saveProject.triggered.connect(self.saveProject)
+        self.action_importModels.triggered.connect(self.importModels)
+        self.action_deleteAllModels.triggered.connect(self.deleteAllModels)
+        self.action_configureGpu.triggered.connect(self.configureGpu)
+        self.action_showLatticeModel.triggered.connect(self.showLatticeModel)
+        self.action_showSasCurve.triggered.connect(self.showSasCurve)
+        self.action_showAllModels.triggered.connect(self.showAllModels)
+        self.action_showSelectedModels.triggered.connect(self.showSelectedModels)
+        self.action_Cascade.triggered.connect(self.mdiArea.cascadeSubWindows)
+        self.action_Tile.triggered.connect(self.mdiArea.tileSubWindows)
 
     def importModels(self):
         filepath_list, filetype_list = QFileDialog.getOpenFileNames(None, 'Select Model File(s)', './', "All Files (*);;stl Files (*.stl);;math model Files (*.py)")
         for filepath in filepath_list:
             self.project.importFile(filepath, sld=1)
             basename = os.path.basename(filepath)
-            modelname, _ = os.path.splitext(basename)
-            filetype = basename.split('.')[-1].upper()
+            filetype = filepath.split('.')[-1].upper()
             self.consolePrint(
                 'Import {} model with path: {}'.format(filetype, filepath)
             )
-            if filetype == 'STL':
-                self.tableModel_stlModels.model_list.append(modelname)
-            elif filetype == 'PY':
-                self.tableModel_mathModels.model_list.append(modelname)
-        self.tableModel_stlModels.layoutChanged.emit()
-        self.tableModel_mathModels.layoutChanged.emit()
+            shutil.copyfile(filepath, os.path.join(self.temp_folder, basename))  # 在temp_folder中存储副本，供保存project用
+        self.updateTableView()
 
     def deleteSelectedModels(self):
         # read the selected model indexes
-        indexes_stlmodel = [selectedRow.row() for selectedRow in self.tableView_stlModels.selectionModel().selectedRows()]
-        indexes_mathmodel = [selectedRow.row() for selectedRow in self.tableView_mathModels.selectionModel().selectedRows()]
+        indexes, indexes_stlmodel, indexes_mathmodel = self.getSelectedModelIndexes()
         indexes_stlmodel.sort(reverse=True)
         indexes_mathmodel.sort(reverse=True)
         for i in indexes_stlmodel:
-            self.consolePrint('Delete STL model: {}'.format(self.project.model.stlmodel_list[i].name))
-            del self.tableModel_stlModels.model_list[i]
             del self.project.model.stlmodel_list[i]
+            self.consolePrint('Delete STL model: {}'.format(self.project.model.stlmodel_list[i].name))
         for i in indexes_mathmodel:
-            self.consolePrint('Delete MATH model: {}'.format(self.project.model.mathmodel_list[i].name))
-            del self.tableModel_mathModels.model_list[i]
             del self.project.model.mathmodel_list[i]
-        self.tableModel_stlModels.layoutChanged.emit()
-        self.tableModel_mathModels.layoutChanged.emit()
+            self.consolePrint('Delete MATH model: {}'.format(self.project.model.mathmodel_list[i].name))
+        self.updateTableView()
 
     def showSelectedModels(self):
         # read the selected model indexes
-        indexes_stlmodel = [selectedRow.row() for selectedRow in self.tableView_stlModels.selectionModel().selectedRows()]
-        indexes_mathmodel = [selectedRow.row() for selectedRow in self.tableView_mathModels.selectionModel().selectedRows()]
+        indexes, indexes_stlmodel, indexes_mathmodel = self.getSelectedModelIndexes()
         indexes_stlmodel.sort()
         indexes_mathmodel.sort()
 
@@ -225,10 +210,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
     def deleteAllModels(self):
         self.project.model.stlmodel_list = []
         self.project.model.mathmodel_list = []
-        self.tableModel_stlModels.model_list = []
-        self.tableModel_mathModels.model_list = []
-        self.tableModel_stlModels.layoutChanged.emit()
-        self.tableModel_mathModels.layoutChanged.emit()
+        self.updateTableView()
         self.consolePrint('All models deleted.')
 
     def showModelModifyWindow(self):
@@ -261,24 +243,28 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
         self.project = temp_project
         self.setPushButtonEnable(True)
         self.setProgressBarRolling(False)
-        self.consolePrint('Points model generation finished. Time consumed: {:.2f} sec'.format(endtime-self.begintime))
+        self.consolePrint('Lattice model generation finished. Time consumed: {:.2f} sec'.format(endtime-self.begintime))
         self.showLatticeModel()
 
     def showLatticeModel(self):
-        window = Ui_plotView()
-        plotPointsWithSld(self.project.points_with_sld, show=False, figure=window.canvas.fig)
-        window.setWindowTitle('Lattice model view')
-        interval = self.project.model.interval
-        text = 'interval = {:.4f}\tnumber of points = {}'.format(interval, self.project.model.points_with_sld.shape[0])
-        window.label_text.setText(text)
-        self.mdiArea.addSubWindow(window)
-        window.show()
+        try:
+            window = Ui_plotView()
+            plotPointsWithSld(self.project.points_with_sld, show=False, figure=window.canvas.fig)
+            window.setWindowTitle('Lattice model view')
+            interval = self.project.model.interval
+            text = 'interval = {:.4f}\tnumber of points = {}'.format(interval, self.project.model.points_with_sld.shape[0])
+            window.label_text.setText(text)
+            self.mdiArea.addSubWindow(window)
+            window.show()
+            self.consolePrint('Lattice model shown')
+        except:
+            self.consolePrint('(X) Lattice model hasn\'t been generated !')
 
     def calcSasCurve(self):
         try:
             self.project.model.points_with_sld
         except:
-            self.consolePrint('(X) Please generate points first !')
+            self.consolePrint('(X) Please generate lattice model first !')
         else:
             self.project.setupData()
             qmin = float(self.lineEdit_qmin.text())
@@ -306,12 +292,16 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
         self.showSasCurve()
 
     def showSasCurve(self):
-        window = Ui_plotView()
-        plotSasCurve(self.project.q, self.project.I, show=False, figure=window.canvas.fig)
-        window.setWindowTitle('SAS curve view')
-        window.label_text.setText('')
-        self.mdiArea.addSubWindow(window)
-        window.show()
+        try:
+            window = Ui_plotView()
+            plotSasCurve(self.project.q, self.project.I, show=False, figure=window.canvas.fig)
+            window.setWindowTitle('SAS curve view')
+            window.label_text.setText('')
+            self.mdiArea.addSubWindow(window)
+            window.show()
+            self.consolePrint('SAS curve shown')
+        except:
+            self.consolePrint('(X) SAS curve hasn\'t been generated !')
 
     def configureGpu(self):
         try:
@@ -355,7 +345,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
             self,
             'Save project',
             './',
-            'All Files (*);;Model2SAS project Files (*.m2s_proj)'
+            'All Files (*);;Model2SAS project Files (*.m2sproj)'
             )
         if ok:
             self.params['project name'] = self.project.name
@@ -371,22 +361,88 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
             l += [model.name for model in self.project.model.mathmodel_list]
             self.params['model list'] = l
 
-            self.clearTempFolder()
             filepath_params = os.path.join(self.temp_folder, 'params.json')
             with open(filepath_params, 'w') as f:
                 json.dump(self.params, f, indent=4)
             filepath_pickle = os.path.join(self.temp_folder, 'project.pickle')
             with open(filepath_pickle, 'wb') as f:
                 pickle.dump(self.project, f)
-            
+
+            file_list = [filepath_params, filepath_pickle]
+            file_list += [os.path.join(self.temp_folder, model.name) for model in self.project.model.stlmodel_list]
+            file_list += [os.path.join(self.temp_folder, model.name) for model in self.project.model.mathmodel_list]
             with zipfile.ZipFile(filepath_save, mode='w', compression=zipfile.ZIP_STORED) as z:
-                z.write(filepath_params, arcname=os.path.basename(filepath_params))
-                z.write(filepath_pickle, arcname=os.path.basename(filepath_pickle))
+                for file in file_list:
+                    z.write(file, arcname=os.path.basename(file))
             self.consolePrint('Project saved in {}'.format(os.path.abspath(filepath_save)))
-            self.clearTempFolder()
 
     def loadProject(self):
-        pass
+        filename, filetype = QFileDialog.getOpenFileName(
+            self, 
+            'Load project file', 
+            './', 
+            'Model2SAS project Files (*.m2sproj)'
+            )
+        if filename:
+            self.clearTempFolder()
+            sys.path.append(self.temp_folder)  # 这样加载数学模型时就不会出问题了
+            with zipfile.ZipFile(filename, mode='r') as z:
+                z.extractall(path=self.temp_folder)
+            for file in os.listdir(self.temp_folder):
+                if file.split('.')[-1].lower() == 'json':
+                    filepath_params = os.path.join(self.temp_folder, file)
+                elif file.split('.')[-1].lower() == 'pickle':
+                    filepath_pickle = os.path.join(self.temp_folder, file)
+            with open(filepath_pickle, 'rb') as f:
+                self.project = pickle.load(f)
+            self.setParamsFromJson(filepath_params)
+            self.updateTableView()
+            self.consolePrint('Loaded project: {}'.format(filename))
+            self.showAllModels()
+            self.showLatticeModel()
+            self.showSasCurve()
+
+    def newProject(self):
+        name, ok_pressed = QInputDialog.getText(self, 'New Project', 'Name: ')
+        if ok_pressed:
+            if name == '':
+                name = 'New Project'
+            self.project = model2sas(name)
+            self.label_projectName.setText('Project: {}'.format(self.project.name))
+            self.consolePrint('New project established with name: {}'.format(self.project.name))
+            self.updateTableView()
+
+    ############## some tool functions ##############
+    def setParamsFromJson(self, json_file):
+        try:
+            with open(json_file, 'r') as f:
+                self.params = json.load(f)
+        except:
+            self.params = {
+            'project name': 'New Project',
+            'model list': [],
+            'grid points num': 10000,
+            'interval': 1.0,
+            'use grid points num': True,
+            'use interval': False,
+            'q min': 0.001,
+            'q max': 1,
+            'q num': 200,
+            'l max': 50
+            }  # 记录所有参数，供保存和加载project用
+            with open(json_file, 'r') as f:
+                json.dump(self.params, f, indent=4)
+        self.label_projectName.setText('Project: {}'.format(self.params['project name']))
+        self.lineEdit_gridPointsNum.setText(str(self.params['grid points num']))
+        self.lineEdit_interval.setText(str(self.params['interval']))
+        if self.params['use interval']:
+            self.radioButton_interval.setChecked(self.params['use interval'])
+        else:
+            self.radioButton_gridPointsNum.setChecked(self.params['use grid points num'])
+        self.lineEdit_qmin.setText(str(self.params['q min']))
+        self.lineEdit_qmax.setText(str(self.params['q max']))
+        self.lineEdit_qnum.setText(str(self.params['q num']))
+        self.lineEdit_lmax.setText(str(self.params['l max']))
 
     def clearTempFolder(self):
         def clearFolder(folder):
@@ -399,9 +455,23 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
                     os.rmdir(path)
         clearFolder(self.temp_folder)
 
+    def getSelectedModelIndexes(self):
+        indexes_tableview = [selectedRow.row() for selectedRow in self.tableView_models.selectionModel().selectedRows()]
+        indexes_tableview.sort()
+        stlmodel_num = len(self.project.model.stlmodel_list)
+        indexes_stlmodel, indexes_mathmodel = [], []
+        for i in indexes_tableview:
+            if i < stlmodel_num:
+                indexes_stlmodel.append(i)
+            else:
+                indexes_mathmodel.append(i-stlmodel_num)
+        return indexes_tableview, indexes_stlmodel, indexes_mathmodel
 
+    def updateTableView(self):
+        self.tableModel_models.model_list = [model.name for model in self.project.model.stlmodel_list]
+        self.tableModel_models.model_list += [model.name for model in self.project.model.mathmodel_list]
+        self.tableModel_models.layoutChanged.emit()
 
-    ####### some functions for GUI use ########
     def consolePrint(self, string):
         console_str = '[{}] {}'.format(time.strftime('%Y-%m-%d %H:%M:%S'), string)
         print(console_str)
@@ -421,7 +491,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
             # progress bar 停止滚动
             self.progressBar.setMinimum(0)
             self.progressBar.setMaximum(100)
-    ###########################################
+    ####################################################
 
 
 app = QtWidgets.QApplication(sys.argv)

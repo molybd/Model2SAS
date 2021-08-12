@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from Plot import plotPointsWithSld, plotStlMeshes
-from qtgui.modelModifyWindow_ui import Ui_modelModifyWindow
+from qtgui.ModelModifyWindow_ui import Ui_modelModifyWindow
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QMainWindow
