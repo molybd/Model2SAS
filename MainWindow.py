@@ -144,11 +144,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
         indexes_stlmodel.sort(reverse=True)
         indexes_mathmodel.sort(reverse=True)
         for i in indexes_stlmodel:
-            del self.project.model.stlmodel_list[i]
             self.consolePrint('Delete STL model: {}'.format(self.project.model.stlmodel_list[i].name))
+            del self.project.model.stlmodel_list[i]
         for i in indexes_mathmodel:
-            del self.project.model.mathmodel_list[i]
             self.consolePrint('Delete MATH model: {}'.format(self.project.model.mathmodel_list[i].name))
+            del self.project.model.mathmodel_list[i]
         self.updateTableView()
 
     def showSelectedModels(self):

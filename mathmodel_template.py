@@ -24,10 +24,9 @@ class specific_mathmodel:
             'R1': 10,
             'R2': 15
         }
-        self.boundary_min = -self.params['R2']*np.ones(3)
-        self.boundary_max = self.params['R2']*np.ones(3)
         self.coord = 'sph'  # 'xyz' or 'sph' or 'cyl'
         # must have these 4 attributes
+        self.boundary_min, self.boundary_max = self.genBoundary()
 
     def genBoundary(self):
         # re-generate boundary in case that params are altered in software
