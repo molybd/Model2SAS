@@ -2,6 +2,7 @@
 
 from numpy import pi
 from ModelModifyWindow import modelModifyWindow
+from MathModelGenerationWindow import mathModelGenerationWindow
 import os
 import zipfile
 import json
@@ -123,19 +124,25 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
         self.action_showSasCurve.triggered.connect(self.showSasCurve)
         self.action_showAllModels.triggered.connect(self.showAllModels)
         self.action_showSelectedModels.triggered.connect(self.showSelectedModels)
+        self.action_mathModelGeneration.triggered.connect(self.showMathModelGenerationWindow)
         self.action_Cascade.triggered.connect(self.mdiArea.cascadeSubWindows)
         self.action_Tile.triggered.connect(self.mdiArea.tileSubWindows)
 
     def importModels(self):
         filepath_list, filetype_list = QFileDialog.getOpenFileNames(None, 'Select Model File(s)', './', "All Files (*);;stl Files (*.stl);;math model Files (*.py)")
         for filepath in filepath_list:
-            self.project.importFile(filepath, sld=1)
             basename = os.path.basename(filepath)
             filetype = filepath.split('.')[-1].upper()
-            self.consolePrint(
-                'Import {} model with path: {}'.format(filetype, filepath)
-            )
-            shutil.copyfile(filepath, os.path.join(self.temp_folder, basename))  # 在temp_folder中存储副本，供保存project用
+            if filetype != 'STL' and filetype != 'PY':
+                self.consolePrint('(X) Wrong file type! Only .stl and .py file supported')
+            else:
+                try:
+                    self.project.importFile(filepath, sld=1)
+                except:
+                    self.consolePrint('(X) Import model failed with path: {}'.format(filepath))
+                else:
+                    self.consolePrint('Import {} model with path: {}'.format(filetype, filepath))
+                    shutil.copyfile(filepath, os.path.join(self.temp_folder, basename))  # 在temp_folder中存储副本，供保存project用
         self.updateTableView()
 
     def deleteSelectedModels(self):
@@ -290,6 +297,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
         self.setProgressBarRolling(False)
         self.consolePrint('SAS curve calculation finished. Time consumed: {:.2f} sec'.format(endtime-self.begintime))
         self.showSasCurve()
+
+    def showMathModelGenerationWindow(self):
+        window_gen_math_model = mathModelGenerationWindow()
+        self.mdiArea.addSubWindow(window_gen_math_model)
+        window_gen_math_model.show()
 
     def showSasCurve(self):
         try:

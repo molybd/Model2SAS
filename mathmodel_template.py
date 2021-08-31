@@ -48,4 +48,5 @@ class specific_mathmodel:
 
     def sld(self):
         r = self.points_sph[:, 0]
-        return r * self.in_model_grid_index  # must return sld index
+        sld_grid_index = r * self.in_model_grid_index
+        return sld_grid_index  # must return sld index

@@ -11,6 +11,23 @@ def genRgb(i, colormap='tab10', discrete_colormap=True):
     i = int(i)
     return colors[i%N]
 
+def genScale(points):
+    # points.shape = (n, 3)
+    def getCenterAndRadius(p):
+        center = (p.max() + p.min()) / 2
+        radius = np.abs(p.max() - p.min()) / 2
+        return center, radius
+
+    x, y, z = points[:, 0].flatten(), points[:, 1].flatten(), points[:, 2].flatten()
+    center_x, radius_x = getCenterAndRadius(x)
+    center_y, radius_y = getCenterAndRadius(y)
+    center_z, radius_z = getCenterAndRadius(z)
+    radius = max(radius_x, radius_y, radius_z)
+    scale_x = [center_x-radius, center_x+radius]
+    scale_y = [center_y-radius, center_y+radius]
+    scale_z = [center_z-radius, center_z+radius]
+    return scale_x, scale_y, scale_z
+
 def plotStlMeshes(mesh_list, label_list=None, show=True, figure=None):
     if label_list:
         use_legend = True
@@ -43,6 +60,10 @@ def plotStlMeshes(mesh_list, label_list=None, show=True, figure=None):
     #scale = mesh.points.flatten()
     axes.auto_scale_xyz(scale, scale, scale)
 
+    axes.set_xlabel('X')
+    axes.set_ylabel('Y')
+    axes.set_zlabel('Z')
+
     if use_legend:
         axes.legend()  # 在GUI里绘制图像应当避免使用plt的方法而是使用面向对象的绘图方式，否则plt画出来的东西在GUI中不显示
     #figure.set_tight_layout(True)  # 三维图似乎与tight_layout()不兼容
@@ -65,6 +86,10 @@ def plotPoints(points, label=None, show=True, figure=None):
 
     scale = points[:,:].flatten()
     axes.auto_scale_xyz(scale, scale, scale)
+
+    axes.set_xlabel('X')
+    axes.set_ylabel('Y')
+    axes.set_zlabel('Z')
     
     axes.legend()
     #figure.set_tight_layout(True)  # 三维图似乎与tight_layout()不兼容
@@ -93,6 +118,10 @@ def plotMultiplePoints(points_list, label_list=None, show=True, figure=None):
 
     scale = np.vstack(points_list).flatten()
     axes.auto_scale_xyz(scale, scale, scale)
+
+    axes.set_xlabel('X')
+    axes.set_ylabel('Y')
+    axes.set_zlabel('Z')
     
     if use_legend:
         axes.legend()
@@ -119,6 +148,10 @@ def plotPointsWithSld(points_with_sld, colormap='viridis', show=True, figure=Non
 
     scale = points_with_sld[:,:-1].flatten()
     axes.auto_scale_xyz(scale, scale, scale)
+
+    axes.set_xlabel('X')
+    axes.set_ylabel('Y')
+    axes.set_zlabel('Z')
 
     #figure.set_tight_layout(True)  # 三维图似乎与tight_layout()不兼容
     if show:

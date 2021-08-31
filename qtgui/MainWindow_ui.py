@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file '.\mainwindow.ui'
+# Form implementation generated from reading ui file '.\MainWindow.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.4
 #
@@ -37,6 +37,8 @@ class Ui_mainWindow(object):
         self.menuWindows.setObjectName("menuWindows")
         self.menuOptions = QtWidgets.QMenu(self.menubar)
         self.menuOptions.setObjectName("menuOptions")
+        self.menuTools = QtWidgets.QMenu(self.menubar)
+        self.menuTools.setObjectName("menuTools")
         mainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(mainWindow)
         self.statusbar.setObjectName("statusbar")
@@ -199,6 +201,8 @@ class Ui_mainWindow(object):
         self.action_showAllModels.setObjectName("action_showAllModels")
         self.action_showSelectedModels = QtWidgets.QAction(mainWindow)
         self.action_showSelectedModels.setObjectName("action_showSelectedModels")
+        self.action_mathModelGeneration = QtWidgets.QAction(mainWindow)
+        self.action_mathModelGeneration.setObjectName("action_mathModelGeneration")
         self.dockWidget_controlPanel.raise_()
         self.menuFile.addAction(self.action_newProject)
         self.menuFile.addAction(self.action_loadProject)
@@ -217,8 +221,10 @@ class Ui_mainWindow(object):
         self.menuWindows.addAction(self.action_Cascade)
         self.menuWindows.addAction(self.action_Tile)
         self.menuOptions.addAction(self.action_configureGpu)
+        self.menuTools.addAction(self.action_mathModelGeneration)
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuOptions.menuAction())
+        self.menubar.addAction(self.menuTools.menuAction())
         self.menubar.addAction(self.menuWindows.menuAction())
 
         self.retranslateUi(mainWindow)
@@ -230,6 +236,7 @@ class Ui_mainWindow(object):
         self.menuFile.setTitle(_translate("mainWindow", "File"))
         self.menuWindows.setTitle(_translate("mainWindow", "Windows"))
         self.menuOptions.setTitle(_translate("mainWindow", "Options"))
+        self.menuTools.setTitle(_translate("mainWindow", "Tools"))
         self.dockWidget_explorer.setWindowTitle(_translate("mainWindow", "Model Explorer"))
         self.pushButton_modifyModel.setText(_translate("mainWindow", "modify model"))
         self.pushButton_showSelectedModels.setText(_translate("mainWindow", "show selected model(s)"))
@@ -273,3 +280,4 @@ class Ui_mainWindow(object):
         self.action_showSasCurve.setText(_translate("mainWindow", "Show SAS curve"))
         self.action_showAllModels.setText(_translate("mainWindow", "Show all models"))
         self.action_showSelectedModels.setText(_translate("mainWindow", "Show selected model(s)"))
+        self.action_mathModelGeneration.setText(_translate("mainWindow", "Generate math model"))
