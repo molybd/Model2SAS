@@ -91,7 +91,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
             os.mkdir(self.temp_folder)
         self.clearTempFolder()
 
-        self.default_params_json = 'default_params.json'
+        self.default_params_json = './default_params.json'
         self.setParamsFromJson(self.default_params_json)
 
         self.project = model2sas(self.params['project name'])
@@ -442,7 +442,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
             'q num': 200,
             'l max': 50
             }  # 记录所有参数，供保存和加载project用
-            with open(json_file, 'r') as f:
+            with open(json_file, 'w') as f:
                 json.dump(self.params, f, indent=4)
         self.label_projectName.setText('Project: {}'.format(self.params['project name']))
         self.lineEdit_gridPointsNum.setText(str(self.params['grid points num']))
