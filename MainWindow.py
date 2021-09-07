@@ -19,6 +19,7 @@ import sys
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QInputDialog
 from PyQt5.QtCore import QThread, Qt, pyqtSignal
+from PyQt5.QtGui import QIcon
 
 # my own qtgui files
 from qtgui.MainWindow_ui import Ui_mainWindow
@@ -85,8 +86,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+        self.setWindowIcon(QIcon('resource/icon/logo_256.ico'))  # set window icon
 
-        self.temp_folder = './.TEMP_Model2SAS/'
+        self.temp_folder = os.path.normpath(os.path.expanduser('~/.TEMP_Model2SAS/'))  # 在用户目录下建立临时文件夹，以免安装后出现权限不足报错
         if not os.path.exists(self.temp_folder):
             os.mkdir(self.temp_folder)
         self.clearTempFolder()
