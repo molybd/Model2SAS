@@ -123,7 +123,13 @@ def intensity_cpu(q, points, f, lmax, slice_num=None):
         #########################
  
         ##### calculate Alm #####
-        Alm = np.einsum('rm,rmq->mq', Alm0_without_jl, jl)  # (m, q)
+        # 虽然在CPU上可以直接进行复数运算，但是手动将实部和虚部分开算再合起来比直接运算快
+        # 原因应该是这里实际上是一个复数乘实数的运算，比复数运算简单很多
+        #Alm = np.einsum('rm,rmq->mq', Alm0_without_jl, jl)  # (m, q)
+        Alm0_without_jl_real, Alm0_without_jl_imag = np.real(Alm0_without_jl), np.imag(Alm0_without_jl)
+        Alm_real = np.einsum('rm,rmq->mq', Alm0_without_jl_real, jl)
+        Alm_imag = np.einsum('rm,rmq->mq', Alm0_without_jl_imag, jl)
+        Alm = Alm_real + 1j*Alm_imag
         timestamp = printTime(timestamp, 'Alm')
         #########################
 
@@ -140,7 +146,7 @@ def intensity_cpu(q, points, f, lmax, slice_num=None):
 
 def intensity_gpu(q, points, f, lmax, slice_num=None):
     
-    import torch
+    import torch, pynvml
     
     q = q.astype('float32')
     q = q.reshape(q.size)  # (q,)
@@ -193,8 +199,12 @@ def intensity_gpu(q, points, f, lmax, slice_num=None):
     del il, Ylm
     ############################
 
-    ##### 切片循环，防止爆内存 #####
-    free_memory = psutil.virtual_memory().free
+    ##### 切片循环，防止爆显存 #####
+    # 获得空闲显存，而不是内存
+    pynvml.nvmlInit()
+    handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # 这里未来还可以再改改，默认使用GPU0
+    mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+    free_memory = mem_info.free
     if slice_num:
         slice_num = int(slice_num)
     else:
@@ -233,6 +243,13 @@ def intensity_gpu(q, points, f, lmax, slice_num=None):
         Alm0_without_jl_real_tensor = torch.from_numpy(np.real(Alm0_without_jl))
         Alm0_without_jl_imag_tensor = torch.from_numpy(np.imag(Alm0_without_jl))
         jl_tensor = torch.from_numpy(jl)
+        
+        # 下面的一段将这些tensor移到gpu上进行计算
+        device = "cuda"
+        Alm0_without_jl_real_tensor.to(device)
+        Alm0_without_jl_imag_tensor.to(device)
+        jl_tensor.to(device)
+        
         Alm_real = torch.einsum('rm,rmq->mq', Alm0_without_jl_real_tensor, jl_tensor)
         Alm_imag = torch.einsum('rm,rmq->mq', Alm0_without_jl_imag_tensor, jl_tensor)
         Alm = Alm_real + 1j*Alm_imag
