@@ -172,7 +172,7 @@ p, li { white-space: pre-wrap; }
        <item>
         <widget class="QLabel" name="label_6">
          <property name="text">
-          <string>Use &quot;&amp;&quot;, &quot;|&quot; as &quot;and&quot;, &quot;or&quot;</string>
+          <string>Use &quot;&amp;&quot;, &quot;|&quot; as &quot;and&quot;, &quot;or&quot;; use parentheses for each statement</string>
          </property>
         </widget>
        </item>
