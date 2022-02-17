@@ -117,7 +117,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
         self.action_newProject.triggered.connect(self.newProject)
         self.action_loadProject.triggered.connect(self.loadProject)
         self.action_saveProject.triggered.connect(self.saveProject)
-        self.action_saveLatticeModel.triggered.connect(self.saveLatticeModel)
+        self.action_exportTxtFile.triggered.connect(self.exportLatticeModelAsTxtFile)
+        self.action_exportPDBFile.triggered.connect(self.exportLatticeModelAsPDBFile)
         self.action_saveSasCurve.triggered.connect(self.saveSasCurve)
         self.action_importModels.triggered.connect(self.importModels)
         self.action_deleteAllModels.triggered.connect(self.deleteAllModels)
@@ -129,6 +130,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
         self.action_mathModelGeneration.triggered.connect(self.showMathModelGenerationWindow)
         self.action_Cascade.triggered.connect(self.mdiArea.cascadeSubWindows)
         self.action_Tile.triggered.connect(self.mdiArea.tileSubWindows)
+
 
     def importModels(self):
         filepath_list, filetype_list = QFileDialog.getOpenFileNames(None, 'Select Model File(s)', './', "All Files (*);;stl Files (*.stl);;math model Files (*.py)")
@@ -332,7 +334,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
                 '',
                 'GPU configuration failed')
 
-    def saveLatticeModel(self):
+    def exportLatticeModelAsTxtFile(self):
         try:
             self.project.points_with_sld
         except:
@@ -342,6 +344,20 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
             if filename:
                 self.project.savePointsWithSld(filename)
                 self.consolePrint('Lattice model saved in {}'.format(filename))
+
+    def exportLatticeModelAsPDBFile(self):
+        try:
+            self.project.points_with_sld
+        except:
+            self.consolePrint('(X) There is no points model to save...')
+        else:
+            QtWidgets.QMessageBox.warning(self, 'Warning', 'All SLD information will be lost in PDB file !')
+            filename, filetype = QFileDialog.getSaveFileName(None, 'Save lattice model file', './', "PDB Files (*.pdb)")
+            if filename:
+                self.project.model.exportPDBFile(filename)
+                self.consolePrint('Lattice model saved in {}'.format(filename))
+        
+
     
     def saveSasCurve(self):
         try:

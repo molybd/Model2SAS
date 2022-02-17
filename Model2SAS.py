@@ -13,7 +13,7 @@ from Plot import *
 
 
 class model2sas:
-    ''' A project that contain model and calculation
+    ''' A class that contain model and calculation
 
     Attributes:
     model: model object
@@ -181,6 +181,19 @@ class model:
         grid = np.hstack((x, y, z))
         return grid   # shape == (n, 3)
 
+    def exportPDBFile(self, filename, dummy_atom='C'):
+        '''
+        export model in PDB file, but will losing all SLD information !
+        '''
+        with open(filename, 'w') as f:
+            s = 'REMARK 265 EXPERIMENT TYPE: THEORETICAL MODELLING\n'
+            for i in range(self.points.shape[0]):
+                x = '{:.2f}'.format(self.points[i, 0])
+                y = '{:.2f}'.format(self.points[i, 1])
+                z = '{:.2f}'.format(self.points[i, 2])
+                s += 'ATOM  {:5d} {:<4} ASP A{:4d}    {:>8}{:>8}{:>8}{:>6}{:>6} 0 2 201\n'.format(int(i), dummy_atom, i%10, x, y, z, str(1.0), str(20.0))
+            f.write(s)
+
 
 class data:
 
@@ -204,7 +217,7 @@ class data:
         if use_gpu:
             I = intensity_gpu(q, points, sld, lmax, slice_num=slice_num)
         elif parallel:
-            I = intensity_cpu_parallel(q, points, sld, lmax, core_num=slice_num, proc_num=slice_num)
+            I = intensity_cpu_parallel(q, points, sld, lmax, proc_num=slice_num)
         else:
             I = intensity_cpu(q, points, sld, lmax, slice_num=slice_num)
      
@@ -216,20 +229,20 @@ class data:
 
 if __name__ == "__main__":
     project = model2sas('test')
-    project.importFile('models\\shell.STL')
+    project.importFile('models/shell.STL')
     #plotStlMeshes([stlmodel.mesh for stlmodel in project.model.stlmodel_list], label_list=[stlmodel.name for stlmodel in project.model.stlmodel_list])
     
     #plotPoints(project.model.mathmodel_list[0].sample_points)
     #plotPointsWithSld(project.model.mathmodel_list[0].sample_points_with_sld)
     
-    project.genPoints(grid_num=20000)
+    project.genPoints(grid_num=10000)
     print(project.points_with_sld.shape[0])
     #plotPointsWithSld(project.model.points_with_sld, figure=plt.figure())
-    np.savetxt('test_points_with_sld2.txt', project.points_with_sld)
-    '''
+    #np.savetxt('test_points_with_sld2.txt', project.points_with_sld)
+    
     project.setupData()
-    project.calcSas(0.01, 1, parallel=True)
+    project.calcSas(0.01, 1, parallel=False)
     plotSasCurve(project.q, project.I)
-    '''
+    
 
     

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1147</width>
-    <height>837</height>
+    <height>843</height>
    </rect>
   </property>
   <property name="font">
@@ -36,19 +36,26 @@
      <x>0</x>
      <y>0</y>
      <width>1147</width>
-     <height>21</height>
+     <height>23</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
     <property name="title">
      <string>File</string>
     </property>
+    <widget class="QMenu" name="menuExport_lattice_model">
+     <property name="title">
+      <string>Export lattice model</string>
+     </property>
+     <addaction name="action_exportTxtFile"/>
+     <addaction name="action_exportPDBFile"/>
+    </widget>
     <addaction name="action_newProject"/>
     <addaction name="action_loadProject"/>
     <addaction name="separator"/>
     <addaction name="action_saveProject"/>
-    <addaction name="action_saveLatticeModel"/>
     <addaction name="action_saveSasCurve"/>
+    <addaction name="menuExport_lattice_model"/>
     <addaction name="separator"/>
     <addaction name="action_importModels"/>
     <addaction name="action_deleteAllModels"/>
@@ -430,6 +437,16 @@
   <action name="action_mathModelGeneration">
    <property name="text">
     <string>Generate math model</string>
+   </property>
+  </action>
+  <action name="action_exportTxtFile">
+   <property name="text">
+    <string>txt file</string>
+   </property>
+  </action>
+  <action name="action_exportPDBFile">
+   <property name="text">
+    <string>PDB file</string>
    </property>
   </action>
   <zorder>dockWidget_controlPanel</zorder>
