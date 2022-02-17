@@ -132,7 +132,6 @@ dmypy.json
 
 # generated pictures
 *.svg
-*.png
 *.jpg
 *.tif
 
@@ -163,5 +162,6 @@ doc_temp/
 # qt file
 .qt_for_python/
 
-# resource folder
-resource/
+
+# temporary folder
+temp/
