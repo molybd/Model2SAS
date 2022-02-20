@@ -7,10 +7,6 @@ from multiprocessing import cpu_count, Pool
 import psutil
 import time
 
-##### 下一步计划 #####
-# 根据机器的内存和显存自动切片，防止爆内存或显存
-####################
-
 
 def printTime(last_timestamp, item):
     now = time.time()
@@ -71,7 +67,7 @@ def intensity_cpu(q, points, f, lmax, slice_num=None):
     del il, Ylm
     ############################
 
-    ##### 切片循环，防止爆内存 #####
+    ##### slice the job in case of insufficient RAM #####
     free_memory = psutil.virtual_memory().free
     if slice_num:
         slice_num = int(slice_num)
@@ -86,7 +82,8 @@ def intensity_cpu(q, points, f, lmax, slice_num=None):
         qi = q[index_begin:index_end]
 
         ##### calculate jl #####
-        # 使用l计算，然后再扩充，直接计算会特别慢
+        # calculate using l, and then expand it.
+        # will be very slow to calculate directly.
         n_qi = qi.size
         rq = np.einsum('r,q->rq', r, qi)  #(r, q)
         rq = np.reshape(rq, (n_r, 1, n_qi))  # (r, 1, q)
@@ -96,7 +93,7 @@ def intensity_cpu(q, points, f, lmax, slice_num=None):
         # (r, l, q) -> (r, m, q)
         jl_ext1 = jl_ext1.astype(np.float32)
 
-        # 目前最快的方法
+        # fastest method for now
         jl = []
         for j in range(n_l):
             jl += [jl_ext1[:,j,:]]*(2*j+1)
@@ -104,13 +101,13 @@ def intensity_cpu(q, points, f, lmax, slice_num=None):
         jl = np.swapaxes(jl, 0, 1)  # (r, m, q)
         del rq, jl_ext1
         '''
-        # 用下面的方法不管是用numpy还是torch都是最慢的！
+        # slowest
         jl = jl_ext1[:,0,:].reshape((n_r,1,n_q))
         for j in range(1, n_l):
             t = jl_ext1[:,j,:].reshape((n_r,1,n_q))
             jl = np.concatenate([jl]+[t]*(2*j+1), axis=1)
 
-        # 下面的方法比上面的方法快不少，但是不是最快的
+        # faster than above, but not the fastest
         jl = []
         for k in range(n_r):
             temp = []
@@ -123,6 +120,8 @@ def intensity_cpu(q, points, f, lmax, slice_num=None):
         #########################
  
         ##### calculate Alm #####
+        # although it's able to conduct calculation on complex numbers on cpu,
+        # manually separate and calculate real and imagine parts will be faster
         # 虽然在CPU上可以直接进行复数运算，但是手动将实部和虚部分开算再合起来比直接运算快
         # 原因应该是这里实际上是一个复数乘实数的运算，比复数运算简单很多
         #Alm = np.einsum('rm,rmq->mq', Alm0_without_jl, jl)  # (m, q)
@@ -136,7 +135,7 @@ def intensity_cpu(q, points, f, lmax, slice_num=None):
         Ii = 16 * np.pi**2 * np.sum(np.absolute(Alm)**2, axis=0)  # (q,)
         I_list.append(Ii)
         #timestamp = printTime(timestamp, 'I_i')
-        del jl, Alm  # 即时垃圾回收，不然内存会不够
+        del jl, Alm  # 即时垃圾回收，不然内存会不够 # gc in time, in case of insufficient RAM
         timestamp = printTime(timestamp, 'gc')
 
     I = np.hstack(I_list)
@@ -199,16 +198,16 @@ def intensity_gpu(q, points, f, lmax, slice_num=None):
     del il, Ylm
     ############################
 
-    ##### 切片循环，防止爆显存 #####
-    # 获得空闲显存，而不是内存
+    ##### slice the job in case of insufficient VRAM #####
+    # get free VRAM, not RAM
     pynvml.nvmlInit()
-    handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # 这里未来还可以再改改，默认使用GPU0
+    handle = pynvml.nvmlDeviceGetHandleByIndex(0)
     mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
     free_memory = mem_info.free
     if slice_num:
         slice_num = int(slice_num)
     else:
-        max_size = q.shape[0] * points.shape[0] * (lmax+1)**2 * 4  # float32 一个数占用4byte
+        max_size = q.shape[0] * points.shape[0] * (lmax+1)**2 * 4  # float32, 4byte for a figure
         slice_num = int(max_size/(0.9*free_memory)) + 1
     slice_length = q.size // slice_num + 1
     I_list = []
@@ -218,7 +217,6 @@ def intensity_gpu(q, points, f, lmax, slice_num=None):
         qi = q[index_begin:index_end]
 
         ##### calculate jl #####
-        # 使用l计算，然后再扩充，直接计算会特别慢
         n_qi = qi.size
         rq = np.einsum('r,q->rq', r, qi)  #(r, q)
         rq = np.reshape(rq, (n_r, 1, n_qi))  # (r, 1, q)
@@ -228,7 +226,6 @@ def intensity_gpu(q, points, f, lmax, slice_num=None):
         # (r, l, q) -> (r, m, q)
         jl_ext1 = jl_ext1.astype(np.float32)
 
-        # 目前最快的方法
         jl = []
         for j in range(n_l):
             jl += [jl_ext1[:,j,:]]*(2*j+1)
@@ -239,12 +236,11 @@ def intensity_gpu(q, points, f, lmax, slice_num=None):
         #########################
 
         ##### calculate Alm #####
-        # 将实数与复数分开计算，内存占用比都变为复数计算大为减少，计算速度也快很多
         Alm0_without_jl_real_tensor = torch.from_numpy(np.real(Alm0_without_jl))
         Alm0_without_jl_imag_tensor = torch.from_numpy(np.imag(Alm0_without_jl))
         jl_tensor = torch.from_numpy(jl)
         
-        # 下面的一段将这些tensor移到gpu上进行计算
+        # move tensor to gpu
         device = "cuda"
         Alm0_without_jl_real_tensor.to(device)
         Alm0_without_jl_imag_tensor.to(device)
@@ -267,7 +263,7 @@ def intensity_gpu(q, points, f, lmax, slice_num=None):
         Ii = 16 * np.pi**2 * np.sum(np.absolute(Alm)**2, axis=0)  # (q,)
         I_list.append(Ii)
         #timestamp = printTime(timestamp, 'I_i')
-        del jl, jl_tensor, Alm  # 即时垃圾回收，不然下一个循环内存会不够
+        del jl, jl_tensor, Alm  # gc in time
         timestamp = printTime(timestamp, 'gc')
 
     I = np.hstack(I_list)
@@ -280,6 +276,7 @@ def intensity_cpu_parallel(q, points, f, lmax, core_num=2, proc_num=4):
     目前来看主要的瓶颈是内存不够，而不是CPU，因此其实意义不大
     但是以防有些有巨大内存的需要更快的计算速度，因此还是先保留
     未来也许会把这个方法删除
+    for now, the bottleneck is RAM instead of CPU, so parallel computing is of little help
     '''
     if core_num > cpu_count():
         core_num = cpu_count()
@@ -294,6 +291,7 @@ def intensity_cpu_parallel(q, points, f, lmax, core_num=2, proc_num=4):
         q_list.append(q[i*slice_length:(i+1)*slice_length])
     q_list.append(q[(slice_num-1)*slice_length:])
     # 以防最后几个是空的，得去掉不然会报错
+    # incase of empty list
     while q_list[-1].size == 0:
         q_list.pop()
     slice_num = len(q_list)
@@ -371,7 +369,7 @@ def coordConvert(points, source_coord, target_coord):
         points_xyz = np.vstack((x, y, z)).T
         return points_xyz
 
-    # 先全部转换成直角坐标系
+    # all convert in xyz coordinates
     if source_coord != 'xyz':
         if source_coord == 'sph':
             points_xyz = sph2xyz(points)
@@ -380,7 +378,7 @@ def coordConvert(points, source_coord, target_coord):
     else:
         points_xyz = points
     
-    # 再转换为目标坐标系
+    # then convert to desired coordinates
     if target_coord == 'xyz':
         return points_xyz
     elif target_coord == 'sph':

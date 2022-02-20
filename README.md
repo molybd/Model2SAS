@@ -93,3 +93,7 @@ First, define the parameter and their initial values. Then write the boundary co
 ## Attention
 
 - In the SAS plot, unit of $q$ is $\AA^{-1}$ by default. But be aware that the actual unit is the reverse of length unit in model file. For example, if the sphere with radius=30 means 30 nm, then the unit of $q$ should be $nm^{-1}$
+
+## Future plans
+
+- Implement more SAS curve calculation method.

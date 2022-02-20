@@ -155,7 +155,7 @@ class model:
         sld_grid_index = np.sum(sld_grid_index_stack, axis=0)
 
         points = grid[np.where(in_model_grid_index!=0)]
-        sld = sld_grid_index[np.where(in_model_grid_index!=0)]  # 用 in_model_grid_index 的原因是有可能出现sld=0但是实际在模型内的点
+        sld = sld_grid_index[np.where(in_model_grid_index!=0)]  # use in_model_grid_index to avoid points with sld=0 but in the shape
         sld = sld.reshape((sld.size,1))
         points_with_sld = np.hstack((points, sld))
 
@@ -164,7 +164,7 @@ class model:
         self.sld_grid_index = sld_grid_index
         self.stlmodel_list = stlmodel_list
         self.points = points
-        self.points_with_sld = points_with_sld # shape==(n, 4) 前三列是坐标，最后一列是相应的sld
+        self.points_with_sld = points_with_sld # shape==(n, 4) first 3 columns are coordinates, last column is sld values.
 
     def _genGrid(self, boundary_min, boundary_max, interval):
         '''Generate grid points
@@ -223,7 +223,7 @@ class data:
      
         self.q = q
         self.I = I
-        self.pseudo_error = 0.001 * I   # 默认生成千分之一的误差，主要用于写文件的占位
+        self.pseudo_error = 0.001 * I   # generate 1/1000 pseudo error for placeholder in file
         self.lmax = lmax
 
 

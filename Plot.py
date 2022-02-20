@@ -173,6 +173,7 @@ def plotSasCurve(q, I, label=None, show=True, figure=None):
     axes.set_xlabel(r'Q $(\AA^{-1})$')
     axes.set_ylabel(r'Intensity (a.u.)')
     axes.legend(frameon=False)  # 在GUI里绘制图像应当避免使用plt的方法而是使用面向对象的绘图方式，否则plt画出来的东西在GUI中不显示
+    # use object oriented instead of plt functions, or the plots will not show in GUI
 
     figure.set_tight_layout(True)
     if show:

@@ -26,12 +26,6 @@ from qtgui.MainWindow_ui import Ui_mainWindow
 from qtgui.PlotView_ui import Ui_plotView
 from ModelModifyWindow import modelModifyWindow
 
-''' 尚待解决的问题 & 待加入的功能
-1. 三维图像展示的范围，以及显示坐标轴
-2. showLatticeModel 与 showSasCurve 功能
-3. 默认设置通过默认配置文件加载
-'''
-
 
 class Thread_genLatticeModel(QThread):
     threadEnd = pyqtSignal(object)
@@ -88,7 +82,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
         self.setupUi(self)
         self.setWindowIcon(QIcon('resource/icon/logo_256.ico'))  # set window icon
 
-        self.temp_folder = os.path.normpath(os.path.expanduser('~/.TEMP_Model2SAS/'))  # 在用户目录下建立临时文件夹，以免安装后出现权限不足报错
+        self.temp_folder = os.path.normpath(os.path.expanduser('~/.TEMP_Model2SAS/'))  # 在用户目录下建立临时文件夹，以免安装后出现权限不足报错 set temp folder in user path
         if not os.path.exists(self.temp_folder):
             os.mkdir(self.temp_folder)
         self.clearTempFolder()
@@ -101,10 +95,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
 
         self.tableModel_models = TableModel(['Models'])
         self.tableView_models.setModel(self.tableModel_models)
-        self.tableView_models.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)  # 横向填满
+        self.tableView_models.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)  # 横向填满 fill horizontally
         
-        self.checkBox_useGpu.setEnabled(False)  # 不配置GPU前不可用
-        self.radioButton_gridPointsNum.setChecked(True)  # 默认使用grid num
+        self.checkBox_useGpu.setEnabled(False)  # disabled before configuring gpu
+        self.radioButton_gridPointsNum.setChecked(True)  # use grid num by default
 
         self.pushButton_importModels.clicked.connect(self.importModels)
         self.pushButton_deleteModels.clicked.connect(self.deleteSelectedModels)
@@ -245,7 +239,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
             else:
                 grid_num = int(grid_num)
                 self.thread = Thread_genLatticeModel(self.project, grid_num=grid_num)
-            # 异步计算
+            # 异步计算 asynchronization
             self.thread.threadEnd.connect(self.threadOutput_genLatticeModel)
             self.begintime = time.time()
             self.thread.start()
@@ -289,7 +283,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
                 self.consolePrint('Calculating SAS curve using GPU...See CLI for progress...')
             else:
                 self.consolePrint('Calculating SAS curve using CPU...See CLI for progress...')
-            #异步计算
+            #异步计算 asynchronization
             self.thread = Thread_calcSasCurve(self.project, qmin, qmax, qnum, lmax, useGpu)
             self.thread.threadEnd.connect(self.threadOutput_calcSasCurve)
             self.begintime = time.time()
@@ -415,7 +409,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
             )
         if filename:
             self.clearTempFolder()
-            sys.path.append(self.temp_folder)  # 这样加载数学模型时就不会出问题了
+            sys.path.append(self.temp_folder)  # 这样加载数学模型时就不会出问题了 avoid errors in loading math models
             with zipfile.ZipFile(filename, mode='r') as z:
                 z.extractall(path=self.temp_folder)
             for file in os.listdir(self.temp_folder):
@@ -459,7 +453,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
             'q max': 1,
             'q num': 200,
             'l max': 50
-            }  # 记录所有参数，供保存和加载project用
+            }  # 记录所有参数，供保存和加载project用 record all parameters for saving and loading project
             with open(json_file, 'w') as f:
                 json.dump(self.params, f, indent=4)
         self.label_projectName.setText('Project: {}'.format(self.params['project name']))
@@ -508,17 +502,17 @@ class MainWindow(QtWidgets.QMainWindow, Ui_mainWindow):
         self.textEdit_console.append(console_str)
     
     def setPushButtonEnable(self, true_or_false):
-        # 在某些计算过程中禁用一些按钮避免被疯狂点击
+        # disable some button in case of pushed in the calculation progress
         self.pushButton_genLatticeModel.setEnabled(true_or_false)
         self.pushButton_calcSas.setEnabled(true_or_false)
 
     def setProgressBarRolling(self, true_or_false):
         if true_or_false:
-            # progress bar 开始滚动
+            # progress bar begin rolling
             self.progressBar.setMinimum(0)
             self.progressBar.setMaximum(0)
         else:
-            # progress bar 停止滚动
+            # progress bar end rolling
             self.progressBar.setMinimum(0)
             self.progressBar.setMaximum(100)
     ####################################################

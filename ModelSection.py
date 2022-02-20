@@ -7,9 +7,11 @@ import copy
 
 from Functions import coordConvert
 
-########## 目前还存在的问题 ###########
-# 1. mathmodel 旋转
+########## remaining problems ###########
+# 1. mathmodel rotation
 #    如果旋转中心不在模型正中心，那么旋转后的boundary point圈定的boundary可能不能包含完整模型
+#    if the center of rotation is not located at the center of model,
+#    then the boundary defined by ratated boundary point may not contain the whole model.
 ####################################
 
 
@@ -85,7 +87,7 @@ class stlmodel:
         Returns:
             1darray, shape == (n,), 与输入的点(origins)一一对应, 如果与三角形有交集那么该点对应的值为1，否则为0
         '''
-        # 全部使用float32计算，速度快不少
+        # using float32, which is faster
         O = origins.astype(np.float32)
         D = ray.astype(np.float32)
         V0 = triangle[0].astype(np.float32)
@@ -97,7 +99,7 @@ class stlmodel:
         P = np.cross(D, E2)
         Q = np.cross(T, E1)
         det = np.dot(P, E1)
-        if abs(det) >= np.finfo(np.float32).eps: #因为三角形里使用的是float32，所以在float32下判断是否等于0
+        if abs(det) >= np.finfo(np.float32).eps: 
             t, u, v = np.dot(Q,E2)/det, np.dot(T,P)/det, np.dot(Q,D)/det
             intersect = np.zeros_like(t)
             intersect[(t>0) & (u>0) & (v>0) & ((u+v)<1)] = 1
@@ -366,7 +368,7 @@ class mathmodel:
         in_model_grid_index = specific_mathmodel.shape(grid_in_coord)
         sld_grid_index = specific_mathmodel.sld()
         points = grid[np.where(in_model_grid_index != 0)] # screen points in model
-        sld = sld_grid_index[np.where(in_model_grid_index != 0)]  # 用 in_model_grid_index 的原因是有可能出现sld=0但是实际在模型内的点
+        sld = sld_grid_index[np.where(in_model_grid_index != 0)]  # use in_model_grid_index in case of points in model but with sld=0
         sld = sld.reshape((sld.size, 1))
         points_with_sld = np.hstack((points, sld))
 
