@@ -101,3 +101,5 @@ First, define the parameter and their initial values. Then write the boundary co
 ## Future plans
 
 - Implement more SAS curve calculation method.
+- Add an option to generate q in log space.
+- Add an function to use q from imported data files.
