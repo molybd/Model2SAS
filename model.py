@@ -141,17 +141,19 @@ class StlModel(Model):
     def gen_grid_sld(self, grid_x:np.ndarray, grid_y:np.ndarray, grid_z:np.ndarray) -> np.ndarray:
         '''return sld of each grid points
         '''
-        vectors = self.mesh.vectors
         x, y, z = grid_x.flatten(), grid_y.flatten(), grid_z.flatten()
         grid = np.vstack((x, y, z)).T  # for the use of self._intersect() method
         grid = self.apply_transform(grid, on_grid=True)
 
         # determine whether points inside the model
-        ray = np.random.rand(3).astype(np.float32)    # use random ray. use ray like [1,1,1] may cause some misjudge
+        ray = np.random.random((3,)).astype(np.float32)    # use random ray. use ray like [1,1,1] may cause some misjudge
         if np.sum(ray) <= np.finfo(np.float32).eps:  # in case that all coordinates are 0 so add 0.01, which is almost impossible
             ray = np.array([0.23782647, 0.90581098, 0.34623647], dtype=np.float32)
         
-        intersect_count = np.zeros_like(x)
+        intersect_count = np.zeros_like(x, dtype=np.float32)
+        grid = grid.astype(np.float32)
+        ray = ray.astype(np.float32)
+        vectors = self.mesh.vectors.astype(np.float32)
         for triangle in vectors:
             intersect_count += self._intersect(grid, ray, triangle)
         index = intersect_count % 2   # 1 is in, 0 is out
@@ -175,24 +177,22 @@ class StlModel(Model):
             1darray, shape == (n,), 与输入的点(origins)一一对应, 如果与三角形有交集那么该点对应的值为1，否则为0
         '''
         # using float32, which is faster
-        O = origins.astype(np.float32)
-        D = ray.astype(np.float32)
-        V0 = triangle[0].astype(np.float32)
-        V1 = triangle[1].astype(np.float32)
-        V2 = triangle[2].astype(np.float32)
+        O = origins
+        D = ray
+        V0 = triangle[0]
+        V1 = triangle[1]
+        V2 = triangle[2]
         E1 = V1 - V0
         E2 = V2 - V0
         T = O - V0
         P = np.cross(D, E2)
         Q = np.cross(T, E1)
         det = np.dot(P, E1)
-        if abs(det) >= np.finfo(np.float32).eps: 
-            t, u, v = np.dot(Q,E2)/det, np.dot(T,P)/det, np.dot(Q,D)/det
-            intersect = np.zeros_like(t)
-            intersect[(t>0) & (u>0) & (v>0) & ((u+v)<1)] = 1
-            return intersect
-        else:
-            return np.zeros(origins.shape[0])
+        intersect = np.zeros(origins.shape[0], dtype=np.float32)
+        #if abs(det) > np.finfo(np.float32).eps:  # almost not possible
+        t, u, v = np.dot(Q,E2)/det, np.dot(T,P)/det, np.dot(Q,D)/det
+        intersect[(t>0) & (u>0) & (v>0) & ((u+v)<1)] = 1
+        return intersect
 
     def set_sld(self, sld:float) -> None:
         '''set sld value of stlmodel

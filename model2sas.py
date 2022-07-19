@@ -100,13 +100,13 @@ class Model2Sas:
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from mpl_toolkits import mplot3d
-    import plot
 
     proj = Model2Sas('test')
-    proj.import_model('models/torus.stl')
-    proj.import_model('mathmodel_template.py')
-    proj.models['torus_0'].translate(np.array([0, 0, 10]))
-    proj.models['torus_0'].rotate(np.array([0, 0, 10]), np.array([1, 1, 0]), np.pi/4)
+    #proj.import_model('models/torus.stl')
+    proj.import_model('models/shell_12_large_hole.STL')
+    #proj.import_model('mathmodel_template.py')
+    #proj.models['torus_0'].translate(np.array([0, 0, 10]))
+    #proj.models['torus_0'].rotate(np.array([0, 0, 10]), np.array([1, 1, 0]), np.pi/4)
     grid_x, grid_y, grid_z, grid_sld = proj.gen_combined_model(1)
 
     figure = plt.figure()
@@ -115,6 +115,8 @@ if __name__ == '__main__':
     axes.scatter(x, y, z)
     plt.show()
 
+
+    '''
     q = np.logspace(-2, 0, num=200)
 
     q1, I1 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='debye func')
@@ -126,4 +128,5 @@ if __name__ == '__main__':
     plt.yscale('log')
     plt.xscale('log')
     plt.show()
+    '''
 
