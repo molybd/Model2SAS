@@ -87,6 +87,13 @@ class Model2Sas:
             x, y, z, sld = grid_x.flatten(), grid_y.flatten(), grid_z.flatten(), grid_sld.flatten()
             x, y, z, sld = x[np.where(sld!=0)], y[np.where(sld!=0)], z[np.where(sld!=0)], sld[np.where(sld!=0)]
             q, I = sas_calc.sas_sphharm(x, y, z, sld, q, **kwargs)
+        if 'debye' in method:
+            x, y, z, sld = grid_x.flatten(), grid_y.flatten(), grid_z.flatten(), grid_sld.flatten()
+            x, y, z, sld = x[np.where(sld!=0)], y[np.where(sld!=0)], z[np.where(sld!=0)], sld[np.where(sld!=0)]
+            q, I = sas_calc.sas_debyefunc(x, y, z, sld, q)
+        else: # use fft method for default
+            interval = grid_x[0,1,0] - grid_x[0,0,0]
+            q, I = sas_calc.sas_fft(grid_sld, interval, q, **kwargs)
         return q, I
 
 
@@ -110,8 +117,12 @@ if __name__ == '__main__':
 
     q = np.logspace(-2, 0, num=200)
 
+    q1, I1 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='debye func')
     q2, I2 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='sph harm')
+    q3, I3 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='fft')
+    plt.plot(q1, I1)
     plt.plot(q2, I2)
+    plt.plot(q3, I3)
     plt.yscale('log')
     plt.xscale('log')
     plt.show()

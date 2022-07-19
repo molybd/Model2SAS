@@ -14,6 +14,119 @@ def printTime(last_timestamp:float, item:str) -> float:
     timestamp = time.time()
     return timestamp
 
+
+def fibo_grid(N:int, R:float) -> np.ndarray:
+    '''generate fibonacci grid
+    '''
+    phi = (np.sqrt(5)-1)/2
+    n = np.arange(N)+1
+    z = (2*n-1)/N - 1
+    x = np.sqrt(1-z**2)*np.cos(2*np.pi*n*phi)
+    y = np.sqrt(1-z**2)*np.sin(2*np.pi*n*phi)
+    return R*np.vstack((x, y, z)).T
+
+def trilinear_interp(px:np.ndarray, py:np.ndarray, pz:np.ndarray, c:np.ndarray, d:float, x:np.ndarray, y:np.ndarray, z:np.ndarray) -> np.ndarray:
+    '''对均匀正方体网格进行插值
+    px, py, pz: 1d, 三个坐标序列, size相同
+    c: 每个坐标点的值, shape=(px.size, py.size, pz.size)
+    d: float 网格间距, 所有格点都是等间距的
+    x, y, z: 需要插值点的三个坐标序列
+    '''
+    ix, iy, iz = (x-px[0])/d, (y-py[0])/d, (z-pz[0])/d
+    ix, iy, iz = ix.astype(np.int64), iy.astype(np.int64), iz.astype(np.int64)
+
+    x0, y0, z0 = px[ix], py[iy], pz[iz]
+    x1, y1, z1 = px[ix+1], py[iy+1], pz[iz+1]
+    xd, yd, zd = (x-x0)/(x1-x0), (y-y0)/(y1-y0), (z-z0)/(z1-z0)
+    
+    c_interp = c[ix, iy, iz]*(1-xd)*(1-yd)*(1-zd)
+    c_interp += c[ix+1, iy, iz]*xd*(1-yd)*(1-zd)
+    c_interp += c[ix, iy+1, iz]*(1-xd)*yd*(1-zd)
+    c_interp += c[ix, iy, iz+1]*(1-xd)*(1-yd)*zd
+    c_interp += c[ix+1, iy, iz+1]*xd*(1-yd)*zd
+    c_interp += c[ix, iy+1, iz+1]*(1-xd)*yd*zd
+    c_interp += c[ix+1, iy+1, iz]*xd*yd*(1-zd)
+    c_interp += c[ix+1, iy+1, iz+1]*xd*yd*zd
+    return c_interp
+
+def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orientation_average_offset:int=100):
+    '''calculate SAS curve by FFT method
+    '''
+    s = q/(2*np.pi)  # since q=2pi/d, so use s=1/d in fft method
+
+    # determine the actual s to calculate
+    # larger n_s gives better result, but comsume more computing power and RAM
+    n_l = grid_sld.shape[0]
+    n_s = max(n_s, n_l) # n_s must >= n_l
+    smin = 1/(n_s*interval)
+    smax = 1/interval * (0.5-1/n_s)
+    s = s[np.where(s>=smin)]
+    s = s[np.where(s<=smax)]
+
+    # fft
+    timestamp = time.time()
+    F = np.fft.rfftn(grid_sld, (n_s, n_s, n_s))
+    F = np.fft.fftshift(F, axes=(0,1))
+    I_grid = np.real(F)**2 + np.imag(F)**2  # faster than abs(F)**2
+    del F
+    timestamp = printTime(timestamp, 'fft')
+
+    # generate coordinates to interpolate
+    n_on_sphere = s**2
+    n_on_sphere = np.rint(n_on_sphere/n_on_sphere[0]) + orientation_average_offset
+    l = []
+    for R, N in zip(s, n_on_sphere):
+        l.append(fibo_grid(N, R))
+    points_to_interpolate = np.vstack(l)
+    timestamp = printTime(timestamp, 'fibo grid')
+
+    # interpolate
+    s1d = np.fft.fftfreq(n_s, d=interval)
+    s1d = np.fft.fftshift(s1d)
+    s1dz = np.fft.rfftfreq(n_s, d=interval)
+    points_to_interpolate = np.expand_dims(np.sign(np.sign(points_to_interpolate[:,2])+0.5), axis=1)*points_to_interpolate # 因为用的rfft，只有z>=0那一半，因此要将z<0的坐标转换为中心对称的坐标
+    #I_interp = interpn((s1d, s1d, s1dz), I_grid, points_to_interpolate)
+    # 用我自己写的 trilinear_interp 比用 scipy.interpolate.interpn 快
+    ds = s1d[1] - s1d[0]
+    x, y, z = tuple(points_to_interpolate.T)
+    I_interp = trilinear_interp(s1d, s1d, s1dz, I_grid, ds, x, y, z)
+    del l, I_grid
+    timestamp = printTime(timestamp, 'interpolate')
+
+    # orientation average
+    I = []
+    begin_index = 0
+    for N in n_on_sphere:
+        N = int(N)
+        Ii = np.average(I_interp[begin_index:begin_index+N])
+        I.append(Ii)
+        begin_index += N
+    I = np.array(I)
+    timestamp = printTime(timestamp, 'average')
+
+    q = 2*np.pi*s
+    return q, I
+
+
+def sas_debyefunc(x:np.ndarray, y:np.ndarray, z:np.ndarray, sld:np.ndarray, q:np.ndarray) -> tuple:
+    '''calculate SAS curve by debye function
+    '''
+    I = []
+    q, x, y, z, sld = q.astype('float32'), x.astype('float32'), y.astype('float32'), z.astype('float32'), sld.astype('float32')
+    dx = x.reshape((x.size,1)) - x.reshape((1,x.size))
+    dy = y.reshape((y.size,1)) - y.reshape((1,y.size))
+    dz = z.reshape((z.size,1)) - z.reshape((1,x.size))
+    d = np.sqrt(dx**2 + dy**2 + dz**2)
+
+    for qi in tqdm.tqdm(q):
+        qd = qi*d
+        fourier_core = np.sin(qd)/qd
+        fourier_core[d<=1e-11] = 1
+        Ii = np.einsum('i,j,ij', sld, sld, fourier_core)
+        I.append(Ii)
+
+    return q, np.array(I)
+
 def sas_sphharm(x:np.ndarray, y:np.ndarray, z:np.ndarray, sld:np.ndarray, q:np.ndarray, lmax:int=50) -> tuple:
     '''calculate SAS curve by spherical harmonics
     '''
