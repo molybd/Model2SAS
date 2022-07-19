@@ -2,6 +2,11 @@
 
 Program to generate small angle scattering curve from 3D models. Models can be STL file and/or math description by .py file. Both module and GUI are available for convenience.
 
+If you use Model2SAS in your research, please cite: 
+
+*Li, Mu, and Yin, Panchao, Model2SAS: software for small-angle scattering data calculation from custom shapes., J. Appl. Cryst., 2022, 55, 663-668.* 
+https://doi.org/10.1107/S1600576722003600
+
 ## Installation
 
 An EXE installation file is available on Windows platform, which doesn't need python environment. For advanced user or Mac and Linux platform, user need to run from source codes. Please refer to the requirements. 
