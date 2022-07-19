@@ -2,51 +2,53 @@
 
 import numpy as np
 
-'''
-to generate a 3D model from a mathematical description
-for example: a hollow sphere is "x**2+y**2+z**2 >= R1**2 and x**2+y**2+z**2 <= R2**2
-also, in spherical coordinates, a hollow sphere is r >=R1 and r <= R2
+# =========================================================
+# A template of hollow sphere math model
+# with various sld equal to the radius of certain point
+# =========================================================
 
-coord is 
-  - 'xyz' |in (x, y, z)
-  - 'sph' |in (r, theta, phi) |theta: 0~2pi ; phi: 0~pi
-  - 'cyl' |in (rho, phi, z) |theta:0-2pi
-'''
+# =========================== ! ===========================
+# Do not change the class name, attributes name or method name !
+# =========================================================
+class SpecificMathModel:
+    '''to generate a 3D model from a mathematical description
+    for example: a hollow sphere is "x**2+y**2+z**2 >= R1**2 and x**2+y**2+z**2 <= R2**2
+    also, in spherical coordinates, a hollow sphere is r >=R1 and r <= R2
 
-# Don't change the class name, attributes name or method name !
-class specific_mathmodel:
-    '''A template of hollow sphere math model
-    with various sld equal to the radius of certain point
+    coord:
+    - 'car' |in (x, y, z)
+    - 'sph' |in (r, theta, phi) |theta: 0~2pi ; phi: 0~pi
+    - 'cyl' |in (rho, phi, z) |theta:0-2pi
     '''
-
     def __init__(self):
+        '''must at least have these 2 attributes
+        '''
         self.params = {
-            'R1': 10,
-            'R2': 15
+            'R1': 8,
+            'R2': 10
         }
-        self.coord = 'sph'  # 'xyz' or 'sph' or 'cyl'
-        # must have these 4 attributes
-        self.boundary_min, self.boundary_max = self.genBoundary()
+        self.coord = 'sph'  # 'car' or 'sph' or 'cyl'
 
-    def genBoundary(self):
-        # re-generate boundary in case that params are altered in software
-        self.boundary_min = -self.params['R2']*np.ones(3)
-        self.boundary_max = self.params['R2']*np.ones(3)
-        return self.boundary_min, self.boundary_max
+    def get_boundary(self):
+        '''re-generate boundary in case that params are altered in software
+        '''
+        boundary_min = -self.params['R2']*np.ones(3)
+        boundary_max = self.params['R2']*np.ones(3)
+        return boundary_min, boundary_max
 
-    def shape(self, grid_in_coord):
-        points_sph = grid_in_coord
-        self.points_sph = points_sph  # for usage in self.sld()
+    def sld(self, grid_points_in_coord):
+        ''' calculate sld values of each grid points
+        Args:
+            grid_points_in_coord: ndarray, shape == (n, 3), value is in the coordinates of self.coord
+        Returns:
+            sld: ndarray, shape == (n,) indicates the sld value of each grid points 
+        '''
+        points_sph = grid_points_in_coord
+        r, theta, phi = points_sph[:,0], points_sph[:,1], points_sph[:,2]
         R1 = self.params['R1']
         R2 = self.params['R2']
 
-        r = points_sph[:, 0]
-        in_model_grid_index = np.zeros_like(r)
-        in_model_grid_index[(r>=R1) & (r<=R2)] = 1
-        self.in_model_grid_index = in_model_grid_index
-        return self.in_model_grid_index  # must return in_model_grid_index
-
-    def sld(self):
-        r = self.points_sph[:, 0]
-        sld_grid_index = r * self.in_model_grid_index
-        return sld_grid_index  # must return sld index
+        index = np.zeros_like(r)
+        index[(r>=R1) & (r<=R2)] = 1
+        sld = r**2 * index
+        return sld
