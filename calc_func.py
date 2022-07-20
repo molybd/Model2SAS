@@ -27,6 +27,7 @@ except:
 
 if TORCH_AVAILABLE:
     CUDA_AVAILABLE = torch.cuda.is_available()
+    DEVICE = 'cuda'
 else:
     CUDA_AVAILABLE = False
 
@@ -96,39 +97,26 @@ def moller_trumbore_intersect_count(origins:np.ndarray, ray:np.ndarray, triangle
     timestamp = print_time(timestamp, 'intersection')
     return intersect_count
 
-def sampling_points(s:np.array, orientation_average_offset:int) -> tuple:
-    '''generate sampling points by fibonacci grid
+def sampling_points(s:np.ndarray, n_on_sphere:np.ndarray) -> tuple:
+    ''' generate sampling points for orientation average
+    using fibonacci grid
+    s and n_on_sphere should have same shape
     '''
-    if TORCH_AVAILABLE and USE_TORCH:
-        pass
-    else:
-        n_on_sphere = s**2
-        n_on_sphere = np.rint(n_on_sphere/n_on_sphere[0]) + orientation_average_offset
-        n_on_sphere = n_on_sphere.astype(np.int64)
-        phi = (np.sqrt(5)-1)/2
-        l_n, l_z, l_R = [], [], []
-        for R, N in zip(s, n_on_sphere):
-            n = np.arange(N)+1
-            z = (2*n-1)/N - 1
-            R = R*np.ones(N)
-            l_n.append(n)
-            l_z.append(z)
-            l_R.append(R)
-        n, z, R = np.concatenate(l_n), np.concatenate(l_z), np.concatenate(l_R)
-        x = R*np.sqrt(1-z**2)*np.cos(2*np.pi*n*phi)
-        y = R*np.sqrt(1-z**2)*np.sin(2*np.pi*n*phi)
-        z = R*z
-    return x, y, z
-
-def fibo_grid(N:int, R:float) -> np.ndarray:
-    '''generate fibonacci grid
-    '''
+    n_on_sphere = n_on_sphere.astype(np.int64)
     phi = (np.sqrt(5)-1)/2
-    n = np.arange(N)+1
-    z = (2*n-1)/N - 1
-    x = np.sqrt(1-z**2)*np.cos(2*np.pi*n*phi)
-    y = np.sqrt(1-z**2)*np.sin(2*np.pi*n*phi)
-    return R*np.stack((x, y, z), axis=1)
+    l_n, l_z, l_R = [], [], []
+    for R, N in zip(s, n_on_sphere):
+        n = np.arange(N, dtype=np.float32)+1
+        z = (2*n-1)/N - 1
+        R = R*np.ones(N, dtype=np.float32)
+        l_n.append(n)
+        l_z.append(z)
+        l_R.append(R)
+    n, z, R = np.concatenate(l_n), np.concatenate(l_z), np.concatenate(l_R)
+    x = R*np.sqrt(1-z**2)*np.cos(2*np.pi*n*phi)
+    y = R*np.sqrt(1-z**2)*np.sin(2*np.pi*n*phi)
+    z = R*z
+    return x, y, z
 
 def trilinear_interp(px:np.ndarray, py:np.ndarray, pz:np.ndarray, c:np.ndarray, d:float, x:np.ndarray, y:np.ndarray, z:np.ndarray) -> np.ndarray:
     '''对均匀正方体网格进行插值
@@ -170,6 +158,7 @@ def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orie
     smax = 1/interval * (0.5-1/n_s)
     s = s[np.where(s>=smin)]
     s = s[np.where(s<=smax)]
+    s = s.astype(np.float32)
 
     # fft
     timestamp = time.time()
@@ -182,38 +171,41 @@ def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orie
         F = np.fft.rfftn(grid_sld, (n_s, n_s, n_s))
         F = np.fft.fftshift(F, axes=(0,1))
         I_grid = np.real(F)**2 + np.imag(F)**2  # faster than abs(F)**2
+        I_grid = I_grid.astype(np.float32)
     del F
     timestamp = print_time(timestamp, 'fft')
 
-    # generate coordinates to interpolate
+    # generate coordinates to interpolate using fibonacci grid
     # 每一个q值对应的球面取多少个取向进行平均
     n_on_sphere = s**2
     n_on_sphere = np.rint(n_on_sphere/n_on_sphere[0]) + orientation_average_offset
-    l = []
-    for R, N in zip(s, n_on_sphere):
-        l.append(fibo_grid(N, R))
-    points_to_interpolate = np.vstack(l)
+    sampling_x, sampling_y, sampling_z = sampling_points(s, n_on_sphere)
+    #points_to_interpolate = np.stack((x,y,z), axis=1)
     timestamp = print_time(timestamp, 'fibo grid')
 
     #### interpolate
     # 因为用的rfft，只有z>=0那一半，因此要将z<0的坐标转换为中心对称的坐标
-    points_to_interpolate = np.expand_dims(np.sign(np.sign(points_to_interpolate[:,2])+0.5), axis=1)*points_to_interpolate 
-    #I_interp = interpn((s1d, s1d, s1dz), I_grid, points_to_interpolate)
+    sign = np.ones_like(sampling_z, dtype=np.float32)
+    sign[sampling_z<0] = -1.
+    sampling_x, sampling_y, sampling_z = sign*sampling_x, sign*sampling_y, sign*sampling_z
     # 用我自己写的 trilinear_interp 比用 scipy.interpolate.interpn 快
     if TORCH_AVAILABLE and USE_TORCH:
         s1d = torch.fft.fftfreq(n_s, d=interval).to(DEVICE)
         s1d = torch.fft.fftshift(s1d)
         s1dz = torch.fft.rfftfreq(n_s, d=interval).to(DEVICE)
         ds = s1d[1] - s1d[0]
-        points_to_interpolate = torch.from_numpy(points_to_interpolate).to(torch.float32).to(DEVICE)
-        I_interp = trilinear_interp(s1d, s1d, s1dz, I_grid, ds, points_to_interpolate[:,0], points_to_interpolate[:,1], points_to_interpolate[:,2])
+        sampling_x = torch.from_numpy(sampling_x).to(DEVICE)
+        sampling_y = torch.from_numpy(sampling_y).to(DEVICE)
+        sampling_z = torch.from_numpy(sampling_z).to(DEVICE)
+        I_interp = trilinear_interp(s1d, s1d, s1dz, I_grid, ds, sampling_x, sampling_y, sampling_z)
         I_interp = I_interp.cpu().numpy()
     else:
         s1d = np.fft.fftfreq(n_s, d=interval)
         s1d = np.fft.fftshift(s1d)
         s1dz = np.fft.rfftfreq(n_s, d=interval)
+        s1d, s1dz = s1d.astype(np.float32), s1dz.astype(np.float32)
         ds = s1d[1] - s1d[0]
-        I_interp = trilinear_interp(s1d, s1d, s1dz, I_grid, ds, points_to_interpolate[:,0], points_to_interpolate[:,1], points_to_interpolate[:,2])
+        I_interp = trilinear_interp(s1d, s1d, s1dz, I_grid, ds, sampling_x, sampling_y, sampling_z)
     del I_grid
     timestamp = print_time(timestamp, 'interpolate')
 
