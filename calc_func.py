@@ -1,4 +1,9 @@
+'''Compute-intensive functions in model2sas.
+Use a seperated module to use pytorch with cuda support more flexibly.
+'''
+
 import time
+
 import tqdm
 import numpy as np
 from scipy.special import sph_harm, spherical_jn
@@ -6,14 +11,64 @@ from scipy.special import sph_harm, spherical_jn
 from utility import convert_coord
 
 
-def printTime(last_timestamp:float, item:str) -> float:
+try:
+    import torch  # for code linting, to comment this line after complete the codes
+    #torch = __import__('torch')
+    TORCH_AVAILABLE = True
+except:
+    TORCH_AVAILABLE = False
+
+if TORCH_AVAILABLE:
+    CUDA_AVAILABLE = torch.cuda.is_available()
+
+
+def print_time(last_timestamp:float, item:str) -> float:
     '''print time used from last timestamp
+    use timestamp = time.time() for the 1st timestamp
     '''
     now = time.time()
     print('{:>20} {:^10}'.format(item, round(now-last_timestamp, 4)))
     timestamp = time.time()
     return timestamp
 
+def moller_trumbore_intersect_count(origins:np.ndarray, ray:np.ndarray, triangles:np.ndarray) -> np.ndarray:
+    '''Calculate all the points intersect with 1 triangle
+    using Möller-Trumbore intersection algorithm
+    see paper https://doi.org/10.1080/10867651.1997.10487468
+
+    Args:
+        origins: ndarray, shape == (n, 3)
+        ray: ndarray, shape==(3,), direction of ray
+        triangles: ndarray, shape==(m,3,3) vertices of a triangle
+
+    Returns:
+        ndarray, shape == (n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
+    '''
+    timestamp = time.time()
+    n = origins.shape[0]
+    origins = origins.astype(np.float32)
+    ray = ray.astype(np.float32)
+    triangles = triangles.astype(np.float32)
+    intersect_count = np.zeros(n, dtype=np.float32)
+    for triangle in triangles:
+        O = origins
+        D = ray
+        V0 = triangle[0]
+        V1 = triangle[1]
+        V2 = triangle[2]
+        E1 = V1 - V0
+        E2 = V2 - V0
+        T = O - V0
+        P = np.cross(D, E2)
+        Q = np.cross(T, E1)
+        det = np.dot(P, E1)
+        intersect = np.zeros(n, dtype=np.float32)
+        #if abs(det) > np.finfo(np.float32).eps:  # almost impossible
+        t, u, v = np.dot(Q,E2)/det, np.dot(T,P)/det, np.dot(Q,D)/det
+        intersect[(t>0) & (u>0) & (v>0) & ((u+v)<1)] = 1
+        intersect_count += intersect
+    timestamp = print_time(timestamp, 'intersection')
+    return intersect_count
 
 def fibo_grid(N:int, R:float) -> np.ndarray:
     '''generate fibonacci grid
@@ -69,7 +124,7 @@ def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orie
     F = np.fft.fftshift(F, axes=(0,1))
     I_grid = np.real(F)**2 + np.imag(F)**2  # faster than abs(F)**2
     del F
-    timestamp = printTime(timestamp, 'fft')
+    timestamp = print_time(timestamp, 'fft')
 
     # generate coordinates to interpolate
     n_on_sphere = s**2
@@ -78,7 +133,7 @@ def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orie
     for R, N in zip(s, n_on_sphere):
         l.append(fibo_grid(N, R))
     points_to_interpolate = np.vstack(l)
-    timestamp = printTime(timestamp, 'fibo grid')
+    timestamp = print_time(timestamp, 'fibo grid')
 
     # interpolate
     s1d = np.fft.fftfreq(n_s, d=interval)
@@ -91,7 +146,7 @@ def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orie
     x, y, z = tuple(points_to_interpolate.T)
     I_interp = trilinear_interp(s1d, s1d, s1dz, I_grid, ds, x, y, z)
     del l, I_grid
-    timestamp = printTime(timestamp, 'interpolate')
+    timestamp = print_time(timestamp, 'interpolate')
 
     # orientation average
     I = []
@@ -102,7 +157,7 @@ def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orie
         I.append(Ii)
         begin_index += N
     I = np.array(I)
-    timestamp = printTime(timestamp, 'average')
+    timestamp = print_time(timestamp, 'average')
 
     q = 2*np.pi*s
     return q, I
@@ -150,10 +205,10 @@ def sas_sphharm(x:np.ndarray, y:np.ndarray, z:np.ndarray, sld:np.ndarray, q:np.n
     phi_ext2 = np.reshape(phi, (n_r, 1))  # (r,) -> (r, 1)
     l_ext2 = np.reshape(l_ext, (1, n_m))  # (m,) -> (1, m)
     m_ext2 = np.reshape(m, (1, n_m))  # (m,) -> (1, m)
-    #timestamp = printTime(timestamp, 'Ylm preparation')
+    #timestamp = print_time(timestamp, 'Ylm preparation')
     Ylm = sph_harm(m_ext2, l_ext2, theta_ext2, phi_ext2).astype(np.complex64)  # broadcast to (r, m) float64
     del theta_ext2, phi_ext2, l_ext2, m_ext2
-    timestamp = printTime(timestamp, 'Ylm')
+    timestamp = print_time(timestamp, 'Ylm')
     #########################
 
     ##### calculate Alm0 without jl #####
@@ -162,10 +217,10 @@ def sas_sphharm(x:np.ndarray, y:np.ndarray, z:np.ndarray, sld:np.ndarray, q:np.n
     for i in range(n_l):
         il_list += [il[i]]*(2*i+1)
     il = np.array(il_list, dtype='complex64')  # (m,)
-    #timestamp = printTime(timestamp, 'il')
+    #timestamp = print_time(timestamp, 'il')
 
     Alm0_without_jl = np.einsum('m,r,rm->rm', il, sld, Ylm)
-    #timestamp = printTime(timestamp, 'Alm0')
+    #timestamp = print_time(timestamp, 'Alm0')
     del il, Ylm
     ############################
 
@@ -173,7 +228,7 @@ def sas_sphharm(x:np.ndarray, y:np.ndarray, z:np.ndarray, sld:np.ndarray, q:np.n
     rq = np.reshape(rq, (n_r, 1, n_q))  # (r, 1, q)
     l_ext1 = np.reshape(l, (1, n_l, 1))  # (1, l, 1)
     jl_ext1 = spherical_jn(l_ext1, rq)  # broadcast to (r, l, q)
-    timestamp = printTime(timestamp, 'jl')
+    timestamp = print_time(timestamp, 'jl')
     # (r, l, q) -> (r, m, q)
     jl_ext1 = jl_ext1.astype(np.float32)
 
@@ -183,13 +238,13 @@ def sas_sphharm(x:np.ndarray, y:np.ndarray, z:np.ndarray, sld:np.ndarray, q:np.n
     jl = np.array(jl, dtype=np.float32)
     jl = np.swapaxes(jl, 0, 1)  # (r, m, q)
     del rq, jl_ext1
-    timestamp = printTime(timestamp, 'jl_rlq->rmq')
+    timestamp = print_time(timestamp, 'jl_rlq->rmq')
 
     Alm0_without_jl_real, Alm0_without_jl_imag = np.real(Alm0_without_jl), np.imag(Alm0_without_jl)
     Alm_real = np.einsum('rm,rmq->mq', Alm0_without_jl_real, jl)
     Alm_imag = np.einsum('rm,rmq->mq', Alm0_without_jl_imag, jl)
     #Alm = Alm_real + 1j*Alm_imag
-    timestamp = printTime(timestamp, 'Alm')
+    timestamp = print_time(timestamp, 'Alm')
 
     I = 16 * np.pi**2 * np.sum(Alm_real**2+Alm_imag**2, axis=0) #(q,)
     del jl, Alm_real, Alm_imag, Alm0_without_jl_real, Alm0_without_jl_imag

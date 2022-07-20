@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 from model import MathModel, StlModel
-import sas_calc
+import calc_func
 
 
 class Model2Sas:
@@ -86,14 +86,14 @@ class Model2Sas:
         if 'sph' in method:
             x, y, z, sld = grid_x.flatten(), grid_y.flatten(), grid_z.flatten(), grid_sld.flatten()
             x, y, z, sld = x[np.where(sld!=0)], y[np.where(sld!=0)], z[np.where(sld!=0)], sld[np.where(sld!=0)]
-            q, I = sas_calc.sas_sphharm(x, y, z, sld, q, **kwargs)
-        if 'debye' in method:
+            q, I = calc_func.sas_sphharm(x, y, z, sld, q, **kwargs)
+        elif 'debye' in method:
             x, y, z, sld = grid_x.flatten(), grid_y.flatten(), grid_z.flatten(), grid_sld.flatten()
             x, y, z, sld = x[np.where(sld!=0)], y[np.where(sld!=0)], z[np.where(sld!=0)], sld[np.where(sld!=0)]
-            q, I = sas_calc.sas_debyefunc(x, y, z, sld, q)
+            q, I = calc_func.sas_debyefunc(x, y, z, sld, q)
         else: # use fft method for default
             interval = grid_x[0,1,0] - grid_x[0,0,0]
-            q, I = sas_calc.sas_fft(grid_sld, interval, q, **kwargs)
+            q, I = calc_func.sas_fft(grid_sld, interval, q, **kwargs)
         return q, I
 
 
@@ -107,7 +107,7 @@ if __name__ == '__main__':
     #proj.import_model('mathmodel_template.py')
     #proj.models['torus_0'].translate(np.array([0, 0, 10]))
     #proj.models['torus_0'].rotate(np.array([0, 0, 10]), np.array([1, 1, 0]), np.pi/4)
-    grid_x, grid_y, grid_z, grid_sld = proj.gen_combined_model(1)
+    grid_x, grid_y, grid_z, grid_sld = proj.gen_combined_model(0.5)
 
     figure = plt.figure()
     axes = mplot3d.Axes3D(figure)
@@ -116,17 +116,20 @@ if __name__ == '__main__':
     plt.show()
 
 
-    '''
+    #'''
     q = np.logspace(-2, 0, num=200)
 
     q1, I1 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='debye func')
+    print('==================')
     q2, I2 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='sph harm')
+    print('==================')
     q3, I3 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='fft')
+    print('==================')
     plt.plot(q1, I1)
     plt.plot(q2, I2)
     plt.plot(q3, I3)
     plt.yscale('log')
     plt.xscale('log')
     plt.show()
-    '''
+    #'''
 
