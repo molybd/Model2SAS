@@ -99,26 +99,27 @@ class Model2Sas:
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    from mpl_toolkits import mplot3d
 
-    calc_func.USE_TORCH = False
+    
+    # init cuda and numba for faster later
+    calc_func.USE_TORCH = True
     calc_func.DEVICE = 'cuda'
-
-    # init cuda if using it, make fft faster
-    init = Model2Sas('test')
-    init.import_model('mathmodel_template.py')
-    grid_x, grid_y, grid_z, grid_sld = init.gen_combined_model(0.5)
-    q = np.logspace(-2, 0, num=200)
-    q3, I3 = init.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='fft')
+    init = Model2Sas('init')
+    init.import_model('models/torus.stl')
+    grid_x, grid_y, grid_z, grid_sld = init.gen_combined_model(2)
+    q_init = np.logspace(-2, 0, num=200)
+    q_init, I_init = init.gen_sas(grid_x, grid_y, grid_z, grid_sld, q_init, method='fft')
+    print('='*40)
 
 
     proj = Model2Sas('test')
-    #proj.import_model('models/torus.stl')
+    proj.import_model('models/torus.stl')
     proj.import_model('models/shell_12_large_hole.STL')
-    #proj.import_model('mathmodel_template.py')
-    #proj.models['torus_0'].translate(np.array([0, 0, 10]))
-    #proj.models['torus_0'].rotate(np.array([0, 0, 10]), np.array([1, 1, 0]), np.pi/4)
+    proj.import_model('mathmodel_template.py')
+    proj.models['torus_0'].translate(np.array([0, 0, 10]))
+    proj.models['torus_0'].rotate(np.array([0, 0, 10]), np.array([1, 1, 0]), np.pi/4)
     grid_x, grid_y, grid_z, grid_sld = proj.gen_combined_model(1)
+    print('='*40)
 
     #figure = plt.figure()
     #axes = mplot3d.Axes3D(figure)
@@ -128,16 +129,21 @@ if __name__ == '__main__':
     
     q = np.logspace(-2, 0, num=200)
 
-    #q1, I1 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='debye func')
-    #print('==================')
-    #q2, I2 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='sph harm')
-    #print('==================')
-    q3, I3 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='fft')
-    #print('==================')
-    #plt.plot(q1, I1)
-    ##plt.plot(q2, I2)
+    calc_func.USE_TORCH = False
+    q1, I1 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='fft')
+    print('='*40)
+    calc_func.USE_TORCH = True
+    calc_func.DEVICE = 'cuda'
+    q1, I1 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='fft')
+    print('='*40)
+    q2, I2 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='sph harm')
+    print('='*40)
+    q3, I3 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='debye_func')
+    print('='*40)
+    plt.plot(q1, I1)
+    plt.plot(q2, I2)
     plt.plot(q3, I3)
     plt.yscale('log')
     plt.xscale('log')
-    plt.show()
+    plt.savefig('test.png')
     

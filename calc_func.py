@@ -3,8 +3,9 @@ Use a seperated module to use pytorch with cuda support more flexibly.
 '''
 
 import time
+import functools
 
-import tqdm
+from numba import jit, prange
 import numpy as np
 from scipy.special import sph_harm, spherical_jn
 
@@ -48,16 +49,18 @@ print('-------------------')
 
 
 
+def timer(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        time_cost = time.time() - start_time
+        print('-> TIME |{:>9} s | {}'.format(round(time_cost, 5), func.__name__))
+        return result
+    return wrapper
 
-def print_time(last_timestamp:float, item:str) -> float:
-    '''print time used from last timestamp
-    use timestamp = time.time() for the 1st timestamp
-    '''
-    now = time.time()
-    print('{:>20} {:^10}'.format(item, round(now-last_timestamp, 5)))
-    timestamp = time.time()
-    return timestamp
-
+@timer
+@jit(nopython=True)#, parallel=True)
 def moller_trumbore_intersect_count(origins:np.ndarray, ray:np.ndarray, triangles:np.ndarray) -> np.ndarray:
     '''Calculate all the points intersect with 1 triangle
     using Möller-Trumbore intersection algorithm
@@ -71,13 +74,13 @@ def moller_trumbore_intersect_count(origins:np.ndarray, ray:np.ndarray, triangle
     Returns:
         ndarray, shape == (n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
     '''
-    timestamp = time.time()
     n = origins.shape[0]
     origins = origins.astype(np.float32)
     ray = ray.astype(np.float32)
     triangles = triangles.astype(np.float32)
     intersect_count = np.zeros(n, dtype=np.float32)
-    for triangle in tqdm.tqdm(triangles):
+    for i in prange(triangles.shape[0]):
+        triangle = triangles[i]
         O = origins
         D = ray
         V0 = triangle[0]
@@ -94,9 +97,9 @@ def moller_trumbore_intersect_count(origins:np.ndarray, ray:np.ndarray, triangle
         t, u, v = np.dot(Q,E2)/det, np.dot(T,P)/det, np.dot(Q,D)/det
         intersect[(t>0) & (u>0) & (v>0) & ((u+v)<1)] = 1
         intersect_count += intersect
-    timestamp = print_time(timestamp, 'intersection')
     return intersect_count
 
+@timer
 def sampling_points(s:np.ndarray, n_on_sphere:np.ndarray) -> tuple:
     ''' generate sampling points for orientation average
     using fibonacci grid
@@ -118,6 +121,7 @@ def sampling_points(s:np.ndarray, n_on_sphere:np.ndarray) -> tuple:
     z = R*z
     return x, y, z
 
+@timer
 def trilinear_interp(px:np.ndarray, py:np.ndarray, pz:np.ndarray, c:np.ndarray, d:float, x:np.ndarray, y:np.ndarray, z:np.ndarray) -> np.ndarray:
     '''对均匀正方体网格进行插值
     px, py, pz: 1d, 三个坐标序列, size相同
@@ -145,6 +149,24 @@ def trilinear_interp(px:np.ndarray, py:np.ndarray, pz:np.ndarray, c:np.ndarray, 
     c_interp += c[ix+1, iy+1, iz+1]*xd*yd*zd
     return c_interp
 
+@timer
+def fft(grid_sld:np.ndarray, n_s:int) -> np.ndarray:
+    '''fft part in sas_fft
+    use real fft to only compute half for saving time
+    '''
+    if TORCH_AVAILABLE and USE_TORCH:
+        grid_sld = torch.from_numpy(grid_sld).to(torch.float32).to(DEVICE)
+        F = torch.fft.rfftn(grid_sld, s=(n_s, n_s, n_s))
+        F = torch.fft.fftshift(F, dim=(0,1))
+        I_grid = torch.real(F)**2 + torch.imag(F)**2
+    else:
+        F = np.fft.rfftn(grid_sld, (n_s, n_s, n_s))
+        F = np.fft.fftshift(F, axes=(0,1))
+        I_grid = np.real(F)**2 + np.imag(F)**2  # faster than abs(F)**2
+        I_grid = I_grid.astype(np.float32)
+    return I_grid
+
+@timer
 def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orientation_average_offset:int=100):
     '''calculate SAS curve by FFT method
     '''
@@ -161,19 +183,7 @@ def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orie
     s = s.astype(np.float32)
 
     # fft
-    timestamp = time.time()
-    if TORCH_AVAILABLE and USE_TORCH:
-        grid_sld = torch.from_numpy(grid_sld).to(torch.float32).to(DEVICE)
-        F = torch.fft.rfftn(grid_sld, s=(n_s, n_s, n_s))
-        F = torch.fft.fftshift(F, dim=(0,1))
-        I_grid = torch.real(F)**2 + torch.imag(F)**2
-    else:
-        F = np.fft.rfftn(grid_sld, (n_s, n_s, n_s))
-        F = np.fft.fftshift(F, axes=(0,1))
-        I_grid = np.real(F)**2 + np.imag(F)**2  # faster than abs(F)**2
-        I_grid = I_grid.astype(np.float32)
-    del F
-    timestamp = print_time(timestamp, 'fft')
+    I_grid = fft(grid_sld, n_s)
 
     # generate coordinates to interpolate using fibonacci grid
     # 每一个q值对应的球面取多少个取向进行平均
@@ -181,7 +191,6 @@ def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orie
     n_on_sphere = np.rint(n_on_sphere/n_on_sphere[0]) + orientation_average_offset
     sampling_x, sampling_y, sampling_z = sampling_points(s, n_on_sphere)
     #points_to_interpolate = np.stack((x,y,z), axis=1)
-    timestamp = print_time(timestamp, 'fibo grid')
 
     #### interpolate
     # 因为用的rfft，只有z>=0那一半，因此要将z<0的坐标转换为中心对称的坐标
@@ -207,7 +216,6 @@ def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orie
         ds = s1d[1] - s1d[0]
         I_interp = trilinear_interp(s1d, s1d, s1dz, I_grid, ds, sampling_x, sampling_y, sampling_z)
     del I_grid
-    timestamp = print_time(timestamp, 'interpolate')
 
     # orientation average
     I = []
@@ -218,48 +226,109 @@ def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orie
         I.append(Ii)
         begin_index += N
     I = np.array(I)
-    timestamp = print_time(timestamp, 'average')
 
     q = 2*np.pi*s
     return q, I
 
+@jit(nopython=True, parallel=True)
+def debye_func_numba(d:np.ndarray, sld:np.ndarray, q:np.ndarray) -> np.ndarray:
+    '''pure numpy implementation, for numba jit use
+    -!- give wrong result! the speed is also abnormally slow
+    '''
+    sld2 = sld.reshape((sld.size,1)) * sld.reshape((1,sld.size))
+    sld2 = sld2.ravel() # for numba jit, np.isnan only available in 1d array
+    d = d.ravel()
 
+    I = np.zeros_like(q, dtype='float32')
+    #for i in range(q.size):
+    for i in prange(q.size):
+    #for i in tqdm.tqdm(range(q.size)):
+        qd = q[i]*d
+        fourier_core = np.sin(qd)/qd
+        fourier_core[np.isnan(fourier_core)] = 1
+        I[i] = np.sum(sld2*fourier_core)
+    return I
+
+def debye_func_numpy(d:np.ndarray, sld:np.ndarray, q:np.ndarray) -> np.ndarray:
+    '''pure numpy implementation, do not consider numba jit use
+    '''
+    sld2 = sld.reshape((sld.size,1))*sld.reshape((1,sld.size))
+    I = np.zeros_like(q, dtype='float32')
+    for i in range(q.size):
+        qd = q[i]*d
+        fourier_core = np.sin(qd)/qd
+        fourier_core[np.isnan(fourier_core)] = 1
+        #I[i] = np.einsum('i,j,ij', sld, sld, fourier_core)
+        I[i] = np.sum(sld2*fourier_core)
+    return I
+
+def debye_func_torch(d:np.ndarray, sld:np.ndarray, q:np.ndarray) -> np.ndarray:
+    '''pytorch implementation
+    '''
+    sld = torch.from_numpy(sld).to(DEVICE)
+    d = torch.from_numpy(d).to(DEVICE)
+    I = torch.zeros(q.size)
+    for i in range(q.size):
+        qd = q[i]*d
+        fourier_core = torch.sin(qd)/qd
+        fourier_core[torch.isnan(fourier_core)] = 1
+        I[i] = torch.einsum('i,j,ij', sld, sld, fourier_core)
+    I = I.cpu().numpy()
+    return I
+
+@timer
 def sas_debyefunc(x:np.ndarray, y:np.ndarray, z:np.ndarray, sld:np.ndarray, q:np.ndarray) -> tuple:
     '''calculate SAS curve by debye function
     '''
-    timestamp = time.time()
+    #timestamp = time.time()
     q, x, y, z, sld = q.astype('float32'), x.astype('float32'), y.astype('float32'), z.astype('float32'), sld.astype('float32')
     dx = x.reshape((x.size,1)) - x.reshape((1,x.size))
     dy = y.reshape((y.size,1)) - y.reshape((1,y.size))
     dz = z.reshape((z.size,1)) - z.reshape((1,x.size))
     d = np.sqrt(dx**2 + dy**2 + dz**2)
-
     if TORCH_AVAILABLE and USE_TORCH:
-        sld = torch.from_numpy(sld).to(DEVICE)
-        d = torch.from_numpy(d).to(DEVICE)
-        l = []
-        for qi in tqdm.tqdm(q):
-            qd = qi*d
-            fourier_core = torch.sin(qd)/qd
-            fourier_core[d<=1e-11] = 1
-            Ii = torch.einsum('i,j,ij', sld, sld, fourier_core)
-            l.append(Ii)
-        I = torch.stack(l).cpu().numpy()
+        I = debye_func_torch(d, sld, q)
     else:
-        l = []
-        for qi in tqdm.tqdm(q):
-            qd = qi*d
-            fourier_core = np.sin(qd)/qd
-            fourier_core[d<=1e-11] = 1
-            Ii = np.einsum('i,j,ij', sld, sld, fourier_core)
-            l.append(Ii)
-        I = np.array(l)
-    timestamp = print_time(timestamp, 'debye func')
+        I = debye_func_numpy(d, sld, q)
     return q, I
 
+@timer
 def sas_sphharm(x:np.ndarray, y:np.ndarray, z:np.ndarray, sld:np.ndarray, q:np.ndarray, lmax:int=50) -> tuple:
     '''calculate SAS curve by spherical harmonics
     '''
+    @timer
+    def calc_Ylm():
+        theta_ext2 = np.reshape(theta, (n_r, 1))  # (r,) -> (r, 1)
+        phi_ext2 = np.reshape(phi, (n_r, 1))  # (r,) -> (r, 1)
+        l_ext2 = np.reshape(l_ext, (1, n_m))  # (m,) -> (1, m)
+        m_ext2 = np.reshape(m, (1, n_m))  # (m,) -> (1, m)
+        Ylm = sph_harm(m_ext2, l_ext2, theta_ext2, phi_ext2).astype(np.complex64)  # broadcast to (r, m) float64
+        return Ylm
+
+    @timer
+    def calc_jl():
+        rq = np.einsum('r,q->rq', r, q)  #(r, q)
+        rq = np.reshape(rq, (n_r, 1, n_q))  # (r, 1, q)
+        l_ext1 = np.reshape(l, (1, n_l, 1))  # (1, l, 1)
+        jl_ext1 = spherical_jn(l_ext1, rq)  # broadcast to (r, l, q)
+        # (r, l, q) -> (r, m, q)
+        jl_ext1 = jl_ext1.astype(np.float32)
+
+        # (r,l,q) -> (r,m,q)
+        jl = []
+        for j in range(n_l):
+            jl += [jl_ext1[:,j,:]]*(2*j+1)
+        jl = np.array(jl, dtype=np.float32)
+        jl = np.swapaxes(jl, 0, 1)  # (r, m, q)
+        return jl
+
+    @timer
+    def calc_Alm():
+        Alm0_without_jl_real, Alm0_without_jl_imag = np.real(Alm0_without_jl), np.imag(Alm0_without_jl)
+        Alm_real = np.einsum('rm,rmq->mq', Alm0_without_jl_real, jl)
+        Alm_imag = np.einsum('rm,rmq->mq', Alm0_without_jl_imag, jl)
+        return Alm_real, Alm_imag
+
     lmax = int(lmax)
     r, theta, phi = convert_coord(x, y, z, 'car', 'sph')
     l = np.linspace(0, lmax, num=lmax+1, endpoint=True, dtype='int16')  # (l,)
@@ -273,18 +342,8 @@ def sas_sphharm(x:np.ndarray, y:np.ndarray, z:np.ndarray, sld:np.ndarray, q:np.n
 
     n_r, n_l, n_m, n_q = r.size, l.size, m.size, q.size
 
-    timestamp = time.time()
-
     ##### calculate Ylm #####
-    theta_ext2 = np.reshape(theta, (n_r, 1))  # (r,) -> (r, 1)
-    phi_ext2 = np.reshape(phi, (n_r, 1))  # (r,) -> (r, 1)
-    l_ext2 = np.reshape(l_ext, (1, n_m))  # (m,) -> (1, m)
-    m_ext2 = np.reshape(m, (1, n_m))  # (m,) -> (1, m)
-    #timestamp = print_time(timestamp, 'Ylm preparation')
-    Ylm = sph_harm(m_ext2, l_ext2, theta_ext2, phi_ext2).astype(np.complex64)  # broadcast to (r, m) float64
-    del theta_ext2, phi_ext2, l_ext2, m_ext2
-    timestamp = print_time(timestamp, 'Ylm')
-    #########################
+    Ylm = calc_Ylm()
 
     ##### calculate Alm0 without jl #####
     il = complex(0,1)**l  # (l,)
@@ -292,35 +351,12 @@ def sas_sphharm(x:np.ndarray, y:np.ndarray, z:np.ndarray, sld:np.ndarray, q:np.n
     for i in range(n_l):
         il_list += [il[i]]*(2*i+1)
     il = np.array(il_list, dtype='complex64')  # (m,)
-    #timestamp = print_time(timestamp, 'il')
-
     Alm0_without_jl = np.einsum('m,r,rm->rm', il, sld, Ylm)
-    #timestamp = print_time(timestamp, 'Alm0')
-    del il, Ylm
     ############################
 
-    rq = np.einsum('r,q->rq', r, q)  #(r, q)
-    rq = np.reshape(rq, (n_r, 1, n_q))  # (r, 1, q)
-    l_ext1 = np.reshape(l, (1, n_l, 1))  # (1, l, 1)
-    jl_ext1 = spherical_jn(l_ext1, rq)  # broadcast to (r, l, q)
-    timestamp = print_time(timestamp, 'jl')
-    # (r, l, q) -> (r, m, q)
-    jl_ext1 = jl_ext1.astype(np.float32)
+    jl = calc_jl()
 
-    jl = []
-    for j in range(n_l):
-        jl += [jl_ext1[:,j,:]]*(2*j+1)
-    jl = np.array(jl, dtype=np.float32)
-    jl = np.swapaxes(jl, 0, 1)  # (r, m, q)
-    del rq, jl_ext1
-    timestamp = print_time(timestamp, 'jl_rlq->rmq')
-
-    Alm0_without_jl_real, Alm0_without_jl_imag = np.real(Alm0_without_jl), np.imag(Alm0_without_jl)
-    Alm_real = np.einsum('rm,rmq->mq', Alm0_without_jl_real, jl)
-    Alm_imag = np.einsum('rm,rmq->mq', Alm0_without_jl_imag, jl)
-    #Alm = Alm_real + 1j*Alm_imag
-    timestamp = print_time(timestamp, 'Alm')
+    Alm_real, Alm_imag = calc_Alm()
 
     I = 16 * np.pi**2 * np.sum(Alm_real**2+Alm_imag**2, axis=0) #(q,)
-    del jl, Alm_real, Alm_imag, Alm0_without_jl_real, Alm0_without_jl_imag
     return q, I
