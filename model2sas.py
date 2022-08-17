@@ -1,8 +1,10 @@
+from ctypes import util
 import os
 
 import numpy as np
 from model import MathModel, StlModel
 import calc_func
+import utility
 
 
 class Model2Sas:
@@ -42,30 +44,6 @@ class Model2Sas:
             i += 1
             modelkey = '{}_{}'.format(modelname, str(i))
         return modelkey
-
-    def gen_suggested_parameters(self) -> tuple:
-        '''To evaluate optimal parameter values based on my experience.
-        e.g. smaller interval surely gives better results but maybe unnecessary
-        and may cause error since it uses much larger RAM and computing time. 
-        
-        Parameters:
-            None
-        Returns:
-            i: interval
-            qmin: min q value
-            qmax: max q value
-        '''
-        # i means interval here
-        boundary_min, boundary_max = self.gen_combined_boundary()
-        length = np.max(boundary_max-boundary_min)
-        qmin, qmax = (1/length)*0.2, (1/length)*25
-        smin, smax = qmin/(2*np.pi), qmax/(2*np.pi)
-        i_expected_max = 1/(2*smax)
-        i_times_ns_expected_min = 1/smin
-        ns = 600  # grid number after fft, same as n_s in fft method
-        i_expected_min = i_times_ns_expected_min / ns
-        i = min(i_expected_min, i_expected_max)
-        return i, qmin, qmax  # i means interval here
 
     def gen_grid(self, interval:float, boundary_min:np.ndarray, boundary_max:np.ndarray) -> tuple:
         '''generate mesh grid according to boundary,
@@ -148,7 +126,11 @@ if __name__ == '__main__':
     proj.import_model('mathmodel_template.py')
     proj.models['torus_0'].translate(np.array([0, 0, 10]))
     proj.models['torus_0'].rotate(np.array([0, 0, 10]), np.array([1, 1, 0]), np.pi/4)
-    grid_x, grid_y, grid_z, grid_sld = proj.gen_combined_model(1)
+    
+    interval, qmin, qmax = utility.gen_suggested_parameters(
+        *proj.gen_combined_boundary()
+    )
+    grid_x, grid_y, grid_z, grid_sld = proj.gen_combined_model(interval)
     print('='*40)
 
     #figure = plt.figure()
@@ -157,7 +139,7 @@ if __name__ == '__main__':
     #axes.scatter(x, y, z)
     #plt.show()
     
-    q = np.logspace(-2, 0, num=200)
+    q = np.linspace(qmin, qmax, num=200)
 
     calc_func.USE_TORCH = False
     q1, I1 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='fft')
@@ -170,9 +152,11 @@ if __name__ == '__main__':
     print('='*40)
     q3, I3 = proj.gen_sas(grid_x, grid_y, grid_z, grid_sld, q, method='debye_func')
     print('='*40)
+
+    i = np.where(np.abs(q-q1[0])<1e-7)
     plt.plot(q1, I1)
-    plt.plot(q2, I2)
-    plt.plot(q3, I3)
+    plt.plot(q2, I2*(I1[0]/I2[i]))
+    plt.plot(q3, I3*(I1[0]/I3[i]))
     plt.yscale('log')
     plt.xscale('log')
     plt.savefig('test.png')

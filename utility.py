@@ -65,3 +65,28 @@ def convert_coord(u:np.ndarray, v:np.ndarray, w:np.ndarray, source_coord:str, ta
         return car2sph(x, y, z)
     elif target_coord == 'cyl':
         return car2cyl(x, y, z)
+
+
+def gen_suggested_parameters(boundary_min:np.ndarray, boundary_max:np.ndarray) -> tuple:
+    '''To evaluate optimal parameter values based on my experience.
+    e.g. smaller interval surely gives better results but maybe unnecessary
+    and may cause error since it uses much larger RAM and computing time. 
+    
+    Parameters:
+        boundary_min
+        boundary_max
+    Returns:
+        i: interval
+        qmin: min q value
+        qmax: max q value
+    '''
+    # i means interval here
+    length = np.max(boundary_max-boundary_min)
+    qmin, qmax = (1/length)*0.2, (1/length)*25
+    smin, smax = qmin/(2*np.pi), qmax/(2*np.pi)
+    i_expected_max = 1/(2*smax)
+    i_times_ns_expected_min = 1/smin
+    ns = 600  # grid number after fft, same as n_s in fft method
+    i_expected_min = i_times_ns_expected_min / ns
+    i = min(i_expected_min, i_expected_max)
+    return i, qmin, qmax  # i means interval here
