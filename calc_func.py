@@ -4,10 +4,13 @@ Use a seperated module to use pytorch with cuda support more flexibly.
 
 import time
 import functools
+import os
 
 from numba import jit, prange
 import numpy as np
 from scipy.special import sph_harm, spherical_jn
+import pyfftw  # a little bit faster than numpy.fft
+pyfftw.interfaces.cache.enable()
 
 from utility import convert_coord
 
@@ -60,7 +63,7 @@ def timer(func):
     return wrapper
 
 @timer
-@jit(nopython=True)#, parallel=True)
+@jit(nopython=True, parallel=True)
 def moller_trumbore_intersect_count(origins:np.ndarray, ray:np.ndarray, triangles:np.ndarray) -> np.ndarray:
     '''Calculate all the points intersect with 1 triangle
     using Möller-Trumbore intersection algorithm
@@ -160,10 +163,17 @@ def fft(grid_sld:np.ndarray, n_s:int) -> np.ndarray:
         F = torch.fft.fftshift(F, dim=(0,1))
         I_grid = torch.real(F)**2 + torch.imag(F)**2
     else:
-        F = np.fft.rfftn(grid_sld, (n_s, n_s, n_s))
-        F = np.fft.fftshift(F, axes=(0,1))
+        #F = np.fft.rfftn(grid_sld, (n_s, n_s, n_s))
+        #F = np.fft.fftshift(F, axes=(0,1))
+        #### using pyfftw is faster than numpy.fft
+        #### especially multithreads available
+        n_threads = int(0.8 * os.cpu_count())
+        temp = pyfftw.empty_aligned(grid_sld.shape, dtype='float32')
+        temp = grid_sld.astype('float32')
+        F = pyfftw.interfaces.numpy_fft.rfftn(temp, (n_s, n_s, n_s), threads=n_threads)
+        F = pyfftw.interfaces.numpy_fft.fftshift(F, axes=(0,1))
         I_grid = np.real(F)**2 + np.imag(F)**2  # faster than abs(F)**2
-        I_grid = I_grid.astype(np.float32)
+        #I_grid = I_grid.astype(np.float32)  # already float32
     return I_grid
 
 @timer
@@ -233,7 +243,7 @@ def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orie
 @jit(nopython=True, parallel=True)
 def debye_func_numba(d:np.ndarray, sld:np.ndarray, q:np.ndarray) -> np.ndarray:
     '''pure numpy implementation, for numba jit use
-    -!- give wrong result! the speed is also abnormally slow
+    -X- give wrong result! the speed is also abnormally slow
     '''
     sld2 = sld.reshape((sld.size,1)) * sld.reshape((1,sld.size))
     sld2 = sld2.ravel() # for numba jit, np.isnan only available in 1d array
