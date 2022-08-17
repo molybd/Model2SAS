@@ -122,13 +122,16 @@ class Model:
 class StlModel(Model):
     '''class for model from stl files
     '''
-    def __init__(self, filename: str, sld:float=1) -> None:
+    def __init__(self, filename: str, sld:float=1, centering:bool=True) -> None:
         '''default uniform sld value
         '''
         super().__init__(filename)
         self.modeltype = 'stl'
         self.sld=sld
         self.mesh = mesh.Mesh.from_file(self.filename)
+        if centering:  # move model center to (0,0,0)
+            center = self.mesh.get_mass_properties()[1]
+            self.mesh.translate(-center)
 
     def _get_original_boundary(self) -> tuple:
         '''get untransformed boundary coordinates of stlmodel
