@@ -43,6 +43,28 @@ class Model2Sas:
             modelkey = '{}_{}'.format(modelname, str(i))
         return modelkey
 
+    def gen_suggested_parameters(self) -> tuple:
+        '''To evaluate optimal parameter values based on my experience.
+        e.g. smaller interval surely gives better results but maybe unnecessary
+        and may cause error since it uses much larger RAM and computing time. 
+        '''
+        # i means interval here
+        boundary_min, boundary_max = self.gen_combined_boundary()
+        length = np.max(boundary_max-boundary_min)
+        qmin, qmax = (1/length)*0.2, (1/length)*25
+        smin, smax = qmin/(2*np.pi), qmax/(2*np.pi)
+        i_expected_max = 1/(2*smax)
+        i_times_ns_expected_min = 1/smin
+        ns = 600  # grid number after fft, same as n_s in fft method
+        i_expected_min = i_times_ns_expected_min / ns
+        i = min(i_expected_min, i_expected_max)
+        sugg_param_dict = {
+            'q_min': qmin,
+            'q_max': qmax,
+            'interval': i
+        }
+        return sugg_param_dict
+
     def gen_grid(self, interval:float, boundary_min:np.ndarray, boundary_max:np.ndarray) -> tuple:
         '''generate mesh grid according to boundary,
         cubic grid with same interval, for FFT use
@@ -55,8 +77,8 @@ class Model2Sas:
         grid_x, grid_y, grid_z = np.meshgrid(x, y, z)
         return grid_x, grid_y, grid_z
 
-    def gen_combined_model(self, interval:float) -> tuple:
-        '''generate lattice model of combined models of all in self.models
+    def gen_combined_boundary(self) -> tuple:
+        '''generate overall boundary of combined models of all in self.models
         '''
         boundary_points = []
         for model in self.models.values():
@@ -64,6 +86,12 @@ class Model2Sas:
         boundary_points = np.array(boundary_points) # shape==(n, 2, 3)
         boundary_min = np.min(boundary_points[:,0,:], axis=0)
         boundary_max = np.max(boundary_points[:,1,:], axis=0)
+        return boundary_min, boundary_max
+
+    def gen_combined_model(self, interval:float) -> tuple:
+        '''generate lattice model of combined models of all in self.models
+        '''
+        boundary_min, boundary_max = self.gen_combined_boundary()
         grid_x, grid_y, grid_z = self.gen_grid(interval, boundary_min, boundary_max)
         grid_sld = np.zeros_like(grid_x)
         for model in self.models.values():
