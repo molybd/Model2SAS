@@ -6,6 +6,7 @@ import time
 import functools
 import os
 
+import tqdm
 from numba import jit, prange
 import numpy as np
 from scipy.special import sph_harm, spherical_jn
@@ -177,15 +178,19 @@ def fft(grid_sld:np.ndarray, n_s:int) -> np.ndarray:
     return I_grid
 
 @timer
-def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=400, orientation_average_offset:int=100):
+def sas_fft(grid_sld:np.ndarray, interval:float, q:np.ndarray, n_s:int=None, orientation_average_offset:int=100):
     '''calculate SAS curve by FFT method
     '''
     s = q/(2*np.pi)  # since q=2pi/d, so use s=1/d in fft method
 
     # determine the actual s to calculate
     # larger n_s gives better result, but comsume more computing power and RAM
-    n_l = grid_sld.shape[0]
-    n_s = max(n_s, n_l) # n_s must >= n_l
+    n_l = max(*grid_sld.shape)
+    if n_s is None:
+        n_s_expected = int(1/(s.min()*interval))
+        n_s = max(n_s_expected, n_l) # n_s must >= n_l
+    else:
+        n_s = max(n_s, n_l)
     smin = 1/(n_s*interval)
     smax = 1/interval * (0.5-1/n_s)
     s = s[np.where(s>=smin)]
@@ -264,7 +269,7 @@ def debye_func_numpy(d:np.ndarray, sld:np.ndarray, q:np.ndarray) -> np.ndarray:
     '''
     sld2 = sld.reshape((sld.size,1))*sld.reshape((1,sld.size))
     I = np.zeros_like(q, dtype='float32')
-    for i in range(q.size):
+    for i in tqdm.tqdm(range(q.size)):
         qd = q[i]*d
         fourier_core = np.sin(qd)/qd
         fourier_core[np.isnan(fourier_core)] = 1
@@ -278,7 +283,7 @@ def debye_func_torch(d:np.ndarray, sld:np.ndarray, q:np.ndarray) -> np.ndarray:
     sld = torch.from_numpy(sld).to(DEVICE)
     d = torch.from_numpy(d).to(DEVICE)
     I = torch.zeros(q.size)
-    for i in range(q.size):
+    for i in tqdm.tqdm(range(q.size)):
         qd = q[i]*d
         fourier_core = torch.sin(qd)/qd
         fourier_core[torch.isnan(fourier_core)] = 1
