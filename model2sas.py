@@ -47,6 +47,13 @@ class Model2Sas:
         '''To evaluate optimal parameter values based on my experience.
         e.g. smaller interval surely gives better results but maybe unnecessary
         and may cause error since it uses much larger RAM and computing time. 
+        
+        Parameters:
+            None
+        Returns:
+            i: interval
+            qmin: min q value
+            qmax: max q value
         '''
         # i means interval here
         boundary_min, boundary_max = self.gen_combined_boundary()
@@ -58,12 +65,7 @@ class Model2Sas:
         ns = 600  # grid number after fft, same as n_s in fft method
         i_expected_min = i_times_ns_expected_min / ns
         i = min(i_expected_min, i_expected_max)
-        sugg_param_dict = {
-            'q_min': qmin,
-            'q_max': qmax,
-            'interval': i
-        }
-        return sugg_param_dict
+        return i, qmin, qmax  # i means interval here
 
     def gen_grid(self, interval:float, boundary_min:np.ndarray, boundary_max:np.ndarray) -> tuple:
         '''generate mesh grid according to boundary,
