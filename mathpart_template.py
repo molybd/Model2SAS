@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 
-import numpy as np
+import torch
+from torch import Tensor
 
 # =========================================================
 # A template of hollow sphere math model
@@ -10,7 +11,7 @@ import numpy as np
 # =========================== ! ===========================
 # Do not change the class name, attributes name or method name !
 # =========================================================
-class SpecificMathModel:
+class MathDescription:
     '''to generate a 3D model from a mathematical description
     for example: a spherical shell is "x**2+y**2+z**2 >= R_core**2 and x**2+y**2+z**2 <= (R_core+thickness)**2
     also, in spherical coordinates, a hollow sphere is (r >= R_core) and (r <= R_core+thickness)
@@ -25,32 +26,34 @@ class SpecificMathModel:
         '''
         self.params = {
             'R_core': 40,
-            'thickness': 10
+            'thickness': 10,
+            'sld_value': 1,
         }
         self.coord = 'sph'  # 'car' or 'sph' or 'cyl'
 
-    def get_boundary(self) -> tuple:
+    def get_bound(self) -> tuple[tuple|list, tuple|list]:
         '''re-generate boundary for every method call
         in case that params are altered in software
         '''
-        boundary_max = (self.params['R_core']+self.params['thickness']) * np.ones(3)
-        boundary_min = -boundary_max
-        return boundary_min, boundary_max
+        bound_max = (self.params['R_core']+self.params['thickness']) * torch.ones(3)
+        bound_min = -bound_max
+        return bound_min.tolist(), bound_max.tolist()
 
-    def sld(self, grid_points_in_coord:np.ndarray) -> np.ndarray:
-        ''' calculate sld values of each grid points
+    def sld(self, u: Tensor, v: Tensor, w: Tensor) -> Tensor:
+        ''' calculate sld values of certain coordinates
         Args:
-            grid_points_in_coord: ndarray, shape == (n, 3), value is in the coordinates of self.coord
-        Returns:
-            sld: ndarray, shape == (n,) indicates the sld value of each grid points 
+            u, v, w: coordinates in self.coord
+                x, y, z if self.coord = 'cat'
+                r, theta, phi if self.coord = 'sph'
+                rho, theta, z if self.coord = 'cyl'
         '''
-        points_sph = grid_points_in_coord
-        r, theta, phi = points_sph[:,0], points_sph[:,1], points_sph[:,2]
+        r, theta, phi = u, v, w
         R = self.params['R_core']
         t = self.params['thickness']
-
-        index = np.zeros_like(r)
-        index[(r>=R) & (r<=(R+t))] = 1
-        #grid_sld = r * np.cos(theta) * np.sin(phi) * index
-        grid_sld = 1 * index
-        return grid_sld
+        sld_value = self.params['sld_value']
+        
+        in_model_index = torch.zeros_like(r)
+        in_model_index[(r>=R) & (r<=(R+t))] = 1.
+        # sld = r * torch.cos(theta) * torch.sin(phi) * in_model_index
+        sld = sld_value * in_model_index
+        return sld
