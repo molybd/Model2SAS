@@ -162,6 +162,8 @@ doc_temp/
 # qt file
 .qt_for_python/
 
-
 # temporary folder
 temp/
+
+# tips for myself
+design,tips&idea.md
