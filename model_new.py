@@ -4,7 +4,6 @@ For the convenience of using CUDA
 
 import os
 import sys
-import time
 
 from stl import mesh
 import numpy as np

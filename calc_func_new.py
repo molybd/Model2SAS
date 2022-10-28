@@ -1,5 +1,5 @@
 '''Compute-intensive functions in model2sas.
-Use a seperated module to use pytorch with cuda support more flexibly.
+All based on pytorch instead of numpy.
 '''
 
 # import numpy as np
