@@ -71,12 +71,17 @@ class Model:
     @timer
     def gen_reciprocal_lattice(self, n_s: int | None = None) -> Tensor:
         '''Generate reciprocal lattice using FFT method.
+        Default model center is at (0, 0, 0), referring to
+        self.bound_min, self.bound_max. But lattice bound
+        for fft is (0, 0, 0) & self.bound_max-self.bound_min.
+        So shift_vector = self.bound_min,
+        shift_multiplier =  e^{-i * s dot (-shif_vector)}.
         '''
         # determine n_s in reciprocal space
+        bound_min, bound_max = self.get_bound()
+        xmin, ymin, zmin = bound_min
+        xmax, ymax, zmax = bound_max
         if n_s is None:
-            bound_min, bound_max = self.get_bound()
-            xmin, ymin, zmin = bound_min
-            xmax, ymax, zmax = bound_max
             L = max(xmax-xmin, ymax-ymin, zmax-zmin)
             # use s in fft. s = q/(2*pi)
             smin = (1/L) / (2*torch.pi)
@@ -85,14 +90,31 @@ class Model:
             n_real_lattice = max(self.sld_lattice.size())
         n_s = max(n_s, n_real_lattice)
 
+        # size at z (3rd dim) is different with x & y (dim1&2)
+        s1d = torch.fft.fftfreq(n_s, d=self.real_spacing)
+        s1d = torch.fft.fftshift(s1d)
+        s1dz = torch.fft.rfftfreq(n_s, d=self.real_spacing)
+
         # using rfft to save time. so only upper half (qz>=0)
         F_half = torch.fft.rfftn(self.sld_lattice, s=(n_s, n_s, n_s))
         F_half = torch.fft.fftshift(F_half, dim=(0,1))
 
+        # shift center to (0, 0, 0)
+        # time-consuming part
+        @timer
+        def center_shift(F):
+            vx, vy, vz = xmin, ymin, zmin
+            sx, sy, sz = torch.meshgrid(s1d, s1d, s1dz, indexing='ij')
+            shift_multiplier = torch.exp(
+                (1j)*2*torch.pi * (sx*vx + sy*vy + sz*vz)
+            )
+            F = F * shift_multiplier
+            return F
+        F_half = center_shift(F_half)
+
         self.n_s = n_s
-        s1d = torch.fft.fftfreq(n_s, d=self.real_spacing)
-        self.s1d = torch.fft.fftshift(s1d)
-        self.s1dz = torch.fft.rfftfreq(n_s, d=self.real_spacing)
+        self.s1d = s1d
+        self.s1dz = s1dz
         self.F_half = F_half
         return F_half
 
