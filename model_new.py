@@ -19,7 +19,28 @@ from utility_new import timer, convert_coord
 #     print(t-timestamp)
 #     return t
 
-class Part:
+class Model:
+    '''Parent class for model, including Part and Assembly,
+    which should overwrite get_F_value() and get_smax()
+    method. Then, both can be treated equally in SAS calculation.
+    '''
+    def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
+        '''Core method for model class, including Part and
+        Assembly. Called by Sas class to calculate SAS pattern
+        or curve.
+        To be overwritten.
+        '''
+        F_value = torch.Tensor()
+        return F_value
+
+    def get_s_max(self) -> float:
+        '''Return maximum s value of a part or assembly.
+        '''
+        smax = 0.
+        return smax
+
+
+class Part(Model):
     '''Parent class for part model.
     Subclass: StlPart and MathPart
     '''
@@ -52,7 +73,7 @@ class Part:
         self.sx: Tensor
         self.sy: Tensor
         self.sz_half: Tensor
-        
+
     def import_lattice_meshgrid(self, x: Tensor, y: Tensor, z: Tensor) -> None:
         '''Import lattice meshgrid from outside of class.
         For the need of some other function.
@@ -135,6 +156,12 @@ class Part:
         to make it faster (about half the time). Otherwise,
         always keep it True is a better choice which takes
         less than 1s.
+        ATTENTION:
+            n_s controls precision in low q region. 
+            larger n_s get more precise in low q, but may use
+            too many memory since F increases in ^3. When n_s
+            not specified, the calculation is controlled by
+            scale factor in smin.
         '''
         # determine n_s in reciprocal space
         bound_min, bound_max = self.get_bound()
@@ -143,11 +170,13 @@ class Part:
         if n_s is None:
             L = max(xmax-xmin, ymax-ymin, zmax-zmin)
             # use s in fft. s = q/(2*pi)
-            smin = (1/L) / (2*torch.pi)
+            smin = 0.25 * (1/L) / (2*torch.pi)  # scale=0.5 here, smaller scale gives larger n_s
             d = self.real_spacing
             n_s = int(1/(smin*d))+1
         n_real_lattice = max(self.sld_lattice.size())
         n_s = max(n_s, n_real_lattice)
+        # larger n_s get more precise in low q,
+        # but may use too many memory since F increases in ^3
 
         # size at z (3rd dim) is different with x & y (dim1&2)
         s1d = torch.fft.fftfreq(n_s, d=self.real_spacing)
@@ -199,9 +228,9 @@ class Part:
         '''
         vx, vy, vz = vector
         # real space
-        self.x += vx
-        self.y += vy
-        self.z += vz
+        self.x = self.x + vx
+        self.y = self.y + vy
+        self.z = self.z + vz
 
         # reciprocal lattice
         translate_multiplier = torch.exp(
@@ -211,7 +240,7 @@ class Part:
 
         def apply_on_reciprocal_lattice(coord: Tensor) -> tuple[Tensor, Tensor]:
             return coord, new_F_half
-        
+
         index = len(self.transformations)
         self.transformations[index] = dict(
             type = 'translate',
@@ -258,7 +287,7 @@ class Part:
         def apply_on_reciprocal_lattice(coord: Tensor) -> tuple[Tensor, Tensor]:
             new_coord = euler_rodrigues_rotate(coord, axis, -angle) # rotate coord reversely to fit reciprocal lattice
             return new_coord, new_F_half
-        
+
         index = len(self.transformations)
         self.transformations[index] = dict(
             type = 'rotate',
@@ -305,17 +334,18 @@ class Part:
 
         '''这里分了三种情况分别进行测试，分别是直接复数插值，实部虚部分别插值，
         以及将复数转换为模与辐角表示后分别进行插值。
-        结果表明，直接复数插值和实部虚部分别插值的结果相同，且计算出来的一维散射
-        曲线均误差很大；
+        结果表明，直接复数插值和实部虚部分别插值的结果相同;
         而模与辐角分别插值得到的一维散射曲线与计算一维曲线中对强度进行插值结果
-        相同，较为准确。
-        （因为模实际上就是强度的开方）
+        相同（因为模实际上就是强度的开方）。
+        但是在组合模型中，模与辐角分别插值导致组合模型的一维散射曲线低q区震动
+        比较严重。这是因为组合模型更依赖于低q区准确的实部和虚部，而零件模型完全
+        只依赖于模，所以精度差一些。
         '''
 
         # 直接复数插值
-        # F_value = calc_func.trilinear_interp(
-        #     sx, sy, sz, self.s1d, self.s1d, self.s1dz, new_F_half, ds
-        # )
+        F_value = calc_func.trilinear_interp(
+            sx, sy, sz, self.s1d, self.s1d, self.s1dz, new_F_half, ds
+        )
 
         # 实部虚部分别插值
         # F_value_real = calc_func.trilinear_interp(
@@ -327,18 +357,23 @@ class Part:
         # F_value = F_value_real + (1j)*F_value_imag
 
         # 模与辐角分别插值
-        new_F_half_mod = torch.sqrt(new_F_half.real**2 + new_F_half.imag**2)
-        new_F_half_ang = torch.arctan2(new_F_half.imag, new_F_half.real)
-        F_value_mod = calc_func.trilinear_interp(
-            sx, sy, sz, self.s1d, self.s1d, self.s1dz, new_F_half_mod, ds
-        )
-        F_value_ang = calc_func.trilinear_interp(
-            sx, sy, sz, self.s1d, self.s1d, self.s1dz, new_F_half_ang, ds
-        )
-        F_value = F_value_mod * (torch.cos(F_value_ang) + (1j)*torch.sin(F_value_ang))
+        # new_F_half_mod = torch.sqrt(new_F_half.real**2 + new_F_half.imag**2)
+        # new_F_half_ang = torch.arctan2(new_F_half.imag, new_F_half.real)
+        # F_value_mod = calc_func.trilinear_interp(
+        #     sx, sy, sz, self.s1d, self.s1d, self.s1dz, new_F_half_mod, ds
+        # )
+        # F_value_ang = calc_func.trilinear_interp(
+        #     sx, sy, sz, self.s1d, self.s1d, self.s1dz, new_F_half_ang, ds
+        # )
+        # F_value = F_value_mod * (torch.cos(F_value_ang) + (1j)*torch.sin(F_value_ang))
 
         return F_value
 
+    def get_s_max(self) -> float:
+        '''Return maximum s value of a part model.
+        '''
+        smax = min(torch.abs(self.s1d.min()).item(), torch.abs(self.s1d.max()).item())
+        return smax
 
     @timer
     def calc_sas1d(self, q1d: Tensor, orientation_average_offset: int = 100) -> tuple[Tensor, Tensor]:
@@ -399,8 +434,8 @@ class StlPart(Part):
         self.sld_value = sld_value
 
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-        '''TODO
-        - 是否需要扩展一些范围
+        '''Get boundary of part model. Return 2 points which
+        determine a cuboid fully containing the whole part model.
         '''
         vec = self.mesh.vectors
         vec = vec.reshape((vec.shape[0]*vec.shape[1], vec.shape[2]))
@@ -450,7 +485,8 @@ class MathPart(Part):
             self.math_description = module.MathDescription()
 
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-        '''get bound from math_description
+        '''Get boundary of part model. Return 2 points which
+        determine a cuboid fully containing the whole part model.
         '''
         bound_min, bound_max = self.math_description.get_bound()
         bound_min, bound_max = tuple(bound_min), tuple(bound_max)
@@ -475,13 +511,14 @@ class MathPart(Part):
 
 
 
-class Assembly:
+class Assembly(Model):
     '''Assembly of several part model
     '''
-    def __init__(self) -> None:
+    def __init__(self, *parts: Part) -> None:
         '''
         '''
         self.parts = {}
+        self.add_parts(*parts)
 
     def add_parts(self, *parts: Part) -> None:
         '''Add part object or list of part object to self.parts dictionary'''
@@ -489,7 +526,23 @@ class Assembly:
             i = len(self.parts)
             self.parts[i] = p
 
+    @timer
+    def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
+        '''Get F value (scattering amplitude) of certain coordinates
+        in reciprocal space. Sum over all parts.
+        '''
+        F_value = torch.zeros(reciprocal_coord.shape[0], dtype=torch.complex64)
+        for part in self.parts.values():
+            F_value += part.get_F_value(reciprocal_coord)
+        return F_value
 
+    def get_s_max(self) -> float:
+        '''Return maximum s value of assembly model.
+        '''
+        smax_list = []
+        for part in self.parts.values():
+            smax_list.append(part.get_s_max())
+        return min(smax_list)
 
 
 if __name__ == '__main__':
@@ -497,29 +550,30 @@ if __name__ == '__main__':
 
     @timer
     def main():
-        part = StlPart(filename=r'models\torus.stl')
-        part.gen_lattice_meshgrid(spacing=1)
+        # part = StlPart(filename=r'models\torus.stl')
+        # part.gen_lattice_meshgrid(spacing=1)
 
-        # part = MathPart(filename=r'mathpart_template.py')
-        # part.gen_lattice_meshgrid(spacing=2)
+        part = MathPart(filename=r'mathpart_template.py')
+        part.gen_lattice_meshgrid(spacing=0.5)
 
         part.gen_sld_lattice()
         part.gen_reciprocal_lattice()
         # print(part.F_half.size())
 
         part.rotate((0,1,0), torch.pi/4)
-        part.translate((200, 0, 0))
+        part.translate((20, 0, 0))
         # part.clear_transformation()
 
-        q = torch.linspace(0.001, 1, 200)
+        q = torch.linspace(0.001, 2, 200)
         q, I = part.calc_sas1d(q)
 
         figure = plt.figure()
         ax = figure.add_subplot(projection='3d')
-        x = part.x[np.where(part.sld_lattice!=0)]
-        y = part.y[np.where(part.sld_lattice!=0)]
-        z = part.z[np.where(part.sld_lattice!=0)]
-        ax.scatter(x, y, z, c=part.sld_lattice[np.where(part.sld_lattice!=0)])
+        x = part.x[torch.where(part.sld_lattice!=0)]
+        y = part.y[torch.where(part.sld_lattice!=0)]
+        z = part.z[torch.where(part.sld_lattice!=0)]
+        value = part.sld_lattice[torch.where(part.sld_lattice!=0)]
+        ax.scatter(x, y, z, c=value)
         plt.show()
 
         plt.plot(q, I)

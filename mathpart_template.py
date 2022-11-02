@@ -25,8 +25,8 @@ class MathDescription:
         '''must at least have these 2 attributes
         '''
         self.params = {
-            'R_core': 40,
-            'thickness': 10,
+            'R_core': 8,
+            'thickness': 2,
             'sld_value': 1,
         }
         self.coord = 'sph'  # 'car' or 'sph' or 'cyl'
