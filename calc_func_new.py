@@ -48,9 +48,9 @@ def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Ten
     phi = (torch.sqrt(torch.tensor(5))-1)/2
     l_n, l_z, l_R = [], [], []
     for R, N in zip(s, n_on_sphere):
-        n = torch.arange(N.int(), dtype=torch.float32)+1
+        n = torch.arange(N.int().item(), dtype=torch.float32) + 1
         z = (2*n-1)/N - 1
-        R = R*torch.ones(N.int(), dtype=torch.float32)
+        R = R*torch.ones(N.int().item(), dtype=torch.float32)
         l_n.append(n)
         l_z.append(z)
         l_R.append(R)
@@ -61,12 +61,15 @@ def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Ten
     return x, y, z
 
 @timer
-def trilinear_interp(px:Tensor, py:Tensor, pz:Tensor, c:Tensor, d:float, x:Tensor, y:Tensor, z:Tensor) -> Tensor:
-    '''对均匀正方体网格进行插值
-    px, py, pz: 1d, 三个坐标序列, size相同
-    c: 每个坐标点的值, shape=(px.size, py.size, pz.size)
-    d: float 网格间距, 所有格点都是等间距的
-    x, y, z: 需要插值点的三个坐标序列
+def trilinear_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tensor, c:Tensor, d:float | Tensor) -> Tensor:
+    '''对等间距网格进行三线性插值
+    ATTENTION:
+        当网格值c是复数时，根据我这里的实际测试结果，这个函数等效于对实部和虚部分别进行插值
+    Parameters:
+        x, y, z: 待插值的三个坐标序列，(x[i], y[i], z[i])代表待插值的某点坐标
+        px, py, pz: 已知数值的点的三个坐标序列，只有一维，也就是说没有进行meshgrid
+        c: 每个坐标点的值, shape=(px.size, py.size, pz.size)
+        d: float 网格间距, 所有格点都是等间距的
     '''
     ix, iy, iz = (x-px[0])/d, (y-py[0])/d, (z-pz[0])/d
     ix, iy, iz = ix.to(torch.int64), iy.to(torch.int64), iz.to(torch.int64) # tensors used as indices must be long, byte or bool tensors
