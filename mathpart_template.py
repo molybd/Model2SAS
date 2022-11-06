@@ -25,15 +25,16 @@ class MathDescription:
         '''must at least have these 2 attributes
         '''
         self.params = {
-            'R_core': 8,
-            'thickness': 2,
+            'R_core': 5,
+            'thickness': 5,
             'sld_value': 1,
         }
         self.coord = 'sph'  # 'car' or 'sph' or 'cyl'
 
     def get_bound(self) -> tuple[tuple|list, tuple|list]:
         '''re-generate boundary for every method call
-        in case that params are altered in software
+        in case that params are altered in software.
+        return coordinates in Cartesian coordinates.
         '''
         bound_max = (self.params['R_core']+self.params['thickness']) * torch.ones(3)
         bound_min = -bound_max

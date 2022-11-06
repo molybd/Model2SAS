@@ -73,38 +73,50 @@ if __name__ == '__main__':
 
     @timer
     def main():
-        part1 = StlPart(filename=r'models\torus.stl')
-        part1.gen_lattice_meshgrid(spacing=1)
+        # part1 = StlPart(filename=r'models\torus.stl')
+        part1 = MathPart(filename=r'models\spherical_core_shell.py')
+        part1.math_description.params = {
+            'R_core': 8,
+            'thickness': 2,
+            'sld_value': 1,
+        }
+        part1.gen_lattice_meshgrid()
         part1.gen_sld_lattice()
         part1.gen_reciprocal_lattice()
 
-        part2 = MathPart(filename=r'mathpart_template.py')
-        part2.gen_lattice_meshgrid(spacing=1)
+        part2 = MathPart(filename=r'models\spherical_core_shell.py')
+        part2.math_description.params = {
+            'R_core': 0,
+            'thickness': 8,
+            'sld_value': 1,
+        }
+        part2.gen_lattice_meshgrid()
         part2.gen_sld_lattice()
         part2.gen_reciprocal_lattice()
 
-        part1.translate((0, 0, 0))
-
         assembly = Assembly(part1, part2)
         scatt = Sas(assembly)
-        q = torch.linspace(0.001, 2, 200)
+        q = torch.linspace(0.001, 1, 200)
         q1, I1 = scatt.calc_sas1d(q)
 
         plot_parts(part1, part2)
         plt.show()
 
+        part3 = MathPart(filename=r'models\spherical_core_shell.py')
+        part3.math_description.params = {
+            'R_core': 0,
+            'thickness': 10,
+            'sld_value': 1,
+        }
+        part3.gen_lattice_meshgrid()
+        part3.gen_sld_lattice()
+        part3.gen_reciprocal_lattice()
 
-        part1.clear_transformation()
-        # part1.translate((0, 0, -20))
-        part1.rotate((0,1,0), torch.pi/4)
-
-
-        assembly = Assembly(part1, part2)
-        scatt = Sas(assembly)
-        q = torch.linspace(0.001, 2, 200)
+        scatt = Sas(part3)
+        q = torch.linspace(0.001, 1, 200)
         q2, I2 = scatt.calc_sas1d(q)
 
-        plot_parts(part1, part2)
+        plot_parts(part3)
         plt.show()
 
         plt.plot(q1, I1)

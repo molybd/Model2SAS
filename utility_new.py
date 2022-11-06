@@ -78,4 +78,3 @@ def convert_coord(u:Tensor, v:Tensor, w:Tensor, original_coord:str, target_coord
         return car2sph(x, y, z)
     elif target_coord == 'cyl':
         return car2cyl(x, y, z)
-        
