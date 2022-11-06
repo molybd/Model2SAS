@@ -23,8 +23,9 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
     Returns:
         Tensor, size=(n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
     '''
+    device = origins.device.type
     n = origins.size()[0]
-    intersect_count = torch.zeros(n, dtype=torch.int32)
+    intersect_count = torch.zeros(n, dtype=torch.int32).to(device)
     E1 = triangles[:,1,:] - triangles[:,0,:]
     E2 = triangles[:,2,:] - triangles[:,0,:]
     for i in range(triangles.size()[0]):
@@ -32,7 +33,7 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
         P = torch.linalg.cross(ray, E2[i,:], dim=-1)
         Q = torch.linalg.cross(T, E1[i,:], dim=-1)
         det = torch.dot(P, E1[i,:])
-        intersect = torch.zeros(n, dtype=torch.int32)
+        intersect = torch.zeros(n, dtype=torch.int32).to(device)
         t, u, v = torch.matmul(Q,E2[i,:])/det, torch.matmul(T,P)/det, torch.matmul(Q,ray)/det
         intersect[(t>0) & (u>0) & (v>0) & ((u+v)<1)] = 1  # faster than below
         # intersect = torch.where((t>0)&(u>0)&(v>0)&((u+v)<1), 1, 0)
@@ -41,10 +42,14 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
 
 @timer
 def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Tensor]:
-    ''' generate sampling points for orientation average
+    ''' Generate sampling points for orientation average
     using fibonacci grid
     s and n_on_sphere should have same shape
+    Calculate on cpu for convinience, transfered to designate device
     '''
+    device = s.device.type
+    s = s.to('cpu')
+    n_on_sphere = n_on_sphere.to('cpu')
     phi = (torch.sqrt(torch.tensor(5))-1)/2
     l_n, l_z, l_R = [], [], []
     for R, N in zip(s, n_on_sphere):
@@ -58,7 +63,7 @@ def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Ten
     x = R*torch.sqrt(1-z**2)*torch.cos(2*torch.pi*n*phi)
     y = R*torch.sqrt(1-z**2)*torch.sin(2*torch.pi*n*phi)
     z = R*z
-    return x, y, z
+    return x.to(device), y.to(device), z.to(device)
 
 @timer
 def trilinear_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tensor, c:Tensor, d:float | Tensor) -> Tensor:

@@ -44,9 +44,10 @@ class Part(Model):
     '''Parent class for part model.
     Subclass: StlPart and MathPart
     '''
-    def __init__(self, filename: str | None = None, partname: str | None = None) -> None:
+    def __init__(self, filename: str | None = None, partname: str | None = None, device: str = 'cpu') -> None:
         '''Init function
         '''
+        self.device = device
         self.partname = partname
         if filename is not None:
             self.filename = filename
@@ -99,7 +100,7 @@ class Part(Model):
         '''
         spacing = x[1,0,0].item() - x[0,0,0].item()
         self.real_spacing = spacing
-        self.x, self.y, self.z = x, y, z
+        self.x, self.y, self.z = x.to(self.device), y.to(self.device), z.to(self.device)
 
     def gen_lattice_meshgrid(self, spacing: float | None = None) -> tuple[Tensor, Tensor, Tensor]:
         '''Generate equally spaced meshgrid in 3d real space.
@@ -125,7 +126,7 @@ class Part(Model):
         z1d = torch.linspace(zmin, zmax, znum)
         x, y, z = torch.meshgrid(x1d, y1d, z1d, indexing='ij')
         self.real_spacing = spacing
-        self.x, self.y, self.z = x, y, z
+        self.x, self.y, self.z = x.to(self.device), y.to(self.device), z.to(self.device)
         return x, y, z
 
     def import_sld_lattice(self, x: Tensor, y: Tensor, z: Tensor, sld_lattice: Tensor) -> None:
@@ -133,8 +134,8 @@ class Part(Model):
         Mainly for test use.
         '''
         self.real_spacing = x[1,0,0].item() - x[0,0,0].item()
-        self.x, self.y, self.z = x, y, z
-        self.sld_lattice = sld_lattice
+        self.x, self.y, self.z = x.to(self.device), y.to(self.device), z.to(self.device)
+        self.sld_lattice = sld_lattice.to(self.device)
         self._store_original_sld_lattice(x, y, z, sld_lattice)
 
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
@@ -159,10 +160,10 @@ class Part(Model):
         return sld_lattice
 
     def _store_original_sld_lattice(self, x: Tensor, y: Tensor, z: Tensor, sld_lattice: Tensor) -> None:
-        self.x_original = x
-        self.y_original = y
-        self.z_original = z
-        self.sld_lattice_original = sld_lattice
+        self.x_original = x.clone()
+        self.y_original = y.clone()
+        self.z_original = z.clone()
+        self.sld_lattice_original = sld_lattice.clone()
 
 
     @timer
@@ -200,9 +201,9 @@ class Part(Model):
         # but may use too many memory since F increases in ^3
 
         # size at z (3rd dim) is different with x & y (dim1&2)
-        s1d = torch.fft.fftfreq(n_s, d=self.real_spacing)
+        s1d = torch.fft.fftfreq(n_s, d=self.real_spacing).to(self.device)
         s1d = torch.fft.fftshift(s1d)
-        s1dz = torch.fft.rfftfreq(n_s, d=self.real_spacing)
+        s1dz = torch.fft.rfftfreq(n_s, d=self.real_spacing).to(self.device)
 
         # using rfft to save time. so only upper half (qz>=0)
         F_half = torch.fft.rfftn(self.sld_lattice, s=(n_s, n_s, n_s))
@@ -225,7 +226,7 @@ class Part(Model):
         self.F_half = F_half
         return F_half
 
-    @timer
+    # @timer
     def _shift_center(self, F: Tensor, sx_1d: Tensor, sy_1d: Tensor, sz_1d: Tensor, vx: float, vy:float, vz:float) -> Tensor:
         '''Default model center is at (0, 0, 0), referring to
         self.bound_min, self.bound_max. But lattice bound
@@ -235,9 +236,13 @@ class Part(Model):
         Will generate reciprocal meshgrid sx, sy, sz.
         '''
         sx, sy, sz_half = torch.meshgrid(sx_1d, sy_1d, sz_1d, indexing='ij')
-        shift_multiplier = torch.exp(
-            -(1j) * 2*torch.pi * (sx*vx + sy*vy + sz_half*vz)
-        )
+        j = torch.tensor(1j).to(self.device)
+        temp = -1 * j * 2*torch.pi * (sx*vx + sy*vy + sz_half*vz)
+        shift_multiplier = torch.exp(temp.real) * (torch.cos(temp.imag) + j*torch.sin(temp.imag))
+        # will raise error when calculating exp on complex numbers on cuda
+        # shift_multiplier = torch.exp(
+        #     -1 * j * 2*torch.pi * (sx*vx + sy*vy + sz_half*vz)
+        # )
         self.sx, self.sy, self.sz_half = sx, sy, sz_half
         return F * shift_multiplier
 
@@ -257,9 +262,13 @@ class Part(Model):
         self.z = self.z + vz
 
         # reciprocal lattice
-        translate_multiplier = torch.exp(
-            -(1j) * 2*torch.pi * (self.sx*vx + self.sy*vy + self.sz_half*vz)
-        )
+        j = torch.tensor(1j).to(self.device)
+        temp = -1 * j * 2*torch.pi * (self.sx*vx + self.sy*vy + self.sz_half*vz)
+        translate_multiplier = torch.exp(temp.real) * (torch.cos(temp.imag) + j*torch.sin(temp.imag))
+        # will raise error when calculating exp on complex numbers on cuda
+        # translate_multiplier = torch.exp(
+        #     -1 * j * 2*torch.pi * (self.sx*vx + self.sy*vy + self.sz_half*vz)
+        # )
 
         def apply_on_reciprocal_lattice(coord: Tensor, F_half: Tensor) -> tuple[Tensor, Tensor]:
             return coord, translate_multiplier*F_half
@@ -286,14 +295,14 @@ class Part(Model):
             angle: float, rotation angle in radians
         '''
         def euler_rodrigues_rotate(coord: Tensor, axis_local: tuple[float, float, float], angle_local: float) -> Tensor:
-            ax = torch.tensor(axis_local)
+            ax = torch.tensor(axis_local).to(self.device)
             ax = ax / torch.sqrt(torch.sum(ax**2))
-            ang = torch.tensor(angle_local)
+            ang = torch.tensor(angle_local).to(self.device)
             a = torch.cos(ang/2)
             b = ax[0]*torch.sin(ang/2)
             c = ax[1]*torch.sin(ang/2)
             d = ax[2]*torch.sin(ang/2)
-            w = torch.tensor((b, c, d))
+            w = torch.tensor((b, c, d)).to(self.device)
 
             x = coord
             wx = -torch.linalg.cross(x, w, dim=-1)
@@ -320,7 +329,7 @@ class Part(Model):
     def clear_transformation(self) -> None:
         '''Clear all transformations. Set part model to default.
         '''
-        self.x, self.y, self.z = self.x_original, self.y_original, self.z_original
+        self.x, self.y, self.z = self.x_original.clone(), self.y_original.clone(), self.z_original.clone()
         self.transformations = {}
 
     @timer
@@ -339,7 +348,7 @@ class Part(Model):
         Parameters:
             reciprocal_coord: shape=(n, 3)
         '''
-        new_coord = reciprocal_coord
+        new_coord = reciprocal_coord.to(self.device)
         new_F_half = self.F_half.clone()
 
         # apply transform
@@ -349,7 +358,7 @@ class Part(Model):
 
         # 因为用的rfft，只有z>=0那一半，因此要将z<0的坐标转换为中心对称的坐标
         sx, sy, sz = torch.unbind(new_coord, dim=-1)
-        sign = torch.ones(sx.size())
+        sign = torch.ones(sx.size()).to(self.device)
         sign[sz<0] = -1.
         sx, sy, sz = sign*sx, sign*sy, sign*sz
         ds = self.s1d[1] - self.s1d[0]
@@ -402,7 +411,8 @@ class Part(Model):
         '''Calculate 1d SAS curve from reciprocal lattice.
         For test only now. Will be transfered to sas module.
         '''
-        s_input = q1d/(2*np.pi)
+        q1d = q1d.to(self.device)
+        s_input = q1d/(2*torch.pi)
         s = s_input[torch.where((s_input>=self.s1d.min())&(s_input<=self.s1d.max()))]
 
         # generate coordinates to interpolate using fibonacci grid
@@ -415,7 +425,7 @@ class Part(Model):
         # 因为用的rfft，只有z>=0那一半，因此要将z<0的坐标转换为中心对称的坐标
         reciprocal_coord = torch.stack([sx, sy, sz], dim=-1)
         F = self.get_F_value(reciprocal_coord)
-        I = torch.real(F)**2 + torch.imag(F)**2
+        I = F.real**2 + F.imag**2
 
         # 直接计算强度再插值
         # I_half = self.F_half.real**2 + self.F_half.imag**2
@@ -428,26 +438,27 @@ class Part(Model):
         # )
 
         # orientation average
+        n_on_sphere = n_on_sphere.to('cpu')
         I_list = []
         begin_index = 0
         for N in n_on_sphere:
             N = int(N)
             Ii = torch.sum(I[begin_index:begin_index+N])/N
-            I_list.append(Ii)
+            I_list.append(Ii.to('cpu').item())
             begin_index += N
         I1d = torch.tensor(I_list)
 
-        return 2*torch.pi*s, I1d
+        return 2*torch.pi*s.to('cpu'), I1d
 
 
 class StlPart(Part):
     '''class for part from stl file.
     Rewrite get_bound and gen_sld_lattice methods.
     '''
-    def __init__(self, filename: str | None = None, sld_value: float = 1.0, centering : bool = True) -> None:
+    def __init__(self, filename: str | None = None, sld_value: float = 1.0, centering : bool = True, device: str = 'cpu') -> None:
         '''load mesh from stl file
         '''
-        super().__init__(filename=filename)
+        super().__init__(filename=filename, device=device)
         if filename is not None:
             self.mesh = mesh.Mesh.from_file(self.filename)
             self.bound_min, self.bound_max = self.get_bound()
@@ -479,8 +490,9 @@ class StlPart(Part):
             dim=1
         )
         ray = torch.rand(3) - 0.5
+        ray = ray.to(self.device)
         vectors = self.mesh.vectors.copy()
-        triangles = torch.from_numpy(vectors).to(torch.float32)
+        triangles = torch.from_numpy(vectors).to(torch.float32).to(self.device)
         intersect_count = calc_func.moller_trumbore_intersect_count(origins, ray, triangles)
         index = intersect_count % 2   # 1 is in, 0 is out
         sld_lattice = self.sld_value * index
@@ -495,11 +507,11 @@ class MathPart(Part):
     '''class for part from math description.
     Rewrite get_bound and gen_sld_lattice methods.
     '''
-    def __init__(self, filename: str | None = None) -> None:
+    def __init__(self, filename: str | None = None, device: str = 'cpu') -> None:
         '''load math object from py file
         TODO: or directly pass through?
         '''
-        super().__init__(filename)
+        super().__init__(filename=filename, device=device)
         if filename is not None:
             abspath = os.path.abspath(filename)
             dirname = os.path.dirname(abspath)
@@ -524,7 +536,7 @@ class MathPart(Part):
         x, y, z = self.x, self.y, self.z
         part_coord = self.math_description.coord
         u, v, w = convert_coord(x, y, z, 'car', part_coord)
-        sld_lattice = self.math_description.sld(u, v, w)
+        sld_lattice = self.math_description.sld(u, v, w) # will deal with device in function automatically
         if isinstance(sld_lattice, np.ndarray):
             sld_lattice = torch.from_numpy(sld_lattice).to(torch.float32)
 
@@ -538,23 +550,26 @@ class Assembly(Model):
     '''Assembly of several part model
     '''
     def __init__(self, *parts: Part) -> None:
-        '''
+        '''All part model must in same device.
         '''
         self.parts = {}
         self.add_parts(*parts)
+        self.device: str
 
     def add_parts(self, *parts: Part) -> None:
         '''Add part object or list of part object to self.parts dictionary'''
         for p in parts:
             i = len(self.parts)
             self.parts[i] = p
+        if len(self.parts) > 0:
+            self.device = self.parts[0].device
 
     @timer
     def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
         '''Get F value (scattering amplitude) of certain coordinates
         in reciprocal space. Sum over all parts.
         '''
-        F_value = torch.zeros(reciprocal_coord.shape[0], dtype=torch.complex64)
+        F_value = torch.zeros(reciprocal_coord.shape[0], dtype=torch.complex64).to(self.device)
         for part in self.parts.values():
             F_value += part.get_F_value(reciprocal_coord)
         return F_value
@@ -573,21 +588,24 @@ if __name__ == '__main__':
 
     @timer
     def main():
-        part = StlPart(filename=r'models\torus.stl')
-        # part = MathPart(filename=r'models\cylinder_y.py')
+        # part = StlPart(filename=r'models\torus.stl', device='cuda')
+        part = MathPart(filename=r'models\cylinder_y.py', device='cuda')
         part.gen_lattice_meshgrid()
         part.gen_sld_lattice()
         part.gen_reciprocal_lattice()
+
+        part.rotate((1,0,0), torch.pi/2)
+        part.translate((10,10,10))
     
         q = torch.linspace(0.005, 2.5, 200)
         q, I = part._calc_sas1d(q)
 
         figure = plt.figure()
         ax = figure.add_subplot(projection='3d')
-        x = part.x[torch.where(part.sld_lattice!=0)]
-        y = part.y[torch.where(part.sld_lattice!=0)]
-        z = part.z[torch.where(part.sld_lattice!=0)]
-        value = part.sld_lattice[torch.where(part.sld_lattice!=0)]
+        x = part.x[torch.where(part.sld_lattice!=0)].to('cpu')
+        y = part.y[torch.where(part.sld_lattice!=0)].to('cpu')
+        z = part.z[torch.where(part.sld_lattice!=0)].to('cpu')
+        value = part.sld_lattice[torch.where(part.sld_lattice!=0)].to('cpu')
         ax.scatter(x, y, z, c=value)
         plt.show()
 

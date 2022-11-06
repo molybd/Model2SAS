@@ -6,20 +6,22 @@ import torch
 from torch import Tensor
 
 import calc_func_new as calc_func
-from utility_new import timer, convert_coord
-from model_new import Assembly, Model
+from utility_new import timer
+from model_new import Part, Assembly
 
 
 class Sas:
     '''Class to generate 1d ort 2d SAS data
     '''
-    def __init__(self, model: Model) -> None:
+    def __init__(self, model: Part | Assembly) -> None:
+        self.device = model.device
         self.model = model
 
     @timer
     def calc_sas1d(self, q1d: Tensor, orientation_average_offset: int = 100) -> tuple[Tensor, Tensor]:
         '''Calculate 1d SAS curve from reciprocal lattice
         '''
+        q1d = q1d.to(self.device)
         s_input = q1d/(2*torch.pi)
         smax = self.model.get_s_max()
         s = s_input[torch.where(s_input<=smax)]
@@ -33,19 +35,20 @@ class Sas:
         #### interpolate
         reciprocal_coord = torch.stack([sx, sy, sz], dim=-1)
         F = self.model.get_F_value(reciprocal_coord)
-        I = torch.real(F)**2 + torch.imag(F)**2
+        I = F.real**2 + F.imag**2
 
         # orientation average
+        n_on_sphere = n_on_sphere.to('cpu')
         I_list = []
         begin_index = 0
         for N in n_on_sphere:
             N = int(N)
             Ii = torch.sum(I[begin_index:begin_index+N])/N
-            I_list.append(Ii)
+            I_list.append(Ii.to('cpu').item())
             begin_index += N
         I1d = torch.tensor(I_list)
 
-        return 2*torch.pi*s, I1d
+        return 2*torch.pi*s.to('cpu'), I1d
 
 
 if __name__ == '__main__':
@@ -73,55 +76,55 @@ if __name__ == '__main__':
 
     @timer
     def main():
-        part1 = MathPart(filename=r'models\cylinder_x.py')
-        part1.math_description.params = {
-            'R': 8,
-            'H': 11,
-            'sld_value': 1
-        }
-        part1.gen_lattice_meshgrid()
-        part1.gen_sld_lattice()
-        part1.gen_reciprocal_lattice()
-        part1.translate((5.5,0,0))
+        # part1 = MathPart(filename=r'models\cylinder_x.py', device='cuda')
+        # part1.math_description.params = {
+        #     'R': 8,
+        #     'H': 11,
+        #     'sld_value': 1
+        # }
+        # part1.gen_lattice_meshgrid()
+        # part1.gen_sld_lattice()
+        # part1.gen_reciprocal_lattice()
+        # part1.translate((5.5,0,0))
 
-        part2 = MathPart(filename=r'models\cylinder_x.py')
-        part2.math_description.params = {
-            'R': 8,
-            'H': 29,
-            'sld_value': 1
-        }
-        part2.gen_lattice_meshgrid()
-        part2.gen_sld_lattice()
-        part2.gen_reciprocal_lattice()
-        part2.translate((-14.5,0,0))
+        # part2 = MathPart(filename=r'models\cylinder_x.py', device='cuda')
+        # part2.math_description.params = {
+        #     'R': 8,
+        #     'H': 29,
+        #     'sld_value': 1
+        # }
+        # part2.gen_lattice_meshgrid()
+        # part2.gen_sld_lattice()
+        # part2.gen_reciprocal_lattice()
+        # part2.translate((-14.5,0,0))
 
-        assembly = Assembly(part1, part2)
-        scatt = Sas(assembly)
-        q = torch.linspace(0.001, 2, 200)
-        q1, I1 = scatt.calc_sas1d(q)
+        # assembly = Assembly(part1, part2)
+        # scatt = Sas(assembly)
+        # q = torch.linspace(0.001, 2, 200)
+        # q1, I1 = scatt.calc_sas1d(q)
 
-        plot_parts(part1, part2)
-        plt.show()
+        # plot_parts(part1, part2)
+        # plt.show()
 
-        part3 = MathPart(filename=r'models\cylinder_x.py')
+        part3 = MathPart(filename=r'models\cylinder_x.py', device='cuda')
         part3.math_description.params = {
             'R': 8,
             'H': 40,
             'sld_value': 1
         }
-        part3.gen_lattice_meshgrid(spacing=0.4)
+        part3.gen_lattice_meshgrid()
         part3.gen_sld_lattice()
-        part3.gen_reciprocal_lattice(n_s=600)
+        part3.gen_reciprocal_lattice()
         part3.rotate((0,0,1), torch.pi/3)
 
         scatt = Sas(part3)
         q = torch.linspace(0.001, 2, 200)
         q2, I2 = scatt.calc_sas1d(q)
 
-        plot_parts(part3)
-        plt.show()
+        # plot_parts(part3)
+        # plt.show()
 
-        plt.plot(q1, I1)
+        # plt.plot(q1, I1)
         plt.plot(q2, I2)
         plt.xscale('log')
         plt.yscale('log')
