@@ -48,12 +48,13 @@ class MathDescription:
                 r, theta, phi if self.coord = 'sph'
                 rho, theta, z if self.coord = 'cyl'
         '''
+        device = u.device
         r, theta, phi = u, v, w
         R = self.params['R_core']
         t = self.params['thickness']
         sld_value = self.params['sld_value']
         
-        in_model_index = torch.zeros_like(r).to(r.device.type)
+        in_model_index = torch.zeros_like(r).to(device)
         in_model_index[(r>=R) & (r<=(R+t))] = 1.
         # sld = r * torch.cos(theta) * torch.sin(phi) * in_model_index
         sld = sld_value * in_model_index

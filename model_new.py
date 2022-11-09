@@ -87,7 +87,7 @@ class Part(Model):
             Lmin: minimum real space scale of a model
             Lmax: maximum real space scale of a model
         '''
-        n_s = 600
+        n_s = 500
         real_spacing = Lmax / 50
         real_spacing = min(real_spacing, Lmin/(10-1))
         return real_spacing, n_s
@@ -121,12 +121,12 @@ class Part(Model):
         znum = int((zmax-zmin)/spacing)+2
         zmax = zmin + spacing*(znum-1)
 
-        x1d = torch.linspace(xmin, xmax, xnum)
-        y1d = torch.linspace(ymin, ymax, ynum)
-        z1d = torch.linspace(zmin, zmax, znum)
+        x1d = torch.linspace(xmin, xmax, xnum).to(self.device)
+        y1d = torch.linspace(ymin, ymax, ynum).to(self.device)
+        z1d = torch.linspace(zmin, zmax, znum).to(self.device)
         x, y, z = torch.meshgrid(x1d, y1d, z1d, indexing='ij')
         self.real_spacing = spacing
-        self.x, self.y, self.z = x.to(self.device), y.to(self.device), z.to(self.device)
+        self.x, self.y, self.z = x, y, z
         return x, y, z
 
     def import_sld_lattice(self, x: Tensor, y: Tensor, z: Tensor, sld_lattice: Tensor) -> None:
@@ -406,6 +406,15 @@ class Part(Model):
         smax = min(torch.abs(self.s1d.min()).item(), torch.abs(self.s1d.max()).item())
         return smax
 
+    def get_sld_lattice(self) -> tuple[Tensor, Tensor, Tensor, Tensor]:
+        '''Return sld lattice for plot use, so on CPU device.
+        '''
+        x = self.x.to('cpu')
+        y = self.y.to('cpu')
+        z = self.z.to('cpu')
+        sld = self.sld_lattice.to('cpu')
+        return x, y, z, sld
+
     @timer
     def _calc_sas1d(self, q1d: Tensor, orientation_average_offset: int = 100) -> tuple[Tensor, Tensor]:
         '''Calculate 1d SAS curve from reciprocal lattice.
@@ -455,10 +464,10 @@ class StlPart(Part):
     '''class for part from stl file.
     Rewrite get_bound and gen_sld_lattice methods.
     '''
-    def __init__(self, filename: str | None = None, sld_value: float = 1.0, centering : bool = True, device: str = 'cpu') -> None:
+    def __init__(self, filename: str | None = None, partname: str | None = None, sld_value: float = 1.0, centering : bool = True, device: str = 'cpu') -> None:
         '''load mesh from stl file
         '''
-        super().__init__(filename=filename, device=device)
+        super().__init__(filename=filename, partname=partname, device=device)
         if filename is not None:
             self.mesh = mesh.Mesh.from_file(self.filename)
             self.bound_min, self.bound_max = self.get_bound()
@@ -507,11 +516,11 @@ class MathPart(Part):
     '''class for part from math description.
     Rewrite get_bound and gen_sld_lattice methods.
     '''
-    def __init__(self, filename: str | None = None, device: str = 'cpu') -> None:
+    def __init__(self, filename: str | None = None, partname: str | None = None, device: str = 'cpu') -> None:
         '''load math object from py file
         TODO: or directly pass through?
         '''
-        super().__init__(filename=filename, device=device)
+        super().__init__(filename=filename, partname=partname, device=device)
         if filename is not None:
             abspath = os.path.abspath(filename)
             dirname = os.path.dirname(abspath)
@@ -538,7 +547,7 @@ class MathPart(Part):
         u, v, w = convert_coord(x, y, z, 'car', part_coord)
         sld_lattice = self.math_description.sld(u, v, w) # will deal with device in function automatically
         if isinstance(sld_lattice, np.ndarray):
-            sld_lattice = torch.from_numpy(sld_lattice).to(torch.float32)
+            sld_lattice = torch.from_numpy(sld_lattice).to(torch.float32).to(self.device)
 
         self.sld_lattice = sld_lattice
         self._store_original_sld_lattice(x, y, z, sld_lattice)
@@ -588,8 +597,8 @@ if __name__ == '__main__':
 
     @timer
     def main():
-        # part = StlPart(filename=r'models\torus.stl', device='cuda')
-        part = MathPart(filename=r'models\cylinder_y.py', device='cuda')
+        # part = StlPart(filename=r'models/torus.stl', device='cuda:1')
+        part = MathPart(filename=r'models/cylinder_y.py', device='cuda:1')
         part.gen_lattice_meshgrid()
         part.gen_sld_lattice()
         part.gen_reciprocal_lattice()
@@ -602,11 +611,12 @@ if __name__ == '__main__':
 
         figure = plt.figure()
         ax = figure.add_subplot(projection='3d')
-        x = part.x[torch.where(part.sld_lattice!=0)].to('cpu')
-        y = part.y[torch.where(part.sld_lattice!=0)].to('cpu')
-        z = part.z[torch.where(part.sld_lattice!=0)].to('cpu')
-        value = part.sld_lattice[torch.where(part.sld_lattice!=0)].to('cpu')
-        ax.scatter(x, y, z, c=value)
+        x, y, z, sld = part.get_sld_lattice()
+        x = x[torch.where(sld!=0)]
+        y = y[torch.where(sld!=0)]
+        z = z[torch.where(sld!=0)]
+        sld = sld[torch.where(sld!=0)]
+        ax.scatter(x, y, z, c=sld)
         plt.show()
 
         plt.plot(q, I)

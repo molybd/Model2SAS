@@ -23,7 +23,7 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
     Returns:
         Tensor, size=(n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
     '''
-    device = origins.device.type
+    device = origins.device
     n = origins.size()[0]
     intersect_count = torch.zeros(n, dtype=torch.int32).to(device)
     E1 = triangles[:,1,:] - triangles[:,0,:]
@@ -47,7 +47,7 @@ def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Ten
     s and n_on_sphere should have same shape
     Calculate on cpu for convinience, transfered to designate device
     '''
-    device = s.device.type
+    device = s.device
     s = s.to('cpu')
     n_on_sphere = n_on_sphere.to('cpu')
     phi = (torch.sqrt(torch.tensor(5))-1)/2

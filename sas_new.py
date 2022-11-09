@@ -58,14 +58,15 @@ if __name__ == '__main__':
     def plot_parts(*parts):
         lx, ly, lz, lc = [], [], [], []
         for part in parts:
-            x = part.x[torch.where(part.sld_lattice!=0)].flatten()
-            y = part.y[torch.where(part.sld_lattice!=0)].flatten()
-            z = part.z[torch.where(part.sld_lattice!=0)].flatten()
-            c = part.sld_lattice[torch.where(part.sld_lattice!=0)].flatten()
+            x, y, z, sld = part.get_sld_lattice()
+            x = x[torch.where(sld!=0)]
+            y = y[torch.where(sld!=0)]
+            z = z[torch.where(sld!=0)]
+            sld = sld[torch.where(sld!=0)]
             lx.append(x)
             ly.append(y)
             lz.append(z)
-            lc.append(c)
+            lc.append(sld)
         x = torch.concat(lx)
         y = torch.concat(ly)
         z = torch.concat(lz)
@@ -76,58 +77,52 @@ if __name__ == '__main__':
 
     @timer
     def main():
-        # part1 = MathPart(filename=r'models\cylinder_x.py', device='cuda')
-        # part1.math_description.params = {
-        #     'R': 8,
-        #     'H': 11,
-        #     'sld_value': 1
-        # }
-        # part1.gen_lattice_meshgrid()
-        # part1.gen_sld_lattice()
-        # part1.gen_reciprocal_lattice()
-        # part1.translate((5.5,0,0))
+        part_list = []
+        for i in range(5):
+            part1 = MathPart(filename=r'models/cylinder_x.py', device='cuda:1')
+            part1.math_description.params = {
+                'R': 10,
+                'H': 50,
+                'sld_value': 1
+            }
+            part1.gen_lattice_meshgrid()
+            part1.gen_sld_lattice()
+            part1.gen_reciprocal_lattice()
+            part1.translate((i*50,0,0))
+            part_list.append(part1)
 
-        # part2 = MathPart(filename=r'models\cylinder_x.py', device='cuda')
-        # part2.math_description.params = {
-        #     'R': 8,
-        #     'H': 29,
-        #     'sld_value': 1
-        # }
-        # part2.gen_lattice_meshgrid()
-        # part2.gen_sld_lattice()
-        # part2.gen_reciprocal_lattice()
-        # part2.translate((-14.5,0,0))
+        assembly = Assembly(*part_list)
+        scatt = Sas(assembly)
+        # q = torch.linspace(0.0001, 2, 200)
+        q = torch.logspace(-4, 0.3, 200)
+        q1, I1 = scatt.calc_sas1d(q)
 
-        # assembly = Assembly(part1, part2)
-        # scatt = Sas(assembly)
-        # q = torch.linspace(0.001, 2, 200)
-        # q1, I1 = scatt.calc_sas1d(q)
-
-        # plot_parts(part1, part2)
+        # plot_parts(*part_list)
         # plt.show()
 
-        part3 = MathPart(filename=r'models\cylinder_x.py', device='cuda')
+        part3 = MathPart(filename=r'models/cylinder_x.py', device='cuda:0')
         part3.math_description.params = {
-            'R': 8,
-            'H': 40,
+            'R': 10,
+            'H': 250,
             'sld_value': 1
         }
-        part3.gen_lattice_meshgrid()
+        part3.gen_lattice_meshgrid(spacing=1)
         part3.gen_sld_lattice()
         part3.gen_reciprocal_lattice()
-        part3.rotate((0,0,1), torch.pi/3)
+        # part3.rotate((0,0,1), torch.pi/3)
 
         scatt = Sas(part3)
-        q = torch.linspace(0.001, 2, 200)
         q2, I2 = scatt.calc_sas1d(q)
 
         # plot_parts(part3)
         # plt.show()
 
-        # plt.plot(q1, I1)
+        plt.plot(q1, I1)
         plt.plot(q2, I2)
         plt.xscale('log')
         plt.yscale('log')
+        plt.savefig('test.png')
         plt.show()
+        
         
     main()
