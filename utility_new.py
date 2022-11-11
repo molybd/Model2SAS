@@ -78,3 +78,17 @@ def convert_coord(u:Tensor, v:Tensor, w:Tensor, original_coord:str, target_coord
         return car2sph(x, y, z)
     elif target_coord == 'cyl':
         return car2cyl(x, y, z)
+
+def abi2modarg(t: Tensor) -> tuple[Tensor, Tensor]:
+    '''Change a complex tensor from a+bi expression
+    to mod*exp(i*arg) expression.
+    '''
+    mod = torch.sqrt(t.real**2 + t.imag**2)
+    arg = torch.arctan2(t.imag, t.real)
+    return mod, arg
+
+def modarg2abi(mod: Tensor, arg: Tensor) -> Tensor:
+    '''Change a complex tensor from mod*exp(i*arg)
+    expression to a+bi expression.
+    '''
+    return mod * torch.complex(torch.cos(arg), torch.sin(arg))

@@ -18,7 +18,7 @@ class Sas:
         self.model = model
 
     @timer
-    def calc_sas1d(self, q1d: Tensor, orientation_average_offset: int = 100) -> tuple[Tensor, Tensor]:
+    def calc_sas1d(self, q1d: Tensor, orientation_average_offset: int = 100, output_device: str = 'cpu') -> tuple[Tensor, Tensor]:
         '''Calculate 1d SAS curve from reciprocal lattice
         '''
         q1d = q1d.to(self.device)
@@ -46,52 +46,38 @@ class Sas:
             Ii = torch.sum(I[begin_index:begin_index+N])/N
             I_list.append(Ii.to('cpu').item())
             begin_index += N
-        I1d = torch.tensor(I_list)
+        I1d = torch.tensor(I_list, device=output_device)
 
-        return 2*torch.pi*s.to('cpu'), I1d
+        return 2*torch.pi*s.to(output_device), I1d
 
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from model_new import StlPart, MathPart
+    from plot_new import plot_parts, plot_assembly, plot_sas1d
 
-    def plot_parts(*parts):
-        lx, ly, lz, lc = [], [], [], []
-        for part in parts:
-            x, y, z, sld = part.get_sld_lattice()
-            x = x[torch.where(sld!=0)]
-            y = y[torch.where(sld!=0)]
-            z = z[torch.where(sld!=0)]
-            sld = sld[torch.where(sld!=0)]
-            lx.append(x)
-            ly.append(y)
-            lz.append(z)
-            lc.append(sld)
-        x = torch.concat(lx)
-        y = torch.concat(ly)
-        z = torch.concat(lz)
-        c = torch.concat(lc)
-        figure = plt.figure()
-        ax = figure.add_subplot(projection='3d')
-        ax.scatter(x, y, z, c=c)
+    def do_all(part, spacing=None, n_s=None, need_centering=True):
+        part.gen_real_lattice_meshgrid(spacing=spacing)
+        part.gen_real_lattice_sld()
+        part.gen_reciprocal_lattice(n_s=n_s, need_centering=need_centering)
 
     @timer
     def main():
+        # '''
         part_list = []
         for i in range(5):
-            part1 = MathPart(filename=r'models/cylinder_x.py', device='cuda:1')
+            part1 = MathPart(filename=r'models/cylinder_x.py', device='cuda')
             part1.math_description.params = {
                 'R': 10,
                 'H': 50,
                 'sld_value': 1
             }
-            part1.gen_lattice_meshgrid()
-            part1.gen_sld_lattice()
-            part1.gen_reciprocal_lattice()
+            do_all(part1, spacing=1)
             part1.translate((i*50,0,0))
             part_list.append(part1)
-
+        # plot_parts(*part_list, show=True)
         assembly = Assembly(*part_list)
+        # plot_assembly(assembly, show=True)
         scatt = Sas(assembly)
         # q = torch.linspace(0.0001, 2, 200)
         q = torch.logspace(-4, 0.3, 200)
@@ -100,29 +86,66 @@ if __name__ == '__main__':
         # plot_parts(*part_list)
         # plt.show()
 
-        part3 = MathPart(filename=r'models/cylinder_x.py', device='cuda:0')
-        part3.math_description.params = {
+        part2 = MathPart(filename=r'models/cylinder_x.py', device='cpu')
+        part2.math_description.params = {
             'R': 10,
             'H': 250,
             'sld_value': 1
         }
-        part3.gen_lattice_meshgrid(spacing=1)
-        part3.gen_sld_lattice()
-        part3.gen_reciprocal_lattice()
-        # part3.rotate((0,0,1), torch.pi/3)
-
-        scatt = Sas(part3)
+        do_all(part2, spacing=1, need_centering=False)
+        scatt = Sas(part2)
         q2, I2 = scatt.calc_sas1d(q)
 
-        # plot_parts(part3)
-        # plt.show()
-
-        plt.plot(q1, I1)
-        plt.plot(q2, I2)
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.savefig('test.png')
+        fig = plt.figure()
+        ax = fig.add_subplot()
+        plot_sas1d(q1, I1, ax=ax, show=False)
+        plot_sas1d(q2, I2, ax=ax, show=False)
         plt.show()
+        fig.savefig('test.png')
+        # '''
+
+        # part = StlPart(filename=r'models/torus.stl', device='cuda')
+        # part = MathPart(filename=r'models/cylinder_y.py', device='cuda')
+        # part.gen_real_lattice_meshgrid()
+        # part.gen_real_lattice_sld()
+        # part.gen_reciprocal_lattice()
+
+        # part.rotate((1,0,0), torch.pi/2)
+        # part.translate((0,100,200))
+
+        # plot_parts(part, savename='test.png', show=True)
+
+        # scatt = Sas(part)
+        # q = torch.linspace(0.005, 2.5, 200)
+        # q = torch.linspace(0.0001, 2, 200)
+        # q, I = scatt.calc_sas1d(q)
+        # plot_sas1d(q, I)
+
+    def main1():
+        part1 = MathPart(filename=r'models/cylinder_z.py', device='cuda:0')
+        part1.math_description.params = {
+                'R': 10,
+                'H': 30,
+                'sld_value': 1
+            }
+        part2 = StlPart(filename=r'models/torus.stl', device='cuda:1', sld_value=2)
+        do_all(part1)
+        do_all(part2)
+        assembly = Assembly(part1, part2, device='cuda:1')
+
+        plot_parts(part1, part2, savename='test1.png')
+        plot_assembly(assembly, savename='test2.png')
+
+        scatt = Sas(assembly)
+        q = torch.linspace(0.001, 2, 200)
+        # q = torch.logspace(-3, 0.3, 200)
+        q1, I1 = scatt.calc_sas1d(q)
+
+        fig = plt.figure()
+        ax = fig.add_subplot()
+        plot_sas1d(q1, I1, ax=ax, show=False)
+        plt.show()
+        fig.savefig('test3.png')
         
         
-    main()
+    main1()
