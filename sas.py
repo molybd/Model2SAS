@@ -5,9 +5,9 @@
 import torch
 from torch import Tensor
 
-import calc_func_new as calc_func
-from utility_new import timer
-from model_new import Part, Assembly
+import calc_func as calc_func
+from utility import timer
+from model import Part, Assembly
 
 
 class Sas:
@@ -53,8 +53,8 @@ class Sas:
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    from model_new import StlPart, MathPart
-    from plot_new import plot_parts, plot_assembly, plot_sas1d
+    from model import StlPart, MathPart
+    from plot import plot_parts, plot_assembly, plot_sas1d
 
     def do_all(part, spacing=None, n_s=None, need_centering=True):
         part.gen_real_lattice_meshgrid(spacing=spacing)
