@@ -1,3 +1,6 @@
+'''Simulation of a 2d detector.
+'''
+
 import torch
 from torch import Tensor
 

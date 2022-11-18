@@ -589,7 +589,7 @@ if __name__ == '__main__':
         part.gen_real_lattice_sld()
         part.gen_reciprocal_lattice()
 
-        # part.rotate((1,0,0), torch.pi/2)
+        part.rotate((1,0,0), torch.pi/2)
         part.translate((30,0,0))
 
         # plot_parts(part, show=True)

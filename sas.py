@@ -64,12 +64,16 @@ class Sas:
         unit. So be careful when generate q2d by detector geometry,
         should match that of model unit.
         '''
+        smax = self.model.get_s_max()
         input_shape = q2d_x.shape
         sx = q2d_x.to(self.device).flatten()/(2*torch.pi)
         sy = q2d_y.to(self.device).flatten()/(2*torch.pi)
         sz = q2d_z.to(self.device).flatten()/(2*torch.pi)
+        s = torch.sqrt(sx**2 + sy**2 + sz**2)
+        sx[s>=smax], sy[s>=smax], sz[s>=smax] = 0., 0., 0.  # set value larger than smax to 0
         reciprocal_coord = torch.stack([sx, sy, sz], dim=-1)
         F = self.model.get_F_value(reciprocal_coord)
+        F[s>=smax] = 0. # set value larger than smax to 0
         I = F.real**2 + F.imag**2
         I = I.reshape(input_shape)
 
@@ -196,5 +200,36 @@ if __name__ == '__main__':
         # plt.show()
         # plt.savefig('test.png')
 
+    def main3():
+        from detector import Detector
 
-    main2()
+        part1 = MathPart(filename=r'models/cylinder_z.py', device='cpu')
+        part1.math_description.params = {
+                'R': 50,
+                'H': 500,
+                'sld_value': 1
+            }
+        do_all(part1)
+        part1.rotate((1,1,0), torch.pi/3)
+        
+        do_all(part1)
+
+        scatt = Sas(part1)
+
+        det = Detector((981, 1043), 172e-6)
+        det.set_sdd(1)
+        det.translate(20e-3, 30e-3)
+        qx, qy, qz = det.get_reciprocal_coord(1.342)
+        I = scatt.calc_sas2d(qx, qy, qz)
+        plt.imshow(torch.log(I.T))
+        # plt.imshow(I.T)
+        plt.show()
+        plt.savefig('test.png')
+
+        # q = torch.linspace(0.01, 1, 200)
+        # I = scatt.calc_sas1d(q)
+        # plt.plot(q, I)
+        # plt.show()
+        # plt.savefig('test.png')
+
+    main3()
