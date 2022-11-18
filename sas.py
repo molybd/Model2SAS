@@ -7,22 +7,23 @@ from torch import Tensor
 
 import calc_func as calc_func
 from utility import timer
-from model import Part, Assembly
+from model import Part, Assembly, Model
 
 
 class Sas:
     '''Class to generate 1d ort 2d SAS data
     '''
-    def __init__(self, model: Part | Assembly) -> None:
+    def __init__(self, model: Part | Assembly | Model) -> None:
         self.device = model.device
         self.model = model
 
     @timer
-    def calc_sas1d(self, q1d: Tensor, orientation_average_offset: int = 100, output_device: str = 'cpu') -> tuple[Tensor, Tensor]:
-        '''Calculate 1d SAS curve from reciprocal lattice
+    def calc_sas1d(self, q1d: Tensor, orientation_average_offset: int = 100) -> Tensor:
+        '''Calculate 1d SAS intensity curve from reciprocal lattice.
+        Orientation averaged.
+        Device of output tensor is the same as input q1d.
         '''
-        q1d = q1d.to(self.device)
-        s_input = q1d/(2*torch.pi)
+        s_input = q1d.to(self.device)/(2*torch.pi)
         smax = self.model.get_s_max()
         s = s_input[torch.where(s_input<=smax)]
 
@@ -46,9 +47,34 @@ class Sas:
             Ii = torch.sum(I[begin_index:begin_index+N])/N
             I_list.append(Ii.to('cpu').item())
             begin_index += N
-        I1d = torch.tensor(I_list, device=output_device)
 
-        return 2*torch.pi*s.to(output_device), I1d
+        output_device = q1d.device
+        I = torch.tensor(I_list, device=output_device)
+        I1d = -1 * torch.ones_like(s_input, device=output_device)
+        I1d[s_input<=smax] = I
+        return I1d
+
+    def calc_sas2d(self, q2d_x: Tensor, q2d_y: Tensor, q2d_z: Tensor) -> Tensor:
+        '''Calculate 2d SAS intensity pattern from reciprocal lattice
+        according to given q coordinates (qx, qy, qz). dims of q2d_x,
+        q2d_y, q2d_z is 2.
+        Device of output tensor is the same as input q2d.
+        Attention:
+        The assumed q unit will still be the reverse of model
+        unit. So be careful when generate q2d by detector geometry,
+        should match that of model unit.
+        '''
+        input_shape = q2d_x.shape
+        sx = q2d_x.to(self.device).flatten()/(2*torch.pi)
+        sy = q2d_y.to(self.device).flatten()/(2*torch.pi)
+        sz = q2d_z.to(self.device).flatten()/(2*torch.pi)
+        reciprocal_coord = torch.stack([sx, sy, sz], dim=-1)
+        F = self.model.get_F_value(reciprocal_coord)
+        I = F.real**2 + F.imag**2
+        I = I.reshape(input_shape)
+
+        output_device = q2d_x.device
+        return I.to(output_device)
 
 
 if __name__ == '__main__':
@@ -81,7 +107,7 @@ if __name__ == '__main__':
         scatt = Sas(assembly)
         # q = torch.linspace(0.0001, 2, 200)
         q = torch.logspace(-4, 0.3, 200)
-        q1, I1 = scatt.calc_sas1d(q)
+        I1 = scatt.calc_sas1d(q)
 
         # plot_parts(*part_list)
         # plt.show()
@@ -94,12 +120,12 @@ if __name__ == '__main__':
         }
         do_all(part2, spacing=1, need_centering=False)
         scatt = Sas(part2)
-        q2, I2 = scatt.calc_sas1d(q)
+        I2 = scatt.calc_sas1d(q)
 
         fig = plt.figure()
         ax = fig.add_subplot()
-        plot_sas1d(q1, I1, ax=ax, show=False)
-        plot_sas1d(q2, I2, ax=ax, show=False)
+        plot_sas1d(q, I1, ax=ax, show=False)
+        plot_sas1d(q, I2, ax=ax, show=False)
         plt.show()
         fig.savefig('test.png')
         # '''
@@ -139,13 +165,36 @@ if __name__ == '__main__':
         scatt = Sas(assembly)
         q = torch.linspace(0.001, 2, 200)
         # q = torch.logspace(-3, 0.3, 200)
-        q1, I1 = scatt.calc_sas1d(q)
+        I1 = scatt.calc_sas1d(q)
 
         fig = plt.figure()
         ax = fig.add_subplot()
-        plot_sas1d(q1, I1, ax=ax, show=False)
+        plot_sas1d(q, I1, ax=ax, show=False)
         plt.show()
         fig.savefig('test3.png')
         
+    def main2():
+        from detector import Detector
+        from std import AgBh, bull_tendon
         
-    main1()
+        scatt = Sas(AgBh)
+        # scatt = Sas(bull_tendon)
+
+        det = Detector((981, 1043), 172e-6)
+        det.set_sdd(1.5)
+        det.translate(20e-3, 30e-3)
+        qx, qy, qz = det.get_reciprocal_coord(1.342)
+        I = scatt.calc_sas2d(qx, qy, qz)
+        plt.imshow(torch.log(I.T))
+        # plt.imshow(I.T)
+        plt.show()
+        plt.savefig('test.png')
+
+        # q = torch.linspace(0.01, 1, 200)
+        # I = scatt.calc_sas1d(q)
+        # plt.plot(q, I)
+        # plt.show()
+        # plt.savefig('test.png')
+
+
+    main2()
