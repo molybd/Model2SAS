@@ -24,6 +24,9 @@ class Model:
     which should overwrite get_F_value() and get_smax()
     method. Then, both can be treated equally in SAS calculation.
     '''
+    def __init__(self, device: str = 'cpu') -> None:
+        self.device = device
+
     def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
         '''Core method for model class, including Part and
         Assembly. Called by Sas class to calculate SAS pattern
