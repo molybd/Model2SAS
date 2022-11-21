@@ -582,9 +582,9 @@ if __name__ == '__main__':
 
     @timer
     def main():
-        # part = StlPart(filename=r'models/torus.stl', device='cuda')
-        # part = MathPart(filename=r'models/cylinder_y.py', device='cpu')
-        part = MathPart(filename=r'mathpart_template.py', device='cpu')
+        # part = StlPart(filename=r'test_models/torus.stl', device='cuda')
+        # part = MathPart(filename=r'test_models/cylinder_y.py', device='cpu')
+        part = MathPart(filename=r'models/mathpart_template.py', device='cpu')
         part.gen_real_lattice_meshgrid()
         part.gen_real_lattice_sld()
         part.gen_reciprocal_lattice()

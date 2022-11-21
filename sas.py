@@ -96,7 +96,7 @@ if __name__ == '__main__':
         # '''
         part_list = []
         for i in range(5):
-            part1 = MathPart(filename=r'models/cylinder_x.py', device='cuda')
+            part1 = MathPart(filename=r'test_models/cylinder_x.py', device='cuda')
             part1.math_description.params = {
                 'R': 10,
                 'H': 50,
@@ -116,7 +116,7 @@ if __name__ == '__main__':
         # plot_parts(*part_list)
         # plt.show()
 
-        part2 = MathPart(filename=r'models/cylinder_x.py', device='cpu')
+        part2 = MathPart(filename=r'test_models/cylinder_x.py', device='cpu')
         part2.math_description.params = {
             'R': 10,
             'H': 250,
@@ -134,8 +134,8 @@ if __name__ == '__main__':
         fig.savefig('test.png')
         # '''
 
-        # part = StlPart(filename=r'models/torus.stl', device='cuda')
-        # part = MathPart(filename=r'models/cylinder_y.py', device='cuda')
+        # part = StlPart(filename=r'test_models/torus.stl', device='cuda')
+        # part = MathPart(filename=r'test_models/cylinder_y.py', device='cuda')
         # part.gen_real_lattice_meshgrid()
         # part.gen_real_lattice_sld()
         # part.gen_reciprocal_lattice()
@@ -152,13 +152,13 @@ if __name__ == '__main__':
         # plot_sas1d(q, I)
 
     def main1():
-        part1 = MathPart(filename=r'models/cylinder_z.py', device='cuda:0')
+        part1 = MathPart(filename=r'test_models/cylinder_z.py', device='cuda:0')
         part1.math_description.params = {
                 'R': 10,
                 'H': 30,
                 'sld_value': 1
             }
-        part2 = StlPart(filename=r'models/torus.stl', device='cuda:1', sld_value=2)
+        part2 = StlPart(filename=r'test_models/torus.stl', device='cuda:1', sld_value=2)
         do_all(part1)
         do_all(part2)
         assembly = Assembly(part1, part2, device='cuda:1')
@@ -179,16 +179,20 @@ if __name__ == '__main__':
         
     def main2():
         from detector import Detector
-        from std import AgBh, bull_tendon
+        from models.std import AgBh, bull_tendon
         
         scatt = Sas(AgBh)
         # scatt = Sas(bull_tendon)
 
         det = Detector((981, 1043), 172e-6)
-        det.set_sdd(1.5)
-        det.translate(20e-3, 30e-3)
+        det.set_sdd(0.5)
+        det.translate(20e-3, 50e-3)
+        # det.pitch(torch.pi/3)
+        # det.roll(torch.pi/3)
+        # det.yaw(torch.pi/3)
         qx, qy, qz = det.get_reciprocal_coord(1.342)
         I = scatt.calc_sas2d(qx, qy, qz)
+        I = det.get_beamstop_mask(5e-3) * I
         plt.imshow(torch.log(I.T))
         # plt.imshow(I.T)
         plt.show()
@@ -203,7 +207,7 @@ if __name__ == '__main__':
     def main3():
         from detector import Detector
 
-        part1 = MathPart(filename=r'models/cylinder_z.py', device='cpu')
+        part1 = MathPart(filename=r'test_models/cylinder_z.py', device='cpu')
         part1.math_description.params = {
                 'R': 50,
                 'H': 500,
