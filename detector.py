@@ -90,7 +90,7 @@ class Detector:
         self._rotate('yaw', angle)
 
     def roll(self, angle: float) -> None:
-        self._rotate('roll', angle)    
+        self._rotate('roll', angle)
 
     def _real_coord_to_reciprocal_coord(self, x: Tensor, y: Tensor, z: Tensor) -> tuple[Tensor, Tensor, Tensor]:
         '''In a coordinate system where sample position as origin,
