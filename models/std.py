@@ -5,15 +5,16 @@ and evaluation use.
 import torch
 from torch import Tensor
 
-from model import Model
 
-
-class Standard(Model):
+class Standard:
     '''Parent model for different standard samples.
+    Inherited from ..model.Model class, have get_F_value
+    and get_s_max 2 methods, can be directly used as a
+    model instead of import as StlPart or MathPart.
     Initialized by d-spacings.
     '''
-    def __init__(self, d_spacing_list: list) -> None:
-        super().__init__()
+    def __init__(self, d_spacing_list: list, device: str = 'cpu') -> None:
+        self.device = device
         self.d_spacing_list = d_spacing_list
 
     def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
