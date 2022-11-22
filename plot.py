@@ -150,6 +150,7 @@ def plot_sas1d(
 def plot_sas2d(
     I2d: Tensor,
     do_log: bool = True,
+    cmap: str = 'viridis',
     fig: Figure | None = None,
     ax: Axes | None = None,
     show: bool = True,
@@ -162,7 +163,7 @@ def plot_sas2d(
 
     if do_log:
         I2d = torch.log(I2d)
-    ax.imshow(I2d.T, origin='lower', **kwargs)
+    ax.imshow(I2d.T, origin='lower', cmap=cmap, **kwargs)
 
     post_process(fig, savename)
     if show:
