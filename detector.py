@@ -112,6 +112,11 @@ class Detector:
         qx, qy, qz = k*rx, k*ry, k*rz
         return qx, qy, qz
 
+    def get_q_range(self, wavelength: float) -> tuple[float, float]:
+        qx, qy, qz = self.get_reciprocal_coord(wavelength)
+        q = torch.sqrt(qx**2 + qy**2 + qz**2)
+        return q.min().item(), q.max().item()
+
     def get_beamstop_mask(self, d: float) -> Tensor:
         '''pattern must have the same shape as self.x, y, z
         '''
