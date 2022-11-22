@@ -150,6 +150,34 @@ def plot_sas1d(
         plt.show()
 
 
+def plot_sas2d(
+    I2d: Tensor,
+    do_log: bool = True,
+    fig: Figure | None = None,
+    ax: Axes | None = None,
+    show: bool = True,
+    savename: str | None = None,
+    **kwargs
+    ):
+    '''Plot 1d SAS curve
+    '''
+    if ax is None:
+        if fig is None:
+            fig = plt.figure()
+        ax = fig.add_subplot()
+
+    if do_log:
+        I2d = torch.log(I2d)
+    ax.imshow(I2d.T, origin='lower')
+
+    if fig is not None:
+        fig.tight_layout()
+        if savename is not None:
+            fig.savefig(savename)
+    if show:
+        plt.show()
+
+
 def plot_detector(
     *dets: Detector,
     values: list[Tensor] | None = None,
