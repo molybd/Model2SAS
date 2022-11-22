@@ -6,6 +6,7 @@ from torch import Tensor
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
+import mpl_toolkits.mplot3d as mp3d
 
 from model import Part, Assembly
 from detector import Detector
@@ -170,6 +171,7 @@ def plot_detector(
             fig = plt.figure()
         ax = fig.add_subplot(projection='3d', box_aspect=(1,2,1))
 
+    # plot detector screen
     if values is not None:
         for det, value in zip(dets, values):
             if isinstance(value, Tensor):
@@ -180,16 +182,35 @@ def plot_detector(
         for det in dets:
             ax.plot_surface(det.x, det.y, det.z)
 
+    # plot light edges on detector
+    for det in dets:
+        v0 = torch.tensor([0., 0., 0.])
+        v1 = torch.tensor((det.x[0,0], det.y[0,0], det.z[0,0]))
+        v2 = torch.tensor((det.x[0,-1], det.y[0,-1], det.z[0,-1]))
+        v3 = torch.tensor((det.x[-1,-1], det.y[-1,-1], det.z[-1,-1]))
+        v4 = torch.tensor((det.x[-1,0], det.y[-1,0], det.z[-1,0]))
+        vtx_list = [
+            torch.stack([v0,v1,v2], dim=0),
+            torch.stack([v0,v2,v3], dim=0),
+            torch.stack([v0,v3,v4], dim=0),
+            torch.stack([v0,v4,v1], dim=0),
+        ]
+        tri = mp3d.art3d.Poly3DCollection(vtx_list)
+        tri.set_color([(0.5, 0.5, 0.5, 0.2)])
+        ax.add_collection3d(tri)
+
+    # plot sample position at origin
     ax.scatter(0, 0, 0, color='k') # origin
 
+    # plot direct x-ray
     l = []
     for det in dets:
         head = det.get_center()
         l.append(torch.abs(head[1]).item())
     arrow_length = max(l)
-    ax.plot([0, 0], [0, arrow_length], [0, 0], color='k')
-    # ax.quiver3D(0, 0, 0, 0, 1, 0, length=arrow_length, arrow_length_ratio=0.1, color='k') # plot X-ray direction
+    ax.plot([0, 0], [0, arrow_length], [0, 0], color='k', linewidth=2)
 
+    # scale plot to better illustrate
     lx, ly, lz = [0.], [0.], [0.]
     for det in dets:
         lx += [det.x.min(), det.x.max()]
