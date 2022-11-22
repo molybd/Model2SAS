@@ -80,6 +80,14 @@ class Part(Model):
         self.sy: Tensor
         self.sz_half: Tensor
 
+    def auto_process(self, spacing: float | None = None,  n_s: int | None = None) -> None:
+        '''Automatically do the pre-processing of part model
+        to than can use get_F_value method.
+        '''
+        self.gen_real_lattice_meshgrid(spacing=spacing)
+        self.gen_real_lattice_sld()
+        self.gen_reciprocal_lattice(n_s=n_s)
+
     def _get_suggested_config(self, Lmin: float, Lmax:float) -> tuple[float, int]:
         '''Calculate optimal real_spacing and n_s values
         for the generation of reciprocal spacing. Based on my
