@@ -12,6 +12,19 @@ from model import Part, Assembly
 from detector import Detector
 
 
+def pre_process(fig: Figure | None, ax: Axes | None, fig_kwargs: dict = {}, ax_kwargs: dict = {}) -> tuple[Figure | None, Axes | None]:
+    if ax is None:
+        if fig is None:
+            fig = plt.figure(**fig_kwargs)
+        ax = fig.add_subplot(**ax_kwargs)
+    return fig, ax
+
+def post_process(fig: Figure | None, savename: str | None = None) -> None:
+    if fig is not None:
+        fig.tight_layout()
+        if savename is not None:
+            fig.savefig(savename)
+
 def find_length(t: Tensor) -> float:
     return t.max().item() - t.min().item()
 
@@ -39,10 +52,8 @@ def plot_parts(
     ) -> None:
     '''Plot parts lattice in scatter plot.
     '''
-    if ax is None:
-        if fig is None:
-            fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
+    fig, ax = pre_process(fig, ax, ax_kwargs=dict(projection='3d'))
+
     lx, ly, lz = [], [], []
     for part in parts:
         x, y, z, sld = part.get_real_lattice(output_device='cpu')
@@ -64,10 +75,7 @@ def plot_parts(
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     
-    if fig is not None:
-        fig.tight_layout()
-        if savename is not None:
-            fig.savefig(savename)
+    post_process(fig, savename)
     if show:
         plt.show()
 
@@ -82,10 +90,8 @@ def plot_assembly(
     ) -> None:
     '''Plot parts lattice in scatter plot.
     '''
-    if ax is None:
-        if fig is None:
-            fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
+    fig, ax = pre_process(fig, ax, ax_kwargs=dict(projection='3d'))
+
     lx, ly, lz, lc = [], [], [], []
     
     for part in assembly.parts.values():
@@ -111,10 +117,7 @@ def plot_assembly(
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     
-    if fig is not None:
-        fig.tight_layout()
-        if savename is not None:
-            fig.savefig(savename)
+    post_process(fig, savename)
     if show:
         plt.show()
 
@@ -130,10 +133,7 @@ def plot_sas1d(
     ):
     '''Plot 1d SAS curve
     '''
-    if ax is None:
-        if fig is None:
-            fig = plt.figure()
-        ax = fig.add_subplot()
+    fig, ax = pre_process(fig, ax)
 
     q, I = q.to('cpu'), I.to('cpu')
     ax.plot(q, I, **kwargs)
@@ -142,10 +142,7 @@ def plot_sas1d(
     ax.set_xlabel(r'Q ($\mathrm{unit^{-1}}$)')
     ax.set_ylabel('Intensity (a.u.)')
 
-    if fig is not None:
-        fig.tight_layout()
-        if savename is not None:
-            fig.savefig(savename)
+    post_process(fig, savename)
     if show:
         plt.show()
 
@@ -161,19 +158,13 @@ def plot_sas2d(
     ):
     '''Plot 1d SAS curve
     '''
-    if ax is None:
-        if fig is None:
-            fig = plt.figure()
-        ax = fig.add_subplot()
+    fig, ax = pre_process(fig, ax)
 
     if do_log:
         I2d = torch.log(I2d)
-    ax.imshow(I2d.T, origin='lower')
+    ax.imshow(I2d.T, origin='lower', **kwargs)
 
-    if fig is not None:
-        fig.tight_layout()
-        if savename is not None:
-            fig.savefig(savename)
+    post_process(fig, savename)
     if show:
         plt.show()
 
@@ -194,10 +185,7 @@ def plot_detector(
     value in values, and set others to None or other
     non-Tensor type. But len(values) == len(dets)
     '''
-    if ax is None:
-        if fig is None:
-            fig = plt.figure()
-        ax = fig.add_subplot(projection='3d', box_aspect=(1,2,1))
+    fig, ax = pre_process(fig, ax, ax_kwargs=dict(projection='3d', box_aspect=(1,2,1)))
 
     # plot detector screen
     if values is not None:
@@ -254,9 +242,6 @@ def plot_detector(
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
 
-    if fig is not None:
-        fig.tight_layout()
-        if savename is not None:
-            fig.savefig(savename)
+    post_process(fig, savename)
     if show:
         plt.show()
