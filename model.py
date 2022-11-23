@@ -105,7 +105,6 @@ class Part(Model):
         real_spacing = min(real_spacing, Lmin/10)
         return real_spacing, n_s
 
-
     def set_real_lattice_meshgrid(self, x: Tensor, y: Tensor, z: Tensor) -> None:
         '''Import lattice meshgrid from outside of class.
         For the need of some other function.
@@ -181,7 +180,7 @@ class Part(Model):
         self.sld_original = sld.clone()
 
 
-    @timer
+    @timer(level=0)
     def gen_reciprocal_lattice(self, n_s: int | None = None, need_centering: bool = True) -> Tensor:
         '''Generate reciprocal lattice from real lattice.
         The actual real lattice begins with bound_min, but
@@ -242,7 +241,6 @@ class Part(Model):
         self.F_half = F_half
         return F_half
 
-    @timer
     def _translate_on_reciprocal_lattice(self, F: Tensor, sx_1d: Tensor, sy_1d: Tensor, sz_1d: Tensor, vx: float, vy:float, vz:float) -> Tensor:
         '''Default model center is at (0, 0, 0), referring to
         self.bound_min, self.bound_max. But real lattice bound
@@ -261,7 +259,7 @@ class Part(Model):
         self.sx, self.sy, self.sz_half = sx, sy, sz_half
         return F_new
 
-    @timer
+    @timer(level=0)
     def translate(self, vector: tuple[float, float, float]) -> None:
         '''Translate model by vector.
         Change real space lattice directly;
@@ -292,7 +290,7 @@ class Part(Model):
             func = apply_on_reciprocal_lattice  # 闭包函数
         )
 
-    @timer
+    @timer(level=0)
     def rotate(self, axis: tuple[float, float, float], angle: float) -> None:
         '''Rotate model around an axis passing origin by angle.
         Change real space lattice directly;
@@ -344,7 +342,7 @@ class Part(Model):
         self.x, self.y, self.z = self.x_original.clone(), self.y_original.clone(), self.z_original.clone()
         self.transformation = {}
 
-    @timer
+    @timer(level=1)
     def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
         '''Get F value (scattering amplitude) of certain coordinates
         in reciprocal space.
@@ -419,7 +417,6 @@ class Part(Model):
         sld = self.sld.to(output_device)
         return x, y, z, sld
 
-    @timer
     def _calc_sas1d(self, q1d: Tensor, orientation_average_offset: int = 100) -> tuple[Tensor, Tensor]:
         '''Calculate 1d SAS curve from reciprocal lattice.
         For test only now. Will be transfered to sas module.
@@ -481,7 +478,7 @@ class StlPart(Part):
         self.bound_min, self.bound_max = bound_min, bound_max
         return bound_min, bound_max
 
-    @timer
+    @timer(level=0)
     def gen_real_lattice_sld(self) -> Tensor:
         '''Generate sld in real lattice, which is sld value on each
         lattice meshgrid point. From stl mesh.
@@ -530,7 +527,7 @@ class MathPart(Part):
         self.bound_min, self.bound_max = bound_min, bound_max
         return bound_min, bound_max
 
-    @timer
+    @timer(level=0)
     def gen_real_lattice_sld(self) -> Tensor:
         '''Generate sld in real lattice, which is sld value on each
         lattice meshgrid point. From math description.
@@ -563,7 +560,7 @@ class Assembly(Model):
             i = len(self.parts)
             self.parts[i] = p
 
-    @timer
+    @timer(level=1)
     def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
         '''Get F value (scattering amplitude) of certain coordinates
         in reciprocal space. Sum over all parts.
@@ -588,7 +585,6 @@ if __name__ == '__main__':
 
     # torch.set_default_dtype(torch.float64)
 
-    @timer
     def main():
         # part = StlPart(filename=r'test_models/torus.stl', device='cuda')
         # part = MathPart(filename=r'test_models/cylinder_y.py', device='cpu')

@@ -17,7 +17,7 @@ class Sas:
         self.device = model.device
         self.model = model
 
-    @timer
+    @timer(level=0)
     def get_sas1d(self, q1d: Tensor, orientation_average_offset: int = 100) -> Tensor:
         '''Calculate 1d SAS intensity curve from reciprocal lattice.
         Orientation averaged.
@@ -54,6 +54,7 @@ class Sas:
         I1d[s_input<=smax] = I
         return I1d
 
+    @timer(level=0)
     def get_sas2d(self, q2d_x: Tensor, q2d_y: Tensor, q2d_z: Tensor) -> Tensor:
         '''Calculate 2d SAS intensity pattern from reciprocal lattice
         according to given q coordinates (qx, qy, qz). dims of q2d_x,

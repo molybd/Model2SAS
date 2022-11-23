@@ -9,7 +9,7 @@ from torch import Tensor
 from utility import timer
 
 
-@timer
+@timer(level=2)
 def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor) -> Tensor:
     '''Calculate all the points intersect with 1 triangle
     using Möller-Trumbore intersection algorithm
@@ -40,7 +40,7 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
         intersect_count += intersect
     return intersect_count
 
-@timer
+@timer(level=2)
 def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Tensor]:
     ''' Generate sampling points for orientation average
     using fibonacci grid
@@ -65,7 +65,7 @@ def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Ten
     z = R*z
     return x.to(device), y.to(device), z.to(device)
 
-@timer
+@timer(level=2)
 def trilinear_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tensor, c:Tensor, d:float | Tensor) -> Tensor:
     '''对等间距网格进行三线性插值
     ATTENTION:

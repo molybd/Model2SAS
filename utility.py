@@ -7,15 +7,21 @@ import torch
 from torch import Tensor
 
 
-def timer(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        time_cost = time.time() - start_time
-        print('-> TIME |{:>9} s | {}'.format(round(time_cost, 5), func.__name__))
-        return result
-    return wrapper
+def timer(level: int = 0):
+    def timer_decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            result = func(*args, **kwargs)
+            time_cost = time.time() - start_time
+            if level ==0:
+                prefix = '✔'
+            else:
+                prefix = ' '
+            print('{} [{:>9}s] {}'.format(prefix, round(time_cost, 5), func.__name__))
+            return result
+        return wrapper
+    return timer_decorator
 
 def convert_coord(u:Tensor, v:Tensor, w:Tensor, original_coord:str, target_coord:str) -> tuple[Tensor, Tensor, Tensor]:
     ''' Convert coordinates
