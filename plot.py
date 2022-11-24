@@ -7,23 +7,36 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 import mpl_toolkits.mplot3d as mp3d
+import functools
 
 from model import Part, Assembly
 from detector import Detector
 
+def fig_ax_process(fig_kwargs: dict = {}, ax_kwargs: dict = {}):
+    def fig_ax_process_decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            fig = kwargs.pop('fig', None)
+            ax = kwargs.pop('ax', None)
+            if ax is None:
+                if fig is None:
+                    fig = plt.figure(**fig_kwargs)
+                ax = fig.add_subplot(**ax_kwargs)
+            kwargs.update(dict(fig=fig, ax=ax))
 
-def pre_process(fig: Figure | None, ax: Axes | None, fig_kwargs: dict = {}, ax_kwargs: dict = {}) -> tuple[Figure | None, Axes | None]:
-    if ax is None:
-        if fig is None:
-            fig = plt.figure(**fig_kwargs)
-        ax = fig.add_subplot(**ax_kwargs)
-    return fig, ax
+            func(*args, **kwargs)
 
-def post_process(fig: Figure | None, savename: str | None = None) -> None:
-    if fig is not None:
-        fig.tight_layout()
-        if savename is not None:
-            fig.savefig(savename)
+            savename = kwargs.pop('savename', None)
+            show = kwargs.pop('show', True)
+            if fig is not None:
+                fig.tight_layout()
+                if savename is not None:
+                    fig.savefig(savename)
+            if show:
+                plt.show()
+        return wrapper
+    return fig_ax_process_decorator
+
 
 def find_length(t: Tensor) -> float:
     return t.max().item() - t.min().item()
@@ -43,6 +56,8 @@ def process_equal_xz_scale_range(x: Tensor, y: Tensor, z: Tensor) -> tuple[tuple
     cx, cz = find_center(x), find_center(z)
     return (cx-len_xz/2, cx+len_xz/2), (y.min().item(), y.max().item()), (cz-len_xz/2, cz+len_xz/2)
 
+
+@fig_ax_process(ax_kwargs=dict(projection='3d'))
 def plot_parts(
     *parts: Part,
     fig: Figure | None = None,
@@ -52,8 +67,6 @@ def plot_parts(
     ) -> None:
     '''Plot parts lattice in scatter plot.
     '''
-    fig, ax = pre_process(fig, ax, ax_kwargs=dict(projection='3d'))
-
     lx, ly, lz = [], [], []
     for part in parts:
         x, y, z, sld = part.get_real_lattice(output_device='cpu')
@@ -74,12 +87,8 @@ def plot_parts(
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-    
-    post_process(fig, savename)
-    if show:
-        plt.show()
 
-
+@fig_ax_process(ax_kwargs=dict(projection='3d'))
 def plot_assembly(
     assembly: Assembly,
     cmap: str = 'viridis',
@@ -90,10 +99,7 @@ def plot_assembly(
     ) -> None:
     '''Plot parts lattice in scatter plot.
     '''
-    fig, ax = pre_process(fig, ax, ax_kwargs=dict(projection='3d'))
-
     lx, ly, lz, lc = [], [], [], []
-    
     for part in assembly.parts.values():
         x, y, z, sld = part.get_real_lattice(output_device='cpu')
         x = x[torch.where(sld!=0)]
@@ -116,12 +122,9 @@ def plot_assembly(
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-    
-    post_process(fig, savename)
-    if show:
-        plt.show()
 
 
+@fig_ax_process()
 def plot_sas1d(
     q: Tensor,
     I: Tensor,
@@ -133,8 +136,6 @@ def plot_sas1d(
     ):
     '''Plot 1d SAS curve
     '''
-    fig, ax = pre_process(fig, ax)
-
     q, I = q.to('cpu'), I.to('cpu')
     ax.plot(q, I, **kwargs)
     ax.set_xscale('log')
@@ -142,11 +143,8 @@ def plot_sas1d(
     ax.set_xlabel(r'Q ($\mathrm{unit^{-1}}$)')
     ax.set_ylabel('Intensity (a.u.)')
 
-    post_process(fig, savename)
-    if show:
-        plt.show()
 
-
+@fig_ax_process()
 def plot_sas2d(
     I2d: Tensor,
     do_log: bool = True,
@@ -159,18 +157,13 @@ def plot_sas2d(
     ):
     '''Plot 1d SAS curve
     '''
-    fig, ax = pre_process(fig, ax)
-
     if do_log:
         I2d = torch.log(I2d)
     ax.imshow(I2d.T, origin='lower', cmap=cmap, **kwargs)
 
-    post_process(fig, savename)
-    if show:
-        plt.show()
 
-
-def plot_detector(
+@fig_ax_process(ax_kwargs=dict(projection='3d', box_aspect=(1,2,1)))
+def plot_real_space_detector(
     *dets: Detector,
     values: list[Tensor] | None = None,
     aspect: str = 'equal_xz',  # equal_all | equal_xz
@@ -186,8 +179,6 @@ def plot_detector(
     value in values, and set others to None or other
     non-Tensor type. But len(values) == len(dets)
     '''
-    fig, ax = pre_process(fig, ax, ax_kwargs=dict(projection='3d', box_aspect=(1,2,1)))
-
     # plot detector screen
     if values is not None:
         for det, value in zip(dets, values):
@@ -243,6 +234,3 @@ def plot_detector(
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
 
-    post_process(fig, savename)
-    if show:
-        plt.show()
