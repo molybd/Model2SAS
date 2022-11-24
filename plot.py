@@ -3,14 +3,21 @@
 
 import torch
 from torch import Tensor
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 import mpl_toolkits.mplot3d as mp3d
+from mpl_toolkits.mplot3d.axes3d import Axes3D
 import functools
 
 from model import Part, Assembly
 from detector import Detector
+
+
+#==================================
+# Utility functions for plot
+#==================================
 
 def fig_ax_process(fig_kwargs: dict = {}, ax_kwargs: dict = {}):
     def fig_ax_process_decorator(func):
@@ -56,12 +63,36 @@ def process_equal_xz_scale_range(x: Tensor, y: Tensor, z: Tensor) -> tuple[tuple
     cx, cz = find_center(x), find_center(z)
     return (cx-len_xz/2, cx+len_xz/2), (y.min().item(), y.max().item()), (cz-len_xz/2, cz+len_xz/2)
 
+def voxel_border(x: Tensor, y: Tensor, z: Tensor):
+    '''x, y, z are 3d tensor, coordinates of meshgrid
+    voxel center.
+    '''
+    def expand_1d(t1d):
+        spacing = t1d[1] - t1d[0]
+        tnew = torch.zeros(t1d.shape[0] + 1)
+        tnew[:-1] = t1d[:]
+        tnew[-1] = t1d[-1] + spacing
+        return tnew
+    xb = expand_1d(x[:,0,0])
+    yb = expand_1d(y[0,:,0])
+    zb = expand_1d(z[0,0,:])
+    return torch.meshgrid(xb, yb, zb, indexing='ij')
+
+def norm(t: Tensor) -> Tensor:
+    return (t-t.min()) / (t.max()-t.min())
+
+
+
+#==================================
+# Plot functions below
+#==================================
 
 @fig_ax_process(ax_kwargs=dict(projection='3d'))
 def plot_parts(
     *parts: Part,
+    type: str = 'scatter',  # 'scatter' or 'voxels'
     fig: Figure | None = None,
-    ax: Axes | None = None,
+    ax: Axes3D | None = None,
     show: bool = True,
     savename: str | None = None,
     ) -> None:
@@ -70,13 +101,18 @@ def plot_parts(
     lx, ly, lz = [], [], []
     for part in parts:
         x, y, z, sld = part.get_real_lattice(output_device='cpu')
-        x = x[torch.where(sld!=0)]
-        y = y[torch.where(sld!=0)]
-        z = z[torch.where(sld!=0)]
-        ax.scatter(x, y, z)
-        lx.append(x)
-        ly.append(y)
-        lz.append(z)
+        if 'vox' in type:
+            xb, yb, zb = voxel_border(x, y, z)
+            model_shape = sld != 0.
+            ax.voxels(xb, yb, zb, model_shape)
+        else:
+            x = x[torch.where(sld!=0)]
+            y = y[torch.where(sld!=0)]
+            z = z[torch.where(sld!=0)]
+            ax.scatter(x, y, z)
+        lx.append(x.flatten())
+        ly.append(y.flatten())
+        lz.append(z.flatten())
     x = torch.concat(lx)
     y = torch.concat(ly)
     z = torch.concat(lz)
@@ -91,30 +127,40 @@ def plot_parts(
 @fig_ax_process(ax_kwargs=dict(projection='3d'))
 def plot_assembly(
     assembly: Assembly,
-    cmap: str = 'viridis',
+    type: str = 'scatter',  # 'scatter' or 'voxels'
+    colormap: str = 'viridis',
     fig: Figure | None = None,
-    ax: Axes | None = None,
+    ax: Axes3D | None = None,
     show: bool = True,
     savename: str | None = None,
     ) -> None:
     '''Plot parts lattice in scatter plot.
     '''
-    lx, ly, lz, lc = [], [], [], []
-    for part in assembly.parts.values():
-        x, y, z, sld = part.get_real_lattice(output_device='cpu')
-        x = x[torch.where(sld!=0)]
-        y = y[torch.where(sld!=0)]
-        z = z[torch.where(sld!=0)]
-        sld = sld[torch.where(sld!=0)]
-        lx.append(x)
-        ly.append(y)
-        lz.append(z)
-        lc.append(sld)
-    x = torch.concat(lx)
-    y = torch.concat(ly)
-    z = torch.concat(lz)
-    c = torch.concat(lc)
-    ax.scatter(x, y, z, c=c, cmap=cmap)
+    if 'vox' in type:
+        assembly.gen_real_lattice_meshgrid()
+        assembly.gen_real_lattice_sld()
+        x, y, z, sld = assembly.get_real_lattice()
+        xb, yb, zb = voxel_border(x, y, z)
+        model_shape = sld != 0.
+        colors = mpl.colormaps[colormap](norm(sld))
+        ax.voxels(xb, yb, zb, model_shape, facecolors=colors)
+    else:
+        lx, ly, lz, lc = [], [], [], []
+        for part in assembly.parts.values():
+            x, y, z, sld = part.get_real_lattice(output_device='cpu')
+            x = x[torch.where(sld!=0)]
+            y = y[torch.where(sld!=0)]
+            z = z[torch.where(sld!=0)]
+            sld = sld[torch.where(sld!=0)]
+            lx.append(x)
+            ly.append(y)
+            lz.append(z)
+            lc.append(sld)
+        x = torch.concat(lx)
+        y = torch.concat(ly)
+        z = torch.concat(lz)
+        c = torch.concat(lc)
+        ax.scatter(x, y, z, c=c, cmap=colormap)
 
     scale_range = process_equal_all_scale_range(x, y, z)
     ax.auto_scale_xyz(*scale_range)
@@ -148,7 +194,7 @@ def plot_sas1d(
 def plot_sas2d(
     I2d: Tensor,
     do_log: bool = True,
-    cmap: str = 'viridis',
+    colormap: str = 'viridis',
     fig: Figure | None = None,
     ax: Axes | None = None,
     show: bool = True,
@@ -159,7 +205,7 @@ def plot_sas2d(
     '''
     if do_log:
         I2d = torch.log(I2d)
-    ax.imshow(I2d.T, origin='lower', cmap=cmap, **kwargs)
+    ax.imshow(I2d.T, origin='lower', cmap=colormap, **kwargs)
 
 
 @fig_ax_process(ax_kwargs=dict(projection='3d', box_aspect=(1,2,1)))
@@ -167,6 +213,7 @@ def plot_real_space_detector(
     *dets: Detector,
     values: list[Tensor] | None = None,
     aspect: str = 'equal_xz',  # equal_all | equal_xz
+    colormap: str = 'viridis',
     fig: Figure | None = None,
     ax: Axes | None = None,
     show: bool = True,
@@ -183,7 +230,9 @@ def plot_real_space_detector(
     if values is not None:
         for det, value in zip(dets, values):
             if isinstance(value, Tensor):
-                ax.plot_surface(det.x, det.y, det.z, facecolors=plt.cm.viridis(value/value.max()))
+                value = torch.nan_to_num(value, nan=0., neginf=0.) # in case of -inf after log
+                colors = mpl.colormaps[colormap](norm(value))
+                ax.plot_surface(det.x, det.y, det.z, facecolors=colors)
             else:
                 ax.plot_surface(det.x, det.y, det.z)
     else:
@@ -239,6 +288,7 @@ def plot_real_space_detector(
 def plot_reciprocal_space_detector(
     *coords: tuple[Tensor, Tensor, Tensor],
     values: list[Tensor] | None = None,
+    colormap: str = 'viridis',
     fig: Figure | None = None,
     ax: Axes | None = None,
     show: bool = True,
@@ -254,7 +304,9 @@ def plot_reciprocal_space_detector(
         for coord, value in zip(coords, values):
             qx, qy, qz = coord
             if isinstance(value, Tensor):
-                ax.plot_surface(qx, qy, qz, facecolors=plt.cm.viridis(value/value.max()))
+                value = torch.nan_to_num(value, nan=0., neginf=0.)
+                colors = mpl.colormaps[colormap](norm(value))
+                ax.plot_surface(qx, qy, qz, facecolors=colors)
             else:
                 ax.plot_surface(qx, qy, qz)
     else:

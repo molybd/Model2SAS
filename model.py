@@ -4,6 +4,7 @@ For the convenience of using CUDA
 
 import os
 import sys
+import copy
 
 from stl import mesh
 import numpy as np
@@ -544,7 +545,7 @@ class MathPart(Part):
         return sld
 
 
-class Assembly(Model):
+class Assembly(Part):
     '''Assembly of several part model
     '''
     def __init__(self, *parts: Part, device: str = 'cpu') -> None:
@@ -578,6 +579,36 @@ class Assembly(Model):
             smax_list.append(part.get_s_max())
         return min(smax_list)
 
+    def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+        '''Get maximum boundary containing all the parts.
+        '''
+        l_xmin = [part.x.min().item() for part in self.parts.values()]
+        l_ymin = [part.y.min().item() for part in self.parts.values()]
+        l_zmin = [part.z.min().item() for part in self.parts.values()]
+        l_xmax = [part.x.max().item() for part in self.parts.values()]
+        l_ymax = [part.y.max().item() for part in self.parts.values()]
+        l_zmax = [part.z.max().item() for part in self.parts.values()]
+        xmin, ymin, zmin = min(l_xmin), min(l_ymin), min(l_zmin)
+        xmax, ymax, zmax = max(l_xmax), max(l_ymax), max(l_zmax)
+        bound_min, bound_max = (xmin, ymin, zmin), (xmax, ymax, zmax)
+        return bound_min, bound_max
+
+    def gen_real_lattice_sld(self) -> Tensor:
+        '''Generate integrated assembly model.
+        Different from the get_F_value(), which directly
+        get F values from each part.
+        Call self.gen_real_lattice_meshgrid() first.
+        '''
+        sld = torch.zeros_like(self.x, dtype=torch.float32, device=self.device)
+        for part in self.parts.values():
+            temp_part = copy.deepcopy(part)
+            temp_part.set_real_lattice_meshgrid(self.x, self.y, self.z)
+            sld = sld + temp_part.gen_real_lattice_sld()
+
+        self.sld = sld
+        self._store_original_real_lattice(self.x, self.y, self.z, sld)
+        return sld
+
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
@@ -586,20 +617,26 @@ if __name__ == '__main__':
     # torch.set_default_dtype(torch.float64)
 
     def main():
-        # part = StlPart(filename=r'test_models/torus.stl', device='cuda')
-        # part = MathPart(filename=r'test_models/cylinder_y.py', device='cpu')
-        part = MathPart(filename=r'models/mathpart_template.py', device='cpu')
-        part.gen_real_lattice_meshgrid()
-        part.gen_real_lattice_sld()
-        part.gen_reciprocal_lattice()
+        part1 = StlPart(filename=r'test_models/torus.stl', device='cpu')
+        part2 = MathPart(filename=r'test_models/cylinder_y.py', device='cpu')
+        # part = MathPart(filename=r'models/mathpart_template.py', device='cpu')
+        part1.gen_real_lattice_meshgrid()
+        part1.gen_real_lattice_sld()
+        part1.gen_reciprocal_lattice()
 
-        part.rotate((1,0,0), torch.pi/2)
-        part.translate((30,0,0))
+        part1.rotate((1,0,0), torch.pi/2)
+        part1.translate((30,0,0))
+
+        part2.auto_process()
+
+        assembly = Assembly(part1, part2)
+        assembly.gen_real_lattice_meshgrid()
+        print(assembly.gen_real_lattice_sld().shape)
 
         # plot_parts(part, show=True)
     
         q = torch.linspace(0.005, 2.5, 200)
-        q, I = part._calc_sas1d(q)
+        q, I = part1._calc_sas1d(q)
         plot_sas1d(q, I, show=True, savename='test.png')
         
     main()
