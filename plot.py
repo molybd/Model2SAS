@@ -44,25 +44,6 @@ def fig_ax_process(fig_kwargs: dict = {}, ax_kwargs: dict = {}):
         return wrapper
     return fig_ax_process_decorator
 
-
-def find_length(t: Tensor) -> float:
-    return t.max().item() - t.min().item()
-
-def find_center(t: Tensor) -> float:
-    return (t.min().item() + t.max().item()) / 2
-
-def process_equal_all_scale_range(x: Tensor, y: Tensor, z: Tensor) -> tuple[tuple, tuple, tuple]:
-    lenx, leny, lenz = find_length(x), find_length(y), find_length(z)
-    len_all = max(lenx, leny, lenz)
-    cx, cy, cz = find_center(x), find_center(y), find_center(z)
-    return (cx-len_all/2, cx+len_all/2), (cy-len_all/2, cy+len_all/2), (cz-len_all/2, cz+len_all/2)
-
-def process_equal_xz_scale_range(x: Tensor, y: Tensor, z: Tensor) -> tuple[tuple, tuple, tuple]:
-    lenx, lenz = find_length(x), find_length(z)
-    len_xz = max(lenx, lenz)
-    cx, cz = find_center(x), find_center(z)
-    return (cx-len_xz/2, cx+len_xz/2), (y.min().item(), y.max().item()), (cz-len_xz/2, cz+len_xz/2)
-
 def voxel_border(x: Tensor, y: Tensor, z: Tensor):
     '''x, y, z are 3d tensor, coordinates of meshgrid
     voxel center.
@@ -98,7 +79,6 @@ def plot_parts(
     ) -> None:
     '''Plot parts lattice in scatter plot.
     '''
-    lx, ly, lz = [], [], []
     for part in parts:
         x, y, z, sld = part.get_real_lattice(output_device='cpu')
         if 'vox' in type:
@@ -110,19 +90,11 @@ def plot_parts(
             y = y[torch.where(sld!=0)]
             z = z[torch.where(sld!=0)]
             ax.scatter(x, y, z)
-        lx.append(x.flatten())
-        ly.append(y.flatten())
-        lz.append(z.flatten())
-    x = torch.concat(lx)
-    y = torch.concat(ly)
-    z = torch.concat(lz)
-
-    scale_range = process_equal_all_scale_range(x, y, z)
-    ax.auto_scale_xyz(*scale_range)
-
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
+
+    ax.set_aspect('equal')
 
 @fig_ax_process(ax_kwargs=dict(projection='3d'))
 def plot_assembly(
@@ -162,12 +134,11 @@ def plot_assembly(
         c = torch.concat(lc)
         ax.scatter(x, y, z, c=c, cmap=colormap)
 
-    scale_range = process_equal_all_scale_range(x, y, z)
-    ax.auto_scale_xyz(*scale_range)
-
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
+
+    ax.set_aspect('equal')
 
 
 @fig_ax_process()
@@ -208,7 +179,7 @@ def plot_sas2d(
     ax.imshow(I2d.T, origin='lower', cmap=colormap, **kwargs)
 
 
-@fig_ax_process(ax_kwargs=dict(projection='3d', box_aspect=(1,2,1)))
+@fig_ax_process(ax_kwargs=dict(projection='3d'))
 def plot_real_space_detector(
     *dets: Detector,
     values: list[Tensor] | None = None,
@@ -267,21 +238,15 @@ def plot_real_space_detector(
     arrow_length = max(l)
     ax.plot([0, 0], [0, arrow_length], [0, 0], color='k', linewidth=2)
 
-    # scale plot to better illustrate
-    lx, ly, lz = [0.], [0.], [0.]
-    for det in dets:
-        lx += [det.x.min(), det.x.max()]
-        ly += [det.y.min(), det.y.max()]
-        lz += [det.z.min(), det.z.max()]
-    if 'all' in aspect:
-        scale_range = process_equal_all_scale_range(torch.tensor(lx), torch.tensor(ly), torch.tensor(lz))
-    else:
-        scale_range = process_equal_xz_scale_range(torch.tensor(lx), torch.tensor(ly), torch.tensor(lz))
-    ax.auto_scale_xyz(*scale_range)
-
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
+
+    if 'all' in aspect:
+        ax.set_aspect('equal')
+    else:
+        ax.set_box_aspect((1,2,1))
+        ax.set_aspect('auto')
 
 
 @fig_ax_process(ax_kwargs=dict(projection='3d'))
@@ -316,15 +281,8 @@ def plot_reciprocal_space_detector(
     
     ax.scatter(0, 0, 0, color='k') # origin
 
-    # scale plot to better illustrate
-    l = []
-    for coord in coords:
-        qx, qy, qz = coord
-        l += [qx.flatten(), qy.flatten(), qz.flatten()]
-    all_coords = torch.concat(l)
-    qmax = torch.abs(all_coords).max()
-    ax.auto_scale_xyz([-qmax, qmax], [-qmax, qmax], [-qmax, qmax])
-
     ax.set_xlabel('Qx')
     ax.set_ylabel('Qy')
     ax.set_zlabel('Qz')
+
+    ax.set_aspect('equal')
