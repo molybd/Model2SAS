@@ -234,3 +234,45 @@ def plot_real_space_detector(
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
 
+
+@fig_ax_process(ax_kwargs=dict(projection='3d'))
+def plot_reciprocal_space_detector(
+    *coords: tuple[Tensor, Tensor, Tensor],
+    values: list[Tensor] | None = None,
+    fig: Figure | None = None,
+    ax: Axes | None = None,
+    show: bool = True,
+    savename: str | None = None
+    ) -> None:
+    '''Plot detector plane in reciprocal space (q space).
+    If only plot detector position, set values to None.
+    If some of patterns are to be plot, then set the
+    cooresponding value in values, and set others to None
+    or other non-Tensor type. But len(values) == len(dets)
+    '''
+    if values is not None:
+        for coord, value in zip(coords, values):
+            qx, qy, qz = coord
+            if isinstance(value, Tensor):
+                ax.plot_surface(qx, qy, qz, facecolors=plt.cm.viridis(value/value.max()))
+            else:
+                ax.plot_surface(qx, qy, qz)
+    else:
+        for coord in coords:
+            qx, qy, qz = coord
+            ax.plot_surface(qx, qy, qz)
+    
+    ax.scatter(0, 0, 0, color='k') # origin
+
+    # scale plot to better illustrate
+    l = []
+    for coord in coords:
+        qx, qy, qz = coord
+        l += [qx.flatten(), qy.flatten(), qz.flatten()]
+    all_coords = torch.concat(l)
+    qmax = torch.abs(all_coords).max()
+    ax.auto_scale_xyz([-qmax, qmax], [-qmax, qmax], [-qmax, qmax])
+
+    ax.set_xlabel('Qx')
+    ax.set_ylabel('Qy')
+    ax.set_zlabel('Qz')
