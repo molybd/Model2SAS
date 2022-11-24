@@ -183,7 +183,7 @@ def plot_sas2d(
 def plot_real_space_detector(
     *dets: Detector,
     values: list[Tensor] | None = None,
-    aspect: str = 'equal_xz',  # equal_all | equal_xz
+    aspect: str = 'equalxz',  # equal | equalxz
     colormap: str = 'viridis',
     fig: Figure | None = None,
     ax: Axes | None = None,
@@ -242,11 +242,11 @@ def plot_real_space_detector(
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
 
-    if 'all' in aspect:
-        ax.set_aspect('equal')
+    ax.set_box_aspect((1,3,1))
+    if 'xz' in aspect:
+        ax.set_aspect('equalxz')
     else:
-        ax.set_box_aspect((1,2,1))
-        ax.set_aspect('auto')
+        ax.set_aspect('equal')
 
 
 @fig_ax_process(ax_kwargs=dict(projection='3d'))
