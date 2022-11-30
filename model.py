@@ -101,7 +101,7 @@ class Part(Model):
             Lmin: minimum real space scale of a model
             Lmax: maximum real space scale of a model
         '''
-        n_s = 501
+        n_s = 512
         real_spacing = Lmax / 50
         real_spacing = min(real_spacing, Lmin/10)
         return real_spacing, n_s
