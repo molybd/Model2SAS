@@ -17,7 +17,7 @@ def timer(level: int = 0):
             if level ==0:
                 prefix = '✔'
             else:
-                prefix = ' '
+                prefix = '⬇'
             print('{} [{:>9}s] {}'.format(prefix, round(time_cost, 5), func.__name__))
             return result
         return wrapper
