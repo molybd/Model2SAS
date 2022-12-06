@@ -243,8 +243,23 @@ class Part(Model):
         else:
             self.centered = False
 
-        # eliminate the difference caused by different spacing in real space.
-        F_half = self.real_spacing**3 * F_half
+        ##### Continuous-density correction #####
+        # Correct discrete density to continuous density by multiplying
+        # box scattering function from a voxel.
+        # And slso eliminate the difference caused by different 
+        # spacing in real space.
+        # ATTENTION!
+        #   Result from sphere shows applying continuous-density
+        #   correction gives worse result then before, which shows
+        #   larger deviation from -4 slope line.
+        #
+        # BEFORE: voxel volume correction
+        # F_half = self.real_spacing**3 * F_half
+        d = self.real_spacing
+        sinc = lambda t: torch.nan_to_num(torch.sin(t)/t, nan=1.)
+        qxd2, qyd2, qzd2 = 2*torch.pi*s1d*d/2, 2*torch.pi*s1d*d/2, 2*torch.pi*s1dz*d/2
+        box_scatt = torch.einsum('i,j,k->ijk', sinc(qxd2), sinc(qyd2), sinc(qzd2))
+        F_half = F_half * d**3 * box_scatt
 
         self.size_reciprocal = size_reciprocal
         self.s1d = s1d
