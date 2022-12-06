@@ -50,7 +50,7 @@ class Part(Model):
     '''Parent class for part model.
     Subclass: StlPart and MathPart
     '''
-    def __init__(self, filename: str | None = None, partname: str | None = None, device: str = 'cpu') -> None:
+    def __init__(self, filename: str | None = None, partname: str | None = None, is_isolated: bool = True, device: str = 'cpu') -> None:
         '''Init function
         '''
         self.device = device
@@ -60,10 +60,13 @@ class Part(Model):
             self.basename = os.path.basename(filename)
             if partname is None:
                 self.partname = os.path.splitext(self.basename)[0]
+        self.is_isolated = is_isolated
         self.transformation = {}
         self.bound_min: tuple[float, float, float]
         self.bound_max: tuple[float, float, float]
         self.real_spacing: float
+        self.size_real: int
+        self.size_reciprocal: int
         self.x: Tensor
         self.y: Tensor
         self.z: Tensor
@@ -73,7 +76,6 @@ class Part(Model):
         self.sld: Tensor
         self.sld_original: Tensor
         self.centered: bool
-        self.n_s: int
         self.s1d: Tensor
         self.s1dz: Tensor
         self.F_half: Tensor
@@ -81,15 +83,15 @@ class Part(Model):
         self.sy: Tensor
         self.sz_half: Tensor
 
-    def auto_process(self, spacing: float | None = None,  n_s: int | None = None) -> None:
+    def auto_process(self, size_real: int | None = None, spacing: float | None = None,  size_reciprocal: int | None = None) -> None:
         '''Automatically do the pre-processing of part model
         to than can use get_F_value method.
         '''
-        self.gen_real_lattice_meshgrid(spacing=spacing)
+        self.gen_real_lattice_meshgrid(size_real=size_real, spacing=spacing)
         self.gen_real_lattice_sld()
-        self.gen_reciprocal_lattice(n_s=n_s)
+        self.gen_reciprocal_lattice(size_reciprocal=size_reciprocal)
 
-    def _get_suggested_config(self, Lmin: float, Lmax:float) -> tuple[float, int]:
+    def _get_suggested_spacing(self, Lmin: float, Lmax:float, size_real: int = 50) -> float:
         '''Calculate optimal real_spacing and n_s values
         for the generation of reciprocal spacing. Based on my
         experience and test, the meshgrid density is set to be
@@ -101,10 +103,10 @@ class Part(Model):
             Lmin: minimum real space scale of a model
             Lmax: maximum real space scale of a model
         '''
-        n_s = 512
-        real_spacing = Lmax / 50
+        n_d = size_real
+        real_spacing = Lmax / n_d
         real_spacing = min(real_spacing, Lmin/10)
-        return real_spacing, n_s
+        return real_spacing
 
     def set_real_lattice_meshgrid(self, x: Tensor, y: Tensor, z: Tensor) -> None:
         '''Import lattice meshgrid from outside of class.
@@ -114,17 +116,21 @@ class Part(Model):
         spacing = x[1,0,0].item() - x[0,0,0].item()
         self.real_spacing = spacing
         self.x, self.y, self.z = x.to(self.device), y.to(self.device), z.to(self.device)
+        self.size_real = max(x.shape)
 
-    def gen_real_lattice_meshgrid(self, spacing: float | None = None) -> tuple[Tensor, Tensor, Tensor]:
+    def gen_real_lattice_meshgrid(self, size_real: int | None = None, spacing: float | None = None) -> tuple[Tensor, Tensor, Tensor]:
         '''Generate equally spaced meshgrid in 3d real space.
+        Can be assigned either size_real or spacing.
         '''
         bound_min, bound_max = self.get_bound()
         xmin, ymin, zmin = bound_min
         xmax, ymax, zmax = bound_max
-        if spacing is None:
-            Lmin = min(xmax-xmin, ymax-ymin, zmax-zmin)
-            Lmax = max(xmax-xmin, ymax-ymin, zmax-zmin)
-            spacing = self._get_suggested_config(Lmin, Lmax)[0]
+        Lmin = min(xmax-xmin, ymax-ymin, zmax-zmin)
+        Lmax = max(xmax-xmin, ymax-ymin, zmax-zmin)
+        if size_real is not None:
+            spacing = self._get_suggested_spacing(Lmin, Lmax, size_real=size_real)
+        elif size_real is None and spacing is None:
+            spacing = self._get_suggested_spacing(Lmin, Lmax)
         # print('real spacing: {}'.format(spacing))
         # ensure equally spacing lattice
         xmin, ymin, zmin = xmin+spacing/2, ymin+spacing/2, zmin+spacing/2
@@ -140,6 +146,7 @@ class Part(Model):
         y1d = torch.linspace(ymin, ymax, ynum, device=self.device)
         z1d = torch.linspace(zmin, zmax, znum, device=self.device)
         x, y, z = torch.meshgrid(x1d, y1d, z1d, indexing='ij')
+        self.size_real = max(xnum, ynum, znum)
         self.real_spacing = spacing
         self.x, self.y, self.z = x, y, z
         return x, y, z
@@ -182,7 +189,7 @@ class Part(Model):
 
 
     @timer(level=0)
-    def gen_reciprocal_lattice(self, n_s: int | None = None, need_centering: bool = True) -> Tensor:
+    def gen_reciprocal_lattice(self, size_reciprocal: int | None = None, need_centering: bool = True) -> Tensor:
         '''Generate reciprocal lattice from real lattice.
         The actual real lattice begins with bound_min, but
         FFT algorithm treats real space lattice as it begins
@@ -205,12 +212,15 @@ class Part(Model):
         bound_min, bound_max = self.get_bound()
         xmin, ymin, zmin = bound_min
         xmax, ymax, zmax = bound_max
-        if n_s is None:
-            Lmin = min(xmax-xmin, ymax-ymin, zmax-zmin)
-            Lmax = max(xmax-xmin, ymax-ymin, zmax-zmin)
-            n_s = self._get_suggested_config(Lmin, Lmax)[1]
-        n_real_lattice = max(self.sld.size())
-        n_s = max(n_s, n_real_lattice)
+        if size_reciprocal is None:
+            if self.is_isolated:
+                size_reciprocal = 10 * self.size_real
+                size_reciprocal = min(600, size_reciprocal)  # in case of using too much resource
+            else:
+                size_reciprocal = self.size_real
+        else:
+            size_reciprocal = max(size_reciprocal, self.size_real)
+        n_s = size_reciprocal
         # print('n_s: {}'.format(n_s))
         # larger n_s get more precise in low q,
         # but may use too many memory since F increases in ^3
@@ -236,7 +246,7 @@ class Part(Model):
         # eliminate the difference caused by different spacing in real space.
         F_half = self.real_spacing**3 * F_half
 
-        self.n_s = n_s
+        self.size_reciprocal = size_reciprocal
         self.s1d = s1d
         self.s1dz = s1dz
         self.F_half = F_half
@@ -455,14 +465,14 @@ class StlPart(Part):
     '''class for part from stl file.
     Rewrite get_bound and gen_real_lattice_sld methods.
     '''
-    def __init__(self, filename: str | None = None, partname: str | None = None, sld_value: float = 1.0, centering : bool = True, device: str = 'cpu') -> None:
+    def __init__(self, filename: str | None = None, partname: str | None = None, is_isolated: bool = True, sld_value: float = 1.0, mesh_centering : bool = True, device: str = 'cpu') -> None:
         '''load mesh from stl file
         '''
-        super().__init__(filename=filename, partname=partname, device=device)
+        super().__init__(filename=filename, partname=partname, is_isolated=is_isolated, device=device)
         if filename is not None:
             self.mesh = mesh.Mesh.from_file(self.filename)
             self.bound_min, self.bound_max = self.get_bound()
-            if centering:# move model center to (0,0,0)
+            if mesh_centering:# move model center to (0,0,0)
                 center = self.mesh.get_mass_properties()[1]
                 self.mesh.translate(-center)
         self.sld_value = sld_value
@@ -507,11 +517,11 @@ class MathPart(Part):
     '''class for part from math description.
     Rewrite get_bound and gen_real_lattice_sld methods.
     '''
-    def __init__(self, filename: str | None = None, partname: str | None = None, device: str = 'cpu') -> None:
+    def __init__(self, filename: str | None = None, partname: str | None = None, is_isolated: bool = True, device: str = 'cpu') -> None:
         '''load math object from py file
         TODO: or directly pass through?
         '''
-        super().__init__(filename=filename, partname=partname, device=device)
+        super().__init__(filename=filename, is_isolated=is_isolated, device=device)
         if filename is not None:
             abspath = os.path.abspath(filename)
             dirname = os.path.dirname(abspath)
@@ -617,26 +627,28 @@ if __name__ == '__main__':
     # torch.set_default_dtype(torch.float64)
 
     def main():
-        part1 = StlPart(filename=r'test_models/torus.stl', device='cpu')
+        # part1 = StlPart(filename=r'test_models/torus.stl', device='cpu')
         part2 = MathPart(filename=r'test_models/cylinder_y.py', device='cpu')
         # part = MathPart(filename=r'models/mathpart_template.py', device='cpu')
-        part1.gen_real_lattice_meshgrid()
-        part1.gen_real_lattice_sld()
-        part1.gen_reciprocal_lattice()
+        # part1.gen_real_lattice_meshgrid()
+        # part1.gen_real_lattice_sld()
+        # part1.gen_reciprocal_lattice()
 
-        part1.rotate((1,0,0), torch.pi/2)
-        part1.translate((30,0,0))
+        # part1.rotate((1,0,0), torch.pi/2)
+        # part1.translate((30,0,0))
 
-        part2.auto_process()
+        part2.gen_real_lattice_meshgrid()
+        part2.gen_real_lattice_sld()
+        part2.gen_reciprocal_lattice()
 
-        assembly = Assembly(part1, part2)
-        assembly.gen_real_lattice_meshgrid()
-        print(assembly.gen_real_lattice_sld().shape)
+        # assembly = Assembly(part1, part2)
+        # assembly.gen_real_lattice_meshgrid()
+        # print(assembly.gen_real_lattice_sld().shape)
 
         # plot_parts(part, show=True)
     
         q = torch.linspace(0.005, 2.5, 200)
-        q, I = part1._calc_sas1d(q)
+        q, I = part2._calc_sas1d(q)
         plot_sas1d(q, I, show=True, savename='test.png')
         
     main()
