@@ -5,7 +5,7 @@ from torch import Tensor
 
 # =========================================================
 # A template of hollow sphere math model
-# with various sld equal to the radius of certain point
+# with various sld equal to the x coordinate of certain point
 # =========================================================
 
 # =========================== ! ===========================
@@ -56,6 +56,6 @@ class MathDescription:
         
         in_model_index = torch.zeros_like(r).to(device)
         in_model_index[(r>=R) & (r<=(R+t))] = 1.
-        # sld = r * torch.cos(theta) * torch.sin(phi) * in_model_index
+        sld = r * torch.cos(theta) * torch.sin(phi) * in_model_index
         sld = sld_value * in_model_index
         return sld
