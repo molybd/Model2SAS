@@ -54,8 +54,8 @@ class Detector:
         w = ax * torch.sin(ang/2)
 
         x = coord
-        wx = -torch.linalg.cross(x, w, dim=-1)
-        x_rotated = x + 2*a*wx + 2*(-torch.linalg.cross(wx, w, dim=-1))
+        wx = -torch.linalg.cross(x, w.expand_as(x), dim=-1)
+        x_rotated = x + 2*a*wx + 2*(-torch.linalg.cross(wx, w.expand_as(wx), dim=-1))
         return x_rotated
 
     def _rotate(self, rotation_type: str, angle: float) -> None:
