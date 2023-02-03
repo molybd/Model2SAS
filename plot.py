@@ -3,13 +3,9 @@
 
 import torch
 from torch import Tensor
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
-from matplotlib.axes import Axes
-import mpl_toolkits.mplot3d as mp3d
-from mpl_toolkits.mplot3d.axes3d import Axes3D
 import functools
+import os
+import plotly.graph_objects as go
 
 from model import Part, Assembly
 from detector import Detector
@@ -19,270 +15,282 @@ from detector import Detector
 # Utility functions for plot
 #==================================
 
-def fig_ax_process(fig_kwargs: dict = {}, ax_kwargs: dict = {}):
-    def fig_ax_process_decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            fig = kwargs.pop('fig', None)
-            ax = kwargs.pop('ax', None)
-            if ax is None:
-                if fig is None:
-                    fig = plt.figure(**fig_kwargs)
-                ax = fig.add_subplot(**ax_kwargs)
-            kwargs.update(dict(fig=fig, ax=ax))
+def plot_utils(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        fig = func(*args, **kwargs)
+        title = kwargs.pop('title', None)
+        show = kwargs.pop('show', True)
+        savename = kwargs.pop('savename', None)
+        if title is not None:
+            fig.update_layout(title_text=title)
+        if show:
+            fig.show()
+        if savename is not None:
+            write_html(savename, fig.to_html(), encoding='utf-8')
+        return fig
+    return wrapper
 
-            func(*args, **kwargs)
-
-            savename = kwargs.pop('savename', None)
-            show = kwargs.pop('show', True)
-            if fig is not None:
-                fig.tight_layout()
-                if savename is not None:
-                    fig.savefig(savename)
-            if show:
-                plt.show()
-        return wrapper
-    return fig_ax_process_decorator
-
-def voxel_border(x: Tensor, y: Tensor, z: Tensor):
-    '''x, y, z are 3d tensor, coordinates of meshgrid
-    voxel center.
+def write_html(filename: str, htmlstr: str, encoding: str = 'utf-8') -> str:
+    '''Write html string to a html file.
+    Reason of implementing this instead of using plotly.io.write_html()
+    is that plotly method doesn't support encoding option, will causs
+    error on Windows.
     '''
-    def expand_1d(t1d):
-        spacing = t1d[1] - t1d[0]
-        tnew = torch.zeros(t1d.shape[0] + 1)
-        tnew[:-1] = t1d[:]
-        tnew[-1] = t1d[-1] + spacing
-        return tnew
-    xb = expand_1d(x[:,0,0])
-    yb = expand_1d(y[0,:,0])
-    zb = expand_1d(z[0,0,:])
-    return torch.meshgrid(xb, yb, zb, indexing='ij')
+    with open(filename, 'w', encoding=encoding) as f:
+        f.write(htmlstr)
+        return os.path.abspath(filename)
 
-def norm(t: Tensor) -> Tensor:
-    return (t-t.min()) / (t.max()-t.min())
+class Voxel(go.Mesh3d):
+    def __init__(self, xc=None, yc=None, zc=None, spacing=None, arg=None, alphahull=None, autocolorscale=None, cauto=None, cmax=None, cmid=None, cmin=None, color=None, coloraxis=None, colorbar=None, colorscale=None, contour=None, customdata=None, customdatasrc=None, delaunayaxis=None, facecolor=None, facecolorsrc=None, flatshading=None, hoverinfo=None, hoverinfosrc=None, hoverlabel=None, hovertemplate=None, hovertemplatesrc=None, hovertext=None, hovertextsrc=None, ids=None, idssrc=None, intensity=None, intensitymode=None, intensitysrc=None, isrc=None, jsrc=None, ksrc=None, legendgroup=None, legendgrouptitle=None, legendrank=None, legendwidth=None, lighting=None, lightposition=None, meta=None, metasrc=None, name=None, opacity=None, reversescale=None, scene=None, showlegend=None, showscale=None, stream=None, text=None, textsrc=None, uid=None, uirevision=None, vertexcolor=None, vertexcolorsrc=None, visible=None, xcalendar=None, xhoverformat=None, xsrc=None, ycalendar=None, yhoverformat=None, ysrc=None, zcalendar=None, zhoverformat=None, zsrc=None, **kwargs):
+        x, y, z, i, j, k = self.gen_vertices_triangles(xc, yc, zc, spacing)
+        super().__init__(arg, alphahull, autocolorscale, cauto, cmax, cmid, cmin, color, coloraxis, colorbar, colorscale, contour, customdata, customdatasrc, delaunayaxis, facecolor, facecolorsrc, flatshading, hoverinfo, hoverinfosrc, hoverlabel, hovertemplate, hovertemplatesrc, hovertext, hovertextsrc, i, ids, idssrc, intensity, intensitymode, intensitysrc, isrc, j, jsrc, k, ksrc, legendgroup, legendgrouptitle, legendrank, legendwidth, lighting, lightposition, meta, metasrc, name, opacity, reversescale, scene, showlegend, showscale, stream, text, textsrc, uid, uirevision, vertexcolor, vertexcolorsrc, visible, x, xcalendar, xhoverformat, xsrc, y, ycalendar, yhoverformat, ysrc, z, zcalendar, zhoverformat, zsrc, **kwargs)
 
+    def gen_vertices_triangles(self, xc, yc, zc, spacing):
+        s = spacing
+        xv = torch.stack((xc-s/2, xc+s/2, xc+s/2, xc-s/2, xc-s/2, xc+s/2, xc+s/2, xc-s/2), dim=1).flatten()
+        yv = torch.stack((yc-s/2, yc-s/2, yc+s/2, yc+s/2, yc-s/2, yc-s/2, yc+s/2, yc+s/2), dim=1).flatten()
+        zv = torch.stack((zc-s/2, zc-s/2, zc-s/2, zc-s/2, zc+s/2, zc+s/2, zc+s/2, zc+s/2), dim=1).flatten()
 
+        i0 = torch.tensor((0, 2, 0, 5, 1, 6, 2, 7, 3, 4, 4, 6))
+        j0 = torch.tensor((1, 3, 1, 4, 2, 5, 3, 6, 0, 7, 5, 7))
+        k0 = torch.tensor((2, 0, 5, 0, 6, 1, 7, 2, 4, 3, 6, 4))
+        seq = 8 * torch.arange(xc.numel())
+        i = (torch.unsqueeze(i0, 0) + torch.unsqueeze(seq, 1)).flatten()
+        j = (torch.unsqueeze(j0, 0) + torch.unsqueeze(seq, 1)).flatten()
+        k = (torch.unsqueeze(k0, 0) + torch.unsqueeze(seq, 1)).flatten()
+        return xv, yv, zv, i, j, k
 
 #==================================
 # Plot functions below
 #==================================
-
-@fig_ax_process(ax_kwargs=dict(projection='3d'))
-def plot_parts(
-    *parts: Part,
-    type: str = 'scatter',  # 'scatter' or 'voxels'
-    fig: Figure | None = None,
-    ax: Axes3D | None = None,
-    show: bool = True,
-    savename: str | None = None,
-    ) -> None:
-    '''Plot parts lattice in scatter plot.
-    '''
-    for part in parts:
-        x, y, z, sld = part.get_real_lattice(output_device='cpu')
-        if 'vox' in type:
-            xb, yb, zb = voxel_border(x, y, z)
-            model_shape = sld != 0.
-            ax.voxels(xb, yb, zb, model_shape)
-        else:
-            x = x[torch.where(sld!=0)]
-            y = y[torch.where(sld!=0)]
-            z = z[torch.where(sld!=0)]
-            ax.scatter(x, y, z)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    ax.set_aspect('equal')
-
-@fig_ax_process(ax_kwargs=dict(projection='3d'))
-def plot_assembly(
-    assembly: Assembly,
-    type: str = 'scatter',  # 'scatter' or 'voxels'
-    colormap: str = 'viridis',
-    fig: Figure | None = None,
-    ax: Axes3D | None = None,
-    show: bool = True,
-    savename: str | None = None,
-    ) -> None:
-    '''Plot parts lattice in scatter plot.
-    '''
-    if 'vox' in type:
-        assembly.gen_real_lattice_meshgrid()
-        assembly.gen_real_lattice_sld()
-        x, y, z, sld = assembly.get_real_lattice()
-        xb, yb, zb = voxel_border(x, y, z)
-        model_shape = sld != 0.
-        colors = mpl.colormaps[colormap](norm(sld))
-        ax.voxels(xb, yb, zb, model_shape, facecolors=colors)
-    else:
-        lx, ly, lz, lc = [], [], [], []
-        for part in assembly.parts.values():
-            x, y, z, sld = part.get_real_lattice(output_device='cpu')
-            x = x[torch.where(sld!=0)]
-            y = y[torch.where(sld!=0)]
-            z = z[torch.where(sld!=0)]
-            sld = sld[torch.where(sld!=0)]
-            lx.append(x)
-            ly.append(y)
-            lz.append(z)
-            lc.append(sld)
-        x = torch.concat(lx)
-        y = torch.concat(ly)
-        z = torch.concat(lz)
-        c = torch.concat(lc)
-        ax.scatter(x, y, z, c=c, cmap=colormap)
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    ax.set_aspect('equal')
-
-
-@fig_ax_process()
+@plot_utils
 def plot_sas1d(
-    q: Tensor,
-    I: Tensor,
-    fig: Figure | None = None,
-    ax: Axes | None = None,
+    q: Tensor | list[Tensor],
+    I: Tensor | list[Tensor],
+    name: str | list[str] | None = None,
+    mode: str | list[str] = 'lines+markers',
+    logx: bool = True,
+    logy: bool = True,
+    title: str | None = None,
     show: bool = True,
-    savename: str | None = None,
-    **kwargs
-    ):
-    '''Plot 1d SAS curve
+    savename: str | None = None
+    ) -> go.Figure:
+    '''plot 1d SAS curve(s).
+    q, I, name combinations: 1q, 1I, 1name | 1q, I list, name list | q list, I list, name list
+    name: can be None
+    mode options: lines | markers | lines+markers, same as q,I,name, can be assigned to each trace by list
     '''
-    q, I = q.to('cpu'), I.to('cpu')
-    ax.plot(q, I, **kwargs)
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_xlabel(r'Q ($\mathrm{unit^{-1}}$)')
-    ax.set_ylabel('Intensity (a.u.)')
+    def gen_list(x, length:int) -> list:
+        if isinstance(x, list):
+            x_list = x
+        else:
+            x_list = [x] * length
+        return x_list
+
+    if isinstance(I, list):
+        I_list = I
+        n = len(I_list)
+        q_list, name_list, mode_list = gen_list(q, n), gen_list(name, n), gen_list(mode, n)
+    else:
+        q_list, I_list, name_list, mode_list = [q], [I], [name], [mode]
+  
+    fig = go.Figure()
+    for qi, Ii, namei, modei in zip(q_list, I_list, name_list, mode_list):
+        fig.add_trace(go.Scatter(
+            x=qi, y=Ii,
+            mode=modei, # 'lines' or 'markers' or 'lines+markers'
+            name=namei
+            ))
+
+    fig.update_layout(xaxis_title=r'Q (1/unit)')
+    fig.update_layout(yaxis_title=r'Intensity (a.u.)')
+    if logx:
+        fig.update_xaxes(type='log')
+    if logy:
+        fig.update_yaxes(type='log')
+    return fig
 
 
-@fig_ax_process()
+@plot_utils
 def plot_sas2d(
     I2d: Tensor,
-    do_log: bool = True,
-    colormap: str = 'viridis',
-    fig: Figure | None = None,
-    ax: Axes | None = None,
-    show: bool = True,
-    savename: str | None = None,
-    **kwargs
-    ):
-    '''Plot 1d SAS curve
-    '''
-    if do_log:
-        I2d = torch.log(I2d)
-    ax.imshow(I2d.T, origin='lower', cmap=colormap, **kwargs)
-
-
-@fig_ax_process(ax_kwargs=dict(projection='3d'))
-def plot_real_space_detector(
-    *dets: Detector,
-    values: list[Tensor] | None = None,
-    aspect: str = 'equalxz',  # equal | equalxz
-    colormap: str = 'viridis',
-    fig: Figure | None = None,
-    ax: Axes | None = None,
+    logI: bool = True,
+    title: str | None = None,
+    colorscale: str | None = None,
     show: bool = True,
     savename: str | None = None
-    ) -> None:
-    '''Plot detector size and position in 3d.
-    Can plot multiple detectors together. If only plot
-    detector position, set values to None. If some of
-    patterns are to be plot, then set the cooresponding
-    value in values, and set others to None or other
-    non-Tensor type. But len(values) == len(dets)
+    ) -> go.Figure:
+    '''plot a 2d SAS pattern.
     '''
-    # plot detector screen
-    if values is not None:
-        for det, value in zip(dets, values):
-            if isinstance(value, Tensor):
-                value = torch.nan_to_num(value, nan=0., neginf=0.) # in case of -inf after log
-                colors = mpl.colormaps[colormap](norm(value))
-                ax.plot_surface(det.x, det.y, det.z, facecolors=colors)
-            else:
-                ax.plot_surface(det.x, det.y, det.z)
+    fig = go.Figure()
+    if logI:
+        data = torch.log(I2d)
+        data = torch.nan_to_num(data, nan=0., neginf=0.) # incase 0 in data, cause log(0) output
     else:
-        for det in dets:
-            ax.plot_surface(det.x, det.y, det.z)
+        data = I2d
+    fig.add_trace(go.Heatmap(
+        z=data.T,
+        colorscale=colorscale
+        ))
+    fig.update_xaxes(
+        scaleanchor='y',
+        scaleratio=1,
+        constrain='domain'
+        )
+    return fig
+
+
+@plot_utils
+def plot_model(
+    *model: Part | Assembly,
+    type: str | None = None,
+    title: str | None = None,
+    colorscale: str = 'Plasma',
+    show: bool = True,
+    savename: str | None = None
+    ) -> go.Figure:
+    '''plot models in 3d
+    type: voxel | volume | None
+        if None, voxel for part model, volume for assembly model
+    '''
+    if type is not None:
+        type = type.lower()
+    fig = go.Figure()
+    for modeli in model:
+        if isinstance(modeli, Assembly):
+            modeli.gen_real_lattice_meshgrid()
+            modeli.gen_real_lattice_sld()
+            x, y, z, sld = modeli.get_real_lattice()
+            spacing = modeli.real_spacing
+            name = 'assembly'
+            if type is None:
+                type = 'volume'
+        else: # isinstance(modeli, Part)
+            x, y, z, sld = modeli.get_real_lattice()
+            spacing = modeli.real_spacing
+            name = modeli.partname
+            if type is None:
+                type = 'voxel'
+        
+        if type == 'voxel':
+            fig.add_trace(Voxel(
+                xc=x[sld!=0],
+                yc=y[sld!=0],
+                zc=z[sld!=0],
+                spacing=spacing,
+                name=name,
+                showlegend=True
+                ))
+        elif type == 'volume':
+            fig.add_trace(go.Volume(
+                x=x.flatten(),
+                y=y.flatten(),
+                z=z.flatten(),
+                value=sld.flatten(),
+                opacity=0.1,
+                surface_count=21,
+                coloraxis='coloraxis'
+            ))
+
+    fig.update_layout(scene_aspectmode='data') # make equal aspect
+    if type == 'volume':
+        fig.update_layout(coloraxis={'colorscale': colorscale})
+    return fig
+
+
+@plot_utils
+def plot_surface(
+    *data: tuple[Tensor, Tensor, Tensor] | tuple[Tensor, Tensor, Tensor, Tensor],
+    logI: bool = True,
+    title: str | None = None,
+    colorscale: str = 'Plasma',
+    show: bool = True,
+    savename: str | None = None
+    ) -> go.Figure:
+    '''plot a surface in real or reciprocal space by coordinates, such as detector surface
+    in reciprocal space
+    data: (x, y, z) | (x, y, z, I2d), all Tensor should be 2d
+    '''
+    if len(data[0]) == 4:
+        value_provided = True
+    else:
+        value_provided = False
+    
+    fig = go.Figure()
+    for i, datai in enumerate(data):
+        if len(datai) == 4:
+            x, y, z, I2d = datai
+            if logI:
+                surfacecolor = torch.log(I2d)
+                surfacecolor = torch.nan_to_num(surfacecolor, nan=0., neginf=0.) # incase 0 in data, cause log(0) output
+            else:
+                surfacecolor = I2d
+        else:
+            x, y, z = datai[:3]
+            surfacecolor = i * torch.ones_like(x)
+
+        fig.add_trace(go.Surface(
+            x=x, y=y, z=z, surfacecolor=surfacecolor, coloraxis='coloraxis'
+        ))
+    fig.update_layout(coloraxis = {'colorscale': colorscale})
+    
+    fig.update_layout(scene_aspectmode='data') # make equal aspect, or use fig.update_scenes(aspectmode='data')
+    return fig
+
+
+@plot_utils
+def plot_real_detector(
+    *data: tuple[Tensor, Tensor, Tensor] | tuple[Tensor, Tensor, Tensor, Tensor],
+    logI: bool = True,
+    title: str | None = None,
+    colorscale: str = 'Plasma',
+    show: bool = True,
+    savename: str | None = None
+    ) -> go.Figure:
+    '''plot detector(s) surface in realspace, also display direct beam
+    and covered solid angle by detector
+    data: (x, y, z) | (x, y, z, I2d), all Tensor should be 2d
+    '''
+    # plot detector surface
+    fig = plot_surface(*data, logI=logI, colorscale=colorscale, show=False)
+
+    fig.add_trace(go.Scatter3d(
+        x=[0,],
+        y=[0,],
+        z=[0,],
+        mode='markers',
+        showlegend=False,
+    )) # sample position at origin
+    end_point_y = max([datai[1].max().item() for datai in data])
+    fig.add_trace(go.Scatter3d(
+        x=[0, 0],
+        y=[0, end_point_y],
+        z=[0, 0],
+        mode='lines',
+        showlegend=False,
+    )) # direct beam
 
     # plot light edges on detector
-    for det in dets:
+    for datai in data:
+        x, y, z = datai[:3]
         v0 = torch.tensor([0., 0., 0.])
-        v1 = torch.tensor((det.x[0,0], det.y[0,0], det.z[0,0]))
-        v2 = torch.tensor((det.x[0,-1], det.y[0,-1], det.z[0,-1]))
-        v3 = torch.tensor((det.x[-1,-1], det.y[-1,-1], det.z[-1,-1]))
-        v4 = torch.tensor((det.x[-1,0], det.y[-1,0], det.z[-1,0]))
-        vtx_list = [
-            torch.stack([v0,v1,v2], dim=0),
-            torch.stack([v0,v2,v3], dim=0),
-            torch.stack([v0,v3,v4], dim=0),
-            torch.stack([v0,v4,v1], dim=0),
-        ]
-        tri = mp3d.art3d.Poly3DCollection(vtx_list)
-        tri.set_color([(0.5, 0.5, 0.5, 0.2)])
-        ax.add_collection3d(tri)
+        v1 = torch.tensor((x[0,0], y[0,0], z[0,0]))
+        v2 = torch.tensor((x[0,-1], y[0,-1], z[0,-1]))
+        v3 = torch.tensor((x[-1,-1], y[-1,-1], z[-1,-1]))
+        v4 = torch.tensor((x[-1,0], y[-1,0], z[-1,0]))
+        x, y, z = torch.unbind(
+            torch.stack([v0,v1,v2,v3,v4], dim=1),
+            dim=0
+            )
+        fig.add_trace(go.Mesh3d(
+            x=x,
+            y=y,
+            z=z,
+            alphahull=0,
+            color='gray',
+            opacity=0.1,
+        ))
 
-    # plot sample position at origin
-    ax.scatter(0, 0, 0, color='k') # origin
-
-    # plot direct x-ray
-    l = []
-    for det in dets:
-        head = det.get_center()
-        l.append(torch.abs(head[1]).item())
-    arrow_length = max(l)
-    ax.plot([0, 0], [0, arrow_length], [0, 0], color='k', linewidth=2)
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    ax.set_box_aspect((1,3,1))
-    if 'xz' in aspect:
-        ax.set_aspect('equalxz')
-    else:
-        ax.set_aspect('equal')
-
-
-@fig_ax_process(ax_kwargs=dict(projection='3d'))
-def plot_reciprocal_space_detector(
-    *coords: tuple[Tensor, Tensor, Tensor],
-    values: list[Tensor] | None = None,
-    colormap: str = 'viridis',
-    fig: Figure | None = None,
-    ax: Axes | None = None,
-    show: bool = True,
-    savename: str | None = None
-    ) -> None:
-    '''Plot detector plane in reciprocal space (q space).
-    If only plot detector position, set values to None.
-    If some of patterns are to be plot, then set the
-    cooresponding value in values, and set others to None
-    or other non-Tensor type. But len(values) == len(dets)
-    '''
-    if values is not None:
-        for coord, value in zip(coords, values):
-            qx, qy, qz = coord
-            if isinstance(value, Tensor):
-                value = torch.nan_to_num(value, nan=0., neginf=0.)
-                colors = mpl.colormaps[colormap](norm(value))
-                ax.plot_surface(qx, qy, qz, facecolors=colors)
-            else:
-                ax.plot_surface(qx, qy, qz)
-    else:
-        for coord in coords:
-            qx, qy, qz = coord
-            ax.plot_surface(qx, qy, qz)
-    
-    ax.scatter(0, 0, 0, color='k') # origin
-
-    ax.set_xlabel('Qx')
-    ax.set_ylabel('Qy')
-    ax.set_zlabel('Qz')
-
-    ax.set_aspect('equal')
+    fig.update_layout(scene_aspectmode='data') # make equal aspect, or use fig.update_scenes(aspectmode='data')
+    return fig
