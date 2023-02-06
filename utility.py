@@ -15,9 +15,9 @@ def timer(level: int = 0):
             result = func(*args, **kwargs)
             time_cost = time.time() - start_time
             if level ==0:
-                prefix = '✔ '
+                prefix = '✅ '
             else:
-                prefix = '⬇ ' * level
+                prefix = '⏳' + ' ⬇'*level + ' '
             # print('{} [{:>9}s] {}'.format(prefix, round(time_cost, 5), func.__name__))
             print('[{} {:>2}.{:<5.0f} s] {}{}'.format(
                 '⏱',
