@@ -18,7 +18,7 @@ from detector import Detector
 def plot_utils(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        fig = func(*args, **kwargs)
+        fig: go.Figure = func(*args, **kwargs)
         title = kwargs.pop('title', None)
         show = kwargs.pop('show', True)
         savename = kwargs.pop('savename', None)
@@ -27,7 +27,10 @@ def plot_utils(func):
         if show:
             fig.show()
         if savename is not None:
-            write_html(savename, fig.to_html(), encoding='utf-8')
+            if os.path.splitext(savename)[-1] == '.html':
+                write_html(savename, fig.to_html(), encoding='utf-8')
+            else:
+                fig.write_image(savename)
         return fig
     return wrapper
 
