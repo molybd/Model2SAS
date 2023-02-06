@@ -15,10 +15,17 @@ def timer(level: int = 0):
             result = func(*args, **kwargs)
             time_cost = time.time() - start_time
             if level ==0:
-                prefix = '✔'
+                prefix = '✔ '
             else:
-                prefix = '⬇'
-            print('{} [{:>9}s] {}'.format(prefix, round(time_cost, 5), func.__name__))
+                prefix = '⬇ ' * level
+            # print('{} [{:>9}s] {}'.format(prefix, round(time_cost, 5), func.__name__))
+            print('[{} {:>2}.{:<5.0f} s] {}{}'.format(
+                '⏱',
+                int(time_cost),
+                round((time_cost-int(time_cost))*1e5, 5),
+                prefix,
+                func.__name__
+                ))
             return result
         return wrapper
     return timer_decorator
