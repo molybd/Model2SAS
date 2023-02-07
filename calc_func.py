@@ -25,7 +25,7 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
     '''
     device = origins.device
     n = origins.size()[0]
-    intersect_count = torch.zeros(n, dtype=torch.int32).to(device)
+    intersect_count = torch.zeros(n, dtype=torch.int32, device=device)
     E1 = triangles[:,1,:] - triangles[:,0,:]
     E2 = triangles[:,2,:] - triangles[:,0,:]
     for i in range(triangles.size()[0]):
@@ -33,7 +33,7 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
         P = torch.linalg.cross(ray, E2[i,:], dim=-1)
         Q = torch.linalg.cross(T, E1[i,:].expand_as(T), dim=-1)
         det = torch.dot(P, E1[i,:])
-        intersect = torch.zeros(n, dtype=torch.int32).to(device)
+        intersect = torch.zeros(n, dtype=torch.int32, device=device)
         t, u, v = torch.matmul(Q,E2[i,:])/det, torch.matmul(T,P)/det, torch.matmul(Q,ray)/det
         intersect[(t>0) & (u>0) & (v>0) & ((u+v)<1)] = 1  # faster than below
         # intersect = torch.where((t>0)&(u>0)&(v>0)&((u+v)<1), 1, 0)
