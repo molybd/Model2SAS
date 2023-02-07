@@ -5,12 +5,17 @@ All based on pytorch instead of numpy.
 # import numpy as np
 import torch
 from torch import Tensor
+import taichi as ti
+import taichi.math as tm
 
 from utility import timer
 
+ti.init(ti.gpu)
 
-@timer(level=2)
-def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor) -> Tensor:
+# * rewritten with taichi for better speed
+# * same api remains
+# @timer(level=2)
+def _torch_moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor) -> Tensor:
     '''Calculate all the points intersect with 1 triangle
     using Möller-Trumbore intersection algorithm
     see paper https://doi.org/10.1080/10867651.1997.10487468
@@ -38,6 +43,87 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
         intersect[(t>0) & (u>0) & (v>0) & ((u+v)<1)] = 1  # faster than below
         # intersect = torch.where((t>0)&(u>0)&(v>0)&((u+v)<1), 1, 0)
         intersect_count += intersect
+    return intersect_count
+
+@ti.func
+def _one_ray_one_triangle_intersect(
+    O: tm.vec3,
+    D: tm.vec3,
+    V0: tm.vec3,
+    V1: tm.vec3,
+    V2: tm.vec3
+ ) -> ti.int32:
+    E1 = V1 - V0
+    E2 = V2 - V0
+    T = O - V0
+    P = tm.cross(D, E2)
+    Q = tm.cross(T, E1)
+    det = tm.dot(P, E1)
+    # tuv = tm.vec3(tm.dot(Q, E2), tm.dot(P, T), tm.dot(Q, D)) / det
+    t, u, v = tm.dot(Q, E2)/det, tm.dot(P, T)/det, tm.dot(Q, D)/det
+    count: ti.int32 = 0
+    if t > 0.0 and u > 0.0 and v > 0.0 and (u+v)<1.0:
+        count = 1
+    return count
+
+# @timer(level=2)
+def _taichi_moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor) -> Tensor:
+    '''Calculate all the points intersect with 1 triangle
+    using Möller-Trumbore intersection algorithm
+    see paper https://doi.org/10.1080/10867651.1997.10487468
+
+    Args:
+        origins: Tensor, size=(n, 3)
+        ray: Tensor, size=(3,), direction of ray
+        triangles: Tensor, size=(m,3,3) vertices of a triangle
+
+    Returns:
+        Tensor, size=(n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
+    '''
+    device = origins.device
+    # if device.type == 'cuda':
+    #     ti.init(ti.cuda)
+    # else:
+    #     ti.init(ti.cpu)
+    
+    n, m = origins.shape[0], triangles.shape[0]
+    ori = ti.Vector.field(3, ti.f32, shape=(n,))
+    ori.from_torch(origins)
+    r = ti.Vector.field(3, ti.f32, shape=(1,))
+    r.from_torch(ray.unsqueeze(0))
+    tri = ti.Vector.field(3, ti.f32, shape=(m, 3))
+    tri.from_torch(triangles)
+
+    count_vec = ti.field(ti.int32, shape=(n,))
+    @ti.kernel
+    def gen_count_vec():
+        N, M = ori.shape[0], tri.shape[0]
+        for i, j in ti.ndrange(N, M):
+            count_vec[i] += _one_ray_one_triangle_intersect(
+                ori[i], r[0], tri[j,0], tri[j,1], tri[j,2]
+            )
+    gen_count_vec()
+    intersect_count = count_vec.to_torch(device=device)
+    return intersect_count
+
+@timer(level=2)
+def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor, backend: str = 'taichi') -> Tensor:
+    '''Calculate all the points intersect with 1 triangle
+    using Möller-Trumbore intersection algorithm
+    see paper https://doi.org/10.1080/10867651.1997.10487468
+
+    Args:
+        origins: Tensor, size=(n, 3)
+        ray: Tensor, size=(3,), direction of ray
+        triangles: Tensor, size=(m,3,3) vertices of a triangle
+
+    Returns:
+        Tensor, size=(n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
+    '''
+    if backend == 'taichi':
+        intersect_count = _taichi_moller_trumbore_intersect_count(origins, ray, triangles)
+    else:
+        intersect_count = _torch_moller_trumbore_intersect_count(origins, ray, triangles)
     return intersect_count
 
 @timer(level=2)
