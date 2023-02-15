@@ -65,8 +65,8 @@ class Part(Model):
         self.bound_min: tuple[float, float, float]
         self.bound_max: tuple[float, float, float]
         self.real_spacing: float
-        self.size_real: int
-        self.size_reciprocal: int
+        self.real_size: int
+        self.reciprocal_size: int
         self.x: Tensor
         self.y: Tensor
         self.z: Tensor
@@ -83,15 +83,15 @@ class Part(Model):
         self.sy: Tensor
         self.sz_half: Tensor
 
-    def auto_process(self, size_real: int | None = None, spacing: float | None = None,  size_reciprocal: int | None = None) -> None:
+    def auto_process(self, real_size: int | None = None, spacing: float | None = None,  reciprocal_size: int | None = None) -> None:
         '''Automatically do the pre-processing of part model
         to than can use get_F_value method.
         '''
-        self.gen_real_lattice_meshgrid(size_real=size_real, spacing=spacing)
+        self.gen_real_lattice_meshgrid(real_size=real_size, spacing=spacing)
         self.gen_real_lattice_sld()
-        self.gen_reciprocal_lattice(size_reciprocal=size_reciprocal)
+        self.gen_reciprocal_lattice(reciprocal_size=reciprocal_size)
 
-    def _get_suggested_spacing(self, Lmin: float, Lmax:float, size_real: int = 50) -> float:
+    def _get_suggested_spacing(self, Lmin: float, Lmax:float, real_size: int = 50) -> float:
         '''Calculate optimal real_spacing and n_s values
         for the generation of reciprocal spacing. Based on my
         experience and test, the meshgrid density is set to be
@@ -103,7 +103,7 @@ class Part(Model):
             Lmin: minimum real space scale of a model
             Lmax: maximum real space scale of a model
         '''
-        n_d = size_real
+        n_d = real_size
         real_spacing = Lmax / n_d
         real_spacing = min(real_spacing, Lmin/10)
         return real_spacing
@@ -116,20 +116,20 @@ class Part(Model):
         spacing = x[1,0,0].item() - x[0,0,0].item()
         self.real_spacing = spacing
         self.x, self.y, self.z = x.to(self.device), y.to(self.device), z.to(self.device)
-        self.size_real = max(x.shape)
+        self.real_size = max(x.shape)
 
-    def gen_real_lattice_meshgrid(self, size_real: int | None = None, spacing: float | None = None) -> tuple[Tensor, Tensor, Tensor]:
+    def gen_real_lattice_meshgrid(self, real_size: int | None = None, spacing: float | None = None) -> tuple[Tensor, Tensor, Tensor]:
         '''Generate equally spaced meshgrid in 3d real space.
-        Can be assigned either size_real or spacing.
+        Can be assigned either real_size or spacing.
         '''
         bound_min, bound_max = self.get_bound()
         xmin, ymin, zmin = bound_min
         xmax, ymax, zmax = bound_max
         Lmin = min(xmax-xmin, ymax-ymin, zmax-zmin)
         Lmax = max(xmax-xmin, ymax-ymin, zmax-zmin)
-        if size_real is not None:
-            spacing = self._get_suggested_spacing(Lmin, Lmax, size_real=size_real)
-        elif size_real is None and spacing is None:
+        if real_size is not None:
+            spacing = self._get_suggested_spacing(Lmin, Lmax, real_size=real_size)
+        elif real_size is None and spacing is None:
             spacing = self._get_suggested_spacing(Lmin, Lmax)
         # print('real spacing: {}'.format(spacing))
         # ensure equally spacing lattice
@@ -146,7 +146,7 @@ class Part(Model):
         y1d = torch.linspace(ymin, ymax, ynum, device=self.device)
         z1d = torch.linspace(zmin, zmax, znum, device=self.device)
         x, y, z = torch.meshgrid(x1d, y1d, z1d, indexing='ij')
-        self.size_real = max(xnum, ynum, znum)
+        self.real_size = max(xnum, ynum, znum)
         self.real_spacing = spacing
         self.x, self.y, self.z = x, y, z
         return x, y, z
@@ -188,8 +188,8 @@ class Part(Model):
         self.sld_original = sld.clone()
 
 
-    @timer(level=0)
-    def gen_reciprocal_lattice(self, size_reciprocal: int | None = None, need_centering: bool = True) -> Tensor:
+    @timer(level=1)
+    def gen_reciprocal_lattice(self, reciprocal_size: int | None = None, need_centering: bool = True) -> Tensor:
         '''Generate reciprocal lattice from real lattice.
         The actual real lattice begins with bound_min, but
         FFT algorithm treats real space lattice as it begins
@@ -212,15 +212,15 @@ class Part(Model):
         bound_min, bound_max = self.get_bound()
         xmin, ymin, zmin = bound_min
         xmax, ymax, zmax = bound_max
-        if size_reciprocal is None:
+        if reciprocal_size is None:
             if self.is_isolated:
-                size_reciprocal = 10 * self.size_real
-                size_reciprocal = min(600, size_reciprocal)  # in case of using too much resource
+                reciprocal_size = 10 * self.real_size
+                reciprocal_size = min(600, reciprocal_size)  # in case of using too much resource
             else:
-                size_reciprocal = self.size_real
+                reciprocal_size = self.real_size
         else:
-            size_reciprocal = max(size_reciprocal, self.size_real)
-        n_s = size_reciprocal
+            reciprocal_size = max(reciprocal_size, self.real_size)
+        n_s = reciprocal_size
         # print('n_s: {}'.format(n_s))
         # larger n_s get more precise in low q,
         # but may use too many memory since F increases in ^3
@@ -261,7 +261,7 @@ class Part(Model):
         box_scatt = torch.einsum('i,j,k->ijk', sinc(qxd2), sinc(qyd2), sinc(qzd2))
         F_half = F_half * d**3 * box_scatt
 
-        self.size_reciprocal = size_reciprocal
+        self.reciprocal_size = reciprocal_size
         self.s1d = s1d
         self.s1dz = s1dz
         self.F_half = F_half
@@ -410,7 +410,6 @@ class Part(Model):
         # 只依赖于模，所以精度差一些。
         ################################################
         
-
         # 直接复数插值
         F_value = calc_func.trilinear_interp(
             sx, sy, sz, self.s1d, self.s1d, self.s1dz, new_F_half, ds
@@ -442,27 +441,54 @@ class Part(Model):
         z = self.z.to(output_device)
         sld = self.sld.to(output_device)
         return x, y, z, sld
-
-    def _calc_sas1d(self, q1d: Tensor, orientation_average_offset: int = 100) -> tuple[Tensor, Tensor]:
-        '''Calculate 1d SAS curve from reciprocal lattice.
-        For test only now. Will be transfered to sas module.
+    
+    def get_sas(self, qx: Tensor, qy: Tensor, qz: Tensor) -> Tensor:
+        '''Calculate SAS intensity pattern from reciprocal lattice
+        according to given q coordinates (qx, qy, qz). No orientation
+        average.
+        Output dims of intensity and device will be same as input qx.
+        Attention:
+        The assumed q unit will still be the reverse of model
+        unit. So be careful when generate q2d by detector geometry,
+        should match that of model unit.
         '''
-        q1d = q1d.to(self.device)
-        s_input = q1d/(2*torch.pi)
-        s = s_input[torch.where(s_input<=self.s1d.max())]
+        smax = self.get_s_max()
+        input_shape = qx.shape
+        sx = qx.to(self.device).flatten()/(2*torch.pi)
+        sy = qy.to(self.device).flatten()/(2*torch.pi)
+        sz = qz.to(self.device).flatten()/(2*torch.pi)
+        s = torch.sqrt(sx**2 + sy**2 + sz**2)
+        sx[s>=smax], sy[s>=smax], sz[s>=smax] = 0., 0., 0.  # set value larger than smax to 0
+        reciprocal_coord = torch.stack([sx, sy, sz], dim=-1)
+        F = self.get_F_value(reciprocal_coord)
+        F[s>=smax] = 0. # set value larger than smax to 0
+        I = F.real**2 + F.imag**2
+        I = I.reshape(input_shape)
+
+        output_device = qx.device
+        return I.to(output_device)
+
+    def get_sas_1d(self, q1d: Tensor, orientation_average_offset: int = 100) -> Tensor:
+        '''Calculate 1d SAS intensity curve from reciprocal lattice.
+        Orientation averaged.
+        Device of output tensor is the same as input q1d.
+        '''
+        s_input = q1d.to(self.device)/(2*torch.pi)
+        smax = self.get_s_max()
+        s = s_input[torch.where(s_input<=smax)] # only calculate within available range
 
         # generate coordinates to interpolate using fibonacci grid
         # 每一个q值对应的球面取多少个取向进行平均
-        n_on_sphere = s#**2 # increase too fast if use quadratic... time-consuming and unnecessary
+        n_on_sphere = s # s**2 increase too fast if use quadratic... time-consuming and unnecessary
         n_on_sphere = torch.round(n_on_sphere/n_on_sphere[0]) + orientation_average_offset
         sx, sy, sz = calc_func.sampling_points(s, n_on_sphere)
 
-        #### interpolate
+        #### interpolate ####
         reciprocal_coord = torch.stack([sx, sy, sz], dim=-1)
         F = self.get_F_value(reciprocal_coord)
         I = F.real**2 + F.imag**2
 
-        # orientation average
+        #### orientation average ####
         n_on_sphere = n_on_sphere.to('cpu')
         I_list = []
         begin_index = 0
@@ -471,10 +497,44 @@ class Part(Model):
             Ii = torch.sum(I[begin_index:begin_index+N])/N
             I_list.append(Ii.to('cpu').item())
             begin_index += N
-        I1d = torch.tensor(I_list)
 
-        return 2*torch.pi*s.to('cpu'), I1d
+        #### output result ####
+        output_device = q1d.device
+        I = torch.tensor(I_list, device=output_device)
+        I1d = -1 * torch.ones_like(s_input, device=output_device)
+        I1d[s_input<=smax] = I
+        return I1d
 
+    #========================================================
+    #   functions for convinient and intuitionistic usage
+    #========================================================
+    @timer(level=0)
+    def prepare(self, real_size: int | None = None, spacing: float | None = None) -> None:
+        '''Simulate the real sample preparation process. To build the
+        part model in real space.
+        '''
+        self.gen_real_lattice_meshgrid(real_size=real_size, spacing=spacing)
+        self.gen_real_lattice_sld()
+
+    @timer(level=0)
+    def scatter(self, reciprocal_size: int | None = None) -> None:
+        '''Simulate the scattering process to generate full reciprocal lattice.
+        '''
+        self.gen_reciprocal_lattice(reciprocal_size=reciprocal_size)
+
+    @timer(level=0)
+    def measure(self, *qi: Tensor, orientation_average_offset: int = 100) -> Tensor:
+        '''Simulate measurement process. The full scatter pattern is generated
+        in self.scatter() process, this method gives measured result of certain
+        q, return scattering intensity like real SAS measurements.
+        Input should be either 1d q, which will return orientation averaged 1d I;
+        or qx, qy, qz, which will return I(qx, qy, qz) with same shape.
+        '''
+        if len(qi) == 1:
+            I = self.get_sas_1d(*qi, orientation_average_offset=orientation_average_offset)
+        else:
+            I = self.get_sas(*qi)
+        return I
 
 class StlPart(Part):
     '''class for part from stl file.
@@ -504,7 +564,7 @@ class StlPart(Part):
         self.bound_min, self.bound_max = bound_min, bound_max
         return bound_min, bound_max
 
-    @timer(level=0)
+    @timer(level=1)
     def gen_real_lattice_sld(self) -> Tensor:
         '''Generate sld in real lattice, which is sld value on each
         lattice meshgrid point. From stl mesh.
@@ -553,7 +613,7 @@ class MathPart(Part):
         self.bound_min, self.bound_max = bound_min, bound_max
         return bound_min, bound_max
 
-    @timer(level=0)
+    @timer(level=1)
     def gen_real_lattice_sld(self) -> Tensor:
         '''Generate sld in real lattice, which is sld value on each
         lattice meshgrid point. From math description.
@@ -636,36 +696,34 @@ class Assembly(Part):
 
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-    from plot import plot_parts, plot_sas1d
+    from detector import Detector
 
-    # torch.set_default_dtype(torch.float64)
+    part1 = MathPart(filename=r'test_models/cylinder_z.py', device='cpu')
+    part1.math_description.params = {
+            'R': 10,
+            'H': 30,
+            'sld_value': 1
+        }
+    part1.prepare()
+    part1.scatter()
+    q = torch.linspace(0.01, 1, steps=200)
+    I = part1.measure(q)
 
-    def main():
-        # part1 = StlPart(filename=r'test_models/torus.stl', device='cpu')
-        part2 = MathPart(filename=r'test_models/cylinder_y.py', device='cpu')
-        # part = MathPart(filename=r'models/mathpart_template.py', device='cpu')
-        # part1.gen_real_lattice_meshgrid()
-        # part1.gen_real_lattice_sld()
-        # part1.gen_reciprocal_lattice()
+    part2 = StlPart(filename=r'test_models/torus.stl', device='cpu', sld_value=2)
+    part2.prepare()
+    part2.scatter()
 
-        # part1.rotate((1,0,0), torch.pi/2)
-        # part1.translate((30,0,0))
+    assembly = Assembly(part1, part2)
+    I = assembly.measure(q)
 
-        part2.gen_real_lattice_meshgrid()
-        part2.gen_real_lattice_sld()
-        part2.gen_reciprocal_lattice()
+    det1 = Detector((981, 1043), 172e-6)
+    det1.set_sdd(1.5)
+    det1.translate(0, -50e-3)
+    wavelength = 1.342
+    qcoord1 = det1.get_reciprocal_coord(wavelength)
+    I2d1 = assembly.measure(*qcoord1)
 
-        # assembly = Assembly(part1, part2)
-        # assembly.gen_real_lattice_meshgrid()
-        # print(assembly.gen_real_lattice_sld().shape)
 
-        # plot_parts(part, show=True)
-    
-        q = torch.linspace(0.005, 2.5, 200)
-        q, I = part2._calc_sas1d(q)
-        plot_sas1d(q, I, show=True, savename='test.png')
-        
-    main()
+
 
 
