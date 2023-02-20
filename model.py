@@ -509,7 +509,7 @@ class Part(Model):
     #   functions for convinient and intuitionistic usage
     #========================================================
     @timer(level=0)
-    def prepare(self, real_size: int | None = None, spacing: float | None = None) -> None:
+    def sampling(self, real_size: int | None = None, spacing: float | None = None) -> None:
         '''Simulate the real sample preparation process. To build the
         part model in real space.
         '''
@@ -704,13 +704,13 @@ if __name__ == '__main__':
             'H': 30,
             'sld_value': 1
         }
-    part1.prepare()
+    part1.sampling()
     part1.scatter()
     q = torch.linspace(0.01, 1, steps=200)
     I = part1.measure(q)
 
     part2 = StlPart(filename=r'test_models/torus.stl', device='cpu', sld_value=2)
-    part2.prepare()
+    part2.sampling()
     part2.scatter()
 
     assembly = Assembly(part1, part2)
