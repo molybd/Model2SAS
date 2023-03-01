@@ -34,7 +34,7 @@ class Model:
         or curve.
         Parameters:
             reciprocal_coord: shape=(n, 3)
-        To be overwritten.
+        #* To be overwritten.
         '''
         F_value = torch.ones(reciprocal_coord.shape[0], dtype=torch.complex64)
         return F_value
@@ -61,7 +61,7 @@ class Part(Model):
             if partname is None:
                 self.partname = os.path.splitext(self.basename)[0]
         self.is_isolated = is_isolated
-        self.transformation = {}
+        self.transformation: list[dict] = []
         self.bound_min: tuple[float, float, float]
         self.bound_max: tuple[float, float, float]
         self.real_spacing: float
@@ -163,7 +163,7 @@ class Part(Model):
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         '''Get boundary of part model. Return 2 points which
         determine a cuboid fully containing the whole part model.
-        To be overwritten.
+        #* To be overwritten.
         '''
         xmin, ymin, zmin = self.x.min().item(), self.y.min().item(), self.z.min().item()
         xmax, ymax, zmax = self.x.max().item(), self.y.max().item(), self.z.max().item()
@@ -175,7 +175,7 @@ class Part(Model):
         '''Generate SLD lattice of this part model.
         Values at lattice points are corresponding SLD.
         Store original real lattice at last.
-        To be overwritten.
+        #* To be overwritten.
         '''
         x, y, z, sld = self.x, self.y, self.z, self.sld
         self._store_original_real_lattice(x, y, z, sld)
@@ -295,26 +295,24 @@ class Part(Model):
         on coordinates and reciprocal lattice in the later call.
         Method refer to self._translate_on_reciprocal_lattice()
         '''
-        vx, vy, vz = vector
         # real space
-        self.x = self.x + vx
-        self.y = self.y + vy
-        self.z = self.z + vz
+        vx, vy, vz = vector
+        def translate_for_real(x, y, z, sld):
+            return x+vx, y+vy, z+vz, sld
 
         # reciprocal lattice
         multiplier_arg = -1 * 2*torch.pi * (self.sx*vx + self.sy*vy + self.sz_half*vz) # only imaginary part
-
-        def apply_on_reciprocal_lattice(coord: Tensor, F: Tensor) -> tuple[Tensor, Tensor]:
+        def translate_for_recoprocal(reciprocal_coord: Tensor, F: Tensor) -> tuple[Tensor, Tensor]:
             F_mod, F_arg = abi2modarg(F)
-            F_new = modarg2abi(F_mod, F_arg+multiplier_arg)
-            return coord, F_new
+            F_new = modarg2abi(F_mod, F_arg + multiplier_arg)
+            return reciprocal_coord, F_new
 
-        index = len(self.transformation)
-        self.transformation[index] = dict(
+        self.transformation.append(dict(
             type = 'translate',
             param = (vector,),
-            func = apply_on_reciprocal_lattice  # 闭包函数
-        )
+            func_real = translate_for_real,  # 闭包函数
+            func_reciprocal = translate_for_recoprocal, # 闭包函数
+        ))
 
     @timer(level=0)
     def rotate(self, axis: tuple[float, float, float], angle: float) -> None:
@@ -346,27 +344,28 @@ class Part(Model):
             return x_rotated
 
         # real space
-        points = torch.stack([self.x, self.y, self.z], dim=-1)
-        points = euler_rodrigues_rotate(points, axis, angle)
-        self.x, self.y, self.z = torch.unbind(points, dim=-1)
+        def translate_for_real(x, y, z, sld):
+            points = torch.stack([x, y, z], dim=-1)
+            points = euler_rodrigues_rotate(points, axis, angle)
+            return *torch.unbind(points, dim=-1), sld
 
         # reciprocal lattice
-        def apply_on_reciprocal_lattice(coord: Tensor, F: Tensor) -> tuple[Tensor, Tensor]:
-            new_coord = euler_rodrigues_rotate(coord, axis, -angle) # rotate coord reversely to fit reciprocal lattice
-            return new_coord, F
+        def translate_for_recoprocal(reciprocal_coord: Tensor, F: Tensor) -> tuple[Tensor, Tensor]:
+            new_reciprocal_coord = euler_rodrigues_rotate(reciprocal_coord, axis, -angle) # rotate coord reversely to fit reciprocal lattice
+            return new_reciprocal_coord, F
 
-        index = len(self.transformation)
-        self.transformation[index] = dict(
+        self.transformation.append(dict(
             type = 'rotate',
             param = (axis, angle),
-            func = apply_on_reciprocal_lattice  # 闭包函数
-        )
+            func_real = translate_for_real,  # 闭包函数
+            func_reciprocal = translate_for_recoprocal, # 闭包函数
+        ))
 
     def clear_transformation(self) -> None:
         '''Clear all transformations. Set part model to default.
         '''
         self.x, self.y, self.z = self.x_original.clone(), self.y_original.clone(), self.z_original.clone()
-        self.transformation = {}
+        self.transformation = []
 
     @timer(level=1)
     def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
@@ -389,8 +388,8 @@ class Part(Model):
 
         # apply transform
         if self.centered:
-            for transform in self.transformation.values():
-                new_coord, new_F_half = transform['func'](new_coord, new_F_half)
+            for transform in self.transformation:
+                new_coord, new_F_half = transform['func_reciprocal'](new_coord, new_F_half)
 
         # 因为用的rfft，只有z>=0那一半，因此要将z<0的坐标转换为中心对称的坐标
         sx, sy, sz = torch.unbind(new_coord, dim=-1)
@@ -434,12 +433,16 @@ class Part(Model):
         return smax
 
     def get_real_lattice(self, output_device: str = 'cpu') -> tuple[Tensor, Tensor, Tensor, Tensor]:
-        '''Return real lattice
+        '''Return real lattice with sld values
         '''
-        x = self.x.to(output_device)
-        y = self.y.to(output_device)
-        z = self.z.to(output_device)
-        sld = self.sld.to(output_device)
+        x = self.x.clone()
+        y = self.y.clone()
+        z = self.z.clone()
+        sld = self.sld.clone()
+        # apply transform
+        for transform in self.transformation:
+            x, y, z, sld = transform['func_real'](x, y, z, sld)
+        x, y, z, sld = x.to(output_device), y.to(output_device), z.to(output_device), sld.to(output_device)
         return x, y, z, sld
     
     def get_sas(self, qx: Tensor, qy: Tensor, qz: Tensor) -> Tensor:
