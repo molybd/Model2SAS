@@ -178,3 +178,31 @@ def trilinear_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tens
     c_interp += c[ix+1, iy+1, iz]*xd*yd*(1-zd)
     c_interp += c[ix+1, iy+1, iz+1]*xd*yd*zd
     return c_interp
+
+@timer(level=2)
+def euler_rodrigues_rotate(coord: Tensor, axis_local: tuple[float, float, float], angle_local: float) -> Tensor:
+    """Central rotation of coordinates by Euler-Rodrigues formula.
+    Refer to https://en.wikipedia.org/wiki/Euler%E2%80%93Rodrigues_formula
+
+    Args:
+        coord (Tensor): coordinates, shape=(n,3)
+        axis_local (tuple[float, float, float]): rotating axis, vector from (0,0,0)
+        angle_local (float): rotation angle in radian
+
+    Returns:
+        Tensor: rotated coordinates, shape=(n,3)
+    """    
+    device = coord.device
+    ax = torch.tensor(axis_local, dtype=torch.float32, device=device)
+    ax = ax / torch.sqrt(torch.sum(ax**2))
+    ang = torch.tensor(angle_local, dtype=torch.float32, device=device)
+    a = torch.cos(ang/2)
+    b = ax[0]*torch.sin(ang/2)
+    c = ax[1]*torch.sin(ang/2)
+    d = ax[2]*torch.sin(ang/2)
+    w = torch.tensor((b, c, d), device=device)
+
+    x = coord
+    wx = -torch.linalg.cross(x, w.expand_as(x), dim=-1)
+    x_rotated = x + 2*a*wx + 2*(-torch.linalg.cross(wx, w.expand_as(wx), dim=-1))
+    return x_rotated

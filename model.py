@@ -12,6 +12,7 @@ import torch
 from torch import Tensor
 
 import calc_func
+from calc_func import euler_rodrigues_rotate
 from utility import timer, convert_coord, abi2modarg, modarg2abi
 
 
@@ -61,7 +62,7 @@ class Part(Model):
             if partname is None:
                 self.partname = os.path.splitext(self.basename)[0]
         self.is_isolated = is_isolated
-        self.transformation: list[dict] = []
+        self.geo_transform: list[dict] = []
         self.bound_min: tuple[float, float, float]
         self.bound_max: tuple[float, float, float]
         self.real_spacing: float
@@ -286,7 +287,7 @@ class Part(Model):
         return F_new
 
     @timer(level=0)
-    def translate(self, vector: tuple[float, float, float]) -> None:
+    def translate(self, vx: float, vy: float, vz: float) -> None:
         '''Translate model by vector.
         Change real space lattice directly;
         But in reciprocal space, change also depends on input
@@ -296,22 +297,23 @@ class Part(Model):
         Method refer to self._translate_on_reciprocal_lattice()
         '''
         # real space
-        vx, vy, vz = vector
-        def translate_for_real(x, y, z, sld):
+        def func_for_real(x, y, z, sld):
             return x+vx, y+vy, z+vz, sld
 
-        # reciprocal lattice
-        multiplier_arg = -1 * 2*torch.pi * (self.sx*vx + self.sy*vy + self.sz_half*vz) # only imaginary part
-        def translate_for_recoprocal(reciprocal_coord: Tensor, F: Tensor) -> tuple[Tensor, Tensor]:
-            F_mod, F_arg = abi2modarg(F)
-            F_new = modarg2abi(F_mod, F_arg + multiplier_arg)
-            return reciprocal_coord, F_new
+        # reciprocal
+        v = torch.tensor([vx, vy, vz], dtype=torch.float32, device=self.device) # must claim dtype, or will raise error
+        def func_for_reciprocal(reciprocal_coord: Tensor, multiplier_arg: Tensor) -> tuple[Tensor, Tensor]:
+            '''reciprocal_coord.shape == (n,3)
+            multiplier_arg.shape = (n,)
+            '''
+            arg = -2 * torch.pi * (reciprocal_coord @ v)  # only calculate argument of multiplier which is a complex number with mod=1
+            return reciprocal_coord, arg+multiplier_arg
 
-        self.transformation.append(dict(
+        self.geo_transform.append(dict(
             type = 'translate',
-            param = (vector,),
-            func_real = translate_for_real,  # 闭包函数
-            func_reciprocal = translate_for_recoprocal, # 闭包函数
+            param = (vx, vy, vz),
+            func_for_real = func_for_real,  # 闭包函数
+            func_for_reciprocal = func_for_reciprocal, # 闭包函数
         ))
 
     @timer(level=0)
@@ -328,68 +330,46 @@ class Part(Model):
             axis: vector describing direction of the axis
             angle: float, rotation angle in radians
         '''
-        def euler_rodrigues_rotate(coord: Tensor, axis_local: tuple[float, float, float], angle_local: float) -> Tensor:
-            ax = torch.tensor(axis_local, device=self.device)
-            ax = ax / torch.sqrt(torch.sum(ax**2))
-            ang = torch.tensor(angle_local, device=self.device)
-            a = torch.cos(ang/2)
-            b = ax[0]*torch.sin(ang/2)
-            c = ax[1]*torch.sin(ang/2)
-            d = ax[2]*torch.sin(ang/2)
-            w = torch.tensor((b, c, d), device=self.device)
-
-            x = coord
-            wx = -torch.linalg.cross(x, w.expand_as(x), dim=-1)
-            x_rotated = x + 2*a*wx + 2*(-torch.linalg.cross(wx, w.expand_as(wx), dim=-1))
-            return x_rotated
-
         # real space
-        def translate_for_real(x, y, z, sld):
+        def func_for_real(x, y, z, sld):
             points = torch.stack([x, y, z], dim=-1)
             points = euler_rodrigues_rotate(points, axis, angle)
             return *torch.unbind(points, dim=-1), sld
 
-        # reciprocal lattice
-        def translate_for_recoprocal(reciprocal_coord: Tensor, F: Tensor) -> tuple[Tensor, Tensor]:
-            new_reciprocal_coord = euler_rodrigues_rotate(reciprocal_coord, axis, -angle) # rotate coord reversely to fit reciprocal lattice
-            return new_reciprocal_coord, F
+        # reciprocal
+        def func_for_reciprocal(reciprocal_coord: Tensor, multiplier_arg: Tensor) -> tuple[Tensor, Tensor]:
+            '''reciprocal_coord.shape == (n,3)
+            multiplier_arg.shape = (n,)
+            '''
+            new_reciprocal_coord = euler_rodrigues_rotate(reciprocal_coord, axis, -angle)
+            return new_reciprocal_coord, multiplier_arg
 
-        self.transformation.append(dict(
+        self.geo_transform.append(dict(
             type = 'rotate',
             param = (axis, angle),
-            func_real = translate_for_real,  # 闭包函数
-            func_reciprocal = translate_for_recoprocal, # 闭包函数
+            func_for_real = func_for_real,  # 闭包函数
+            func_for_reciprocal = func_for_reciprocal, # 闭包函数
         ))
 
-    def clear_transformation(self) -> None:
-        '''Clear all transformations. Set part model to default.
+    def clear_geo_transform(self) -> None:
+        '''Clear all geometric transforms. Set part model to default.
         '''
         self.x, self.y, self.z = self.x_original.clone(), self.y_original.clone(), self.z_original.clone()
-        self.transformation = []
+        self.geo_transform = []
 
     @timer(level=1)
     def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
         '''Get F value (scattering amplitude) of certain coordinates
         in reciprocal space.
-        Considering transformations applied to the part model, which
-        will be realized in reciprocal space. For now, 2 kinds of
-        transformation are realized here: translate and rotate. Translate
-        doesn't change the reciprocal meshgrid, but change the F value at
-        each grid point; rotation, on the contrary, change the reciprocal
-        meshgrid coordinates (rotate them), but doesn't change the F values.
-        So, this function will return the F values of each coordinates
-        after applying all transformations.
-
         Parameters:
             reciprocal_coord: shape=(n, 3)
         '''
         new_coord = reciprocal_coord.to(self.device)
-        new_F_half = self.F_half.clone()
-
-        # apply transform
+        multiplier_arg = torch.zeros(reciprocal_coord.shape[0], device=self.device)
+        # apply transform function for reciprocal
         if self.centered:
-            for transform in self.transformation:
-                new_coord, new_F_half = transform['func_reciprocal'](new_coord, new_F_half)
+            for transform in reversed(self.geo_transform):
+                new_coord, multiplier_arg = transform['func_for_reciprocal'](new_coord, multiplier_arg)
 
         # 因为用的rfft，只有z>=0那一半，因此要将z<0的坐标转换为中心对称的坐标
         sx, sy, sz = torch.unbind(new_coord, dim=-1)
@@ -411,9 +391,8 @@ class Part(Model):
         
         # 直接复数插值
         F_value = calc_func.trilinear_interp(
-            sx, sy, sz, self.s1d, self.s1d, self.s1dz, new_F_half, ds
+            sx, sy, sz, self.s1d, self.s1d, self.s1dz, self.F_half, ds
         )
-
         # 模与辐角分别插值
         # new_F_half_mod, new_F_half_arg = abi2modarg(new_F_half)
         # F_value_mod = calc_func.trilinear_interp(
@@ -423,6 +402,10 @@ class Part(Model):
         #     sx, sy, sz, self.s1d, self.s1d, self.s1dz, new_F_half_arg, ds
         # )
         # F_value = modarg2abi(F_value_mod, F_value_arg)
+
+        # apply translate
+        F_value_mod, F_value_arg = abi2modarg(F_value)
+        F_value = modarg2abi(F_value_mod, F_value_arg+multiplier_arg)
 
         return F_value
 
@@ -440,8 +423,8 @@ class Part(Model):
         z = self.z.clone()
         sld = self.sld.clone()
         # apply transform
-        for transform in self.transformation:
-            x, y, z, sld = transform['func_real'](x, y, z, sld)
+        for transform in self.geo_transform:
+            x, y, z, sld = transform['func_for_real'](x, y, z, sld)
         x, y, z, sld = x.to(output_device), y.to(output_device), z.to(output_device), sld.to(output_device)
         return x, y, z, sld
     
@@ -633,19 +616,22 @@ class MathPart(Part):
         return sld
 
 
-class Assembly(Part):
-    '''Assembly of several part model
+class Assembly(Part):    
+    '''Assembly of several part model.
+    For SAS calculation, use get_F_value for each part model.
+    The own real lattice is for sld volume plot by using less points.
     '''
-    def __init__(self, *parts: Part, device: str = 'cpu') -> None:
-        '''All part model must in same device.
+    def __init__(self, *part: Part, device: str = 'cpu') -> None:
+        '''???All part model must in same device.
         '''
-        self.parts = {}
-        self.add_parts(*parts)
+        self.parts: dict[int, Part] = {}
+        self.add_part(*part)
         self.device = device
+        self.geo_transform = []  # should always be empty
 
-    def add_parts(self, *parts: Part) -> None:
+    def add_part(self, *part: Part) -> None:
         '''Add part object or list of part object to self.parts dictionary'''
-        for p in parts:
+        for p in part:
             i = len(self.parts)
             self.parts[i] = p
 
@@ -656,7 +642,7 @@ class Assembly(Part):
         '''
         F_value = torch.zeros(reciprocal_coord.shape[0], dtype=torch.complex64, device=self.device)
         for part in self.parts.values():
-            F_value += part.get_F_value(reciprocal_coord).to(self.device)
+            F_value = F_value + part.get_F_value(reciprocal_coord).to(self.device)
         return F_value
 
     def get_s_max(self) -> float:
@@ -666,35 +652,56 @@ class Assembly(Part):
         for part in self.parts.values():
             smax_list.append(part.get_s_max())
         return min(smax_list)
+    
+    def clear_geo_transform(self) -> None:
+        for part in self.parts.values():
+            part.clear_geo_transform()
+    
 
+    #========================================================
+    #  generate own real lattice, only for sld volume plot
+    #========================================================
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         '''Get maximum boundary containing all the parts.
+        It is after all parts' transform
         '''
-        l_xmin = [part.x.min().item() for part in self.parts.values()]
-        l_ymin = [part.y.min().item() for part in self.parts.values()]
-        l_zmin = [part.z.min().item() for part in self.parts.values()]
-        l_xmax = [part.x.max().item() for part in self.parts.values()]
-        l_ymax = [part.y.max().item() for part in self.parts.values()]
-        l_zmax = [part.z.max().item() for part in self.parts.values()]
+        l_xmin, l_ymin, l_zmin, l_xmax, l_ymax, l_zmax = [], [], [], [], [], []
+        for part in self.parts.values():
+            spacing = part.real_spacing
+            x, y, z, _ = part.get_real_lattice()
+            l_xmin.append(x.min().item()-spacing/2)
+            l_ymin.append(y.min().item()-spacing/2)
+            l_zmin.append(z.min().item()-spacing/2)
+            l_xmax.append(x.max().item()+spacing/2)
+            l_ymax.append(y.max().item()+spacing/2)
+            l_zmax.append(z.max().item()+spacing/2)
         xmin, ymin, zmin = min(l_xmin), min(l_ymin), min(l_zmin)
         xmax, ymax, zmax = max(l_xmax), max(l_ymax), max(l_zmax)
         bound_min, bound_max = (xmin, ymin, zmin), (xmax, ymax, zmax)
         return bound_min, bound_max
 
     def gen_real_lattice_sld(self) -> Tensor:
-        '''Generate integrated assembly model.
-        Different from the get_F_value(), which directly
-        get F values from each part.
+        '''Generate lattice sld of assembly model's own.
+        For sld volume plot use only, not used in sas calculation.
         Call self.gen_real_lattice_meshgrid() first.
         '''
         sld = torch.zeros_like(self.x, dtype=torch.float32, device=self.device)
         for part in self.parts.values():
+            #* restore to untransformed
+            x, y, z = self.x.clone(), self.y.clone(), self.z.clone()
+            for transform in reversed(part.geo_transform):
+                if transform['type'] == 'translate':
+                    vx, vy, vz = transform['param']
+                    x, y, z = x-vx, y-vy, z-vz
+                elif transform['type'] == 'rotate':
+                    axis, angle = transform['param']
+                    points = torch.stack([x, y, z], dim=-1)
+                    points = euler_rodrigues_rotate(points, axis, -angle)
+                    x, y, z = torch.unbind(points, dim=-1)
             temp_part = copy.deepcopy(part)
-            temp_part.set_real_lattice_meshgrid(self.x, self.y, self.z)
+            temp_part.set_real_lattice_meshgrid(x, y, z)
             sld = sld + temp_part.gen_real_lattice_sld()
-
         self.sld = sld
-        self._store_original_real_lattice(self.x, self.y, self.z, sld)
         return sld
 
 
