@@ -97,7 +97,7 @@ def plot_sas1d(
         q_list, name_list, mode_list = gen_list(q, n), gen_list(name, n), gen_list(mode, n)
     else:
         q_list, I_list, name_list, mode_list = [q], [I], [name], [mode]
-  
+
     fig = go.Figure()
     for qi, Ii, namei, modei in zip(q_list, I_list, name_list, mode_list):
         fig.add_trace(go.Scatter(
@@ -162,8 +162,7 @@ def plot_model(
     fig = go.Figure()
     for modeli in model:
         if isinstance(modeli, Assembly):
-            modeli.gen_real_lattice_meshgrid()
-            modeli.gen_real_lattice_sld()
+            modeli.sampling()
             x, y, z, sld = modeli.get_real_lattice()
             spacing = modeli.real_spacing
             name = 'assembly'
@@ -204,7 +203,7 @@ def plot_model(
 
 @plot_utils
 def plot_surface(
-    *data: tuple[Tensor, Tensor, Tensor] | tuple[Tensor, Tensor, Tensor, Tensor],
+    *data: Tensor,
     logI: bool = True,
     title: str | None = None,
     colorscale: str = 'Plasma',
@@ -222,7 +221,7 @@ def plot_surface(
     
     fig = go.Figure()
     for i, datai in enumerate(data):
-        if len(datai) == 4:
+        if value_provided:
             x, y, z, I2d = datai
             if logI:
                 surfacecolor = torch.log(I2d)
@@ -244,7 +243,7 @@ def plot_surface(
 
 @plot_utils
 def plot_real_detector(
-    *data: tuple[Tensor, Tensor, Tensor] | tuple[Tensor, Tensor, Tensor, Tensor],
+    *data: Tensor,
     logI: bool = True,
     title: str | None = None,
     colorscale: str = 'Plasma',
