@@ -582,6 +582,13 @@ class MathPart(Part):
             module = __import__(self.partname)
             self.math_description = module.MathDescription()
 
+    def set_params(self, **kwargs) -> None:
+        '''Set params in mathpart, change default param values.
+        '''
+        for key, value in kwargs.items():
+            self.math_description.params[key] = value
+                
+
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         '''Get boundary of part model. Return 2 points which
         determine a cuboid fully containing the whole part model.
