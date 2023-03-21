@@ -163,13 +163,13 @@ def plot_model(
     for modeli in model:
         if isinstance(modeli, Assembly):
             modeli.sampling()
-            x, y, z, sld = modeli.get_real_lattice()
+            x, y, z, sld = modeli.get_real_lattice(output_device='cpu')
             spacing = modeli.real_spacing
             name = 'assembly'
             if type is None:
                 type = 'volume'
         else: # isinstance(modeli, Part)
-            x, y, z, sld = modeli.get_real_lattice()
+            x, y, z, sld = modeli.get_real_lattice(output_device='cpu')
             spacing = modeli.real_spacing
             name = modeli.partname
             if type is None:
@@ -203,7 +203,7 @@ def plot_model(
 
 @plot_utils
 def plot_surface(
-    *data: Tensor,
+    *data: tuple[Tensor, ...],
     logI: bool = True,
     title: str | None = None,
     colorscale: str = 'Plasma',
@@ -243,7 +243,7 @@ def plot_surface(
 
 @plot_utils
 def plot_real_detector(
-    *data: Tensor,
+    *data: tuple[Tensor, ...],
     logI: bool = True,
     title: str | None = None,
     colorscale: str = 'Plasma',

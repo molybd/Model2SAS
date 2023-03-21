@@ -398,7 +398,8 @@ class Part(Model):
         F_value_mod, F_value_arg = abi2modarg(F_value)
         F_value = modarg2abi(F_value_mod, F_value_arg+multiplier_arg)
 
-        return F_value
+        output_device = reciprocal_coord.device
+        return F_value.to(output_device)
 
     def get_s_max(self) -> float:
         '''Return maximum s value available for a part model.
@@ -631,10 +632,12 @@ class Assembly(Part):
         '''Get F value (scattering amplitude) of certain coordinates
         in reciprocal space. Sum over all parts.
         '''
-        F_value = torch.zeros(reciprocal_coord.shape[0], dtype=torch.complex64, device=self.device)
+        new_coord = reciprocal_coord.to(self.device)
+        F_value = torch.zeros(new_coord.shape[0], dtype=torch.complex64, device=self.device)
         for part in self.parts.values():
-            F_value = F_value + part.get_F_value(reciprocal_coord).to(self.device)
-        return F_value
+            F_value = F_value + part.get_F_value(new_coord)
+        output_device = reciprocal_coord.device
+        return F_value.to(output_device)
 
     def get_s_max(self) -> float:
         '''Return maximum s value of assembly model.
