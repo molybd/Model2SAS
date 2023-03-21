@@ -694,7 +694,7 @@ class Assembly(Part):
                     x, y, z = torch.unbind(points, dim=-1)
             temp_part = copy.deepcopy(part)
             temp_part.set_real_lattice_meshgrid(x, y, z)
-            sld = sld + temp_part.gen_real_lattice_sld()
+            sld = sld + temp_part.gen_real_lattice_sld().to(self.device) # part models may be at different devices
         self.sld = sld
         return sld
 
