@@ -16,23 +16,14 @@ from calc_func import euler_rodrigues_rotate
 from utility import timer, convert_coord, abi2modarg, modarg2abi
 
 
-# def print_time(timestamp):
-#     t = time.time()
-#     print(t-timestamp)
-#     return t
-
 class Model:
     '''Parent class for model, including Part and Assembly,
     which should overwrite get_F_value() and get_smax()
     method. Then, both can be treated equally in SAS calculation.
     '''
-    def __init__(self, device: str = 'cpu') -> None:
-        self.device = device
-
     def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
         '''Core method for model class, including Part and
-        Assembly. Called by Sas class to calculate SAS pattern
-        or curve.
+        Assembly.
         Parameters:
             reciprocal_coord: shape=(n, 3)
         #* To be overwritten.
@@ -616,7 +607,7 @@ class MathPart(Part):
         return sld
 
 
-class Assembly(Part):    
+class Assembly(Part):
     '''Assembly of several part model.
     For SAS calculation, use get_F_value for each part model.
     The own real lattice is for sld volume plot by using less points.
