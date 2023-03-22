@@ -107,7 +107,7 @@ def _taichi_moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triang
     return intersect_count
 
 @timer(level=2)
-def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor, backend: str = 'taichi') -> Tensor:
+def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor, backend: str = 'torch') -> Tensor:
     '''Calculate all the points intersect with 1 triangle
     using Möller-Trumbore intersection algorithm
     see paper https://doi.org/10.1080/10867651.1997.10487468
