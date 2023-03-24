@@ -85,12 +85,12 @@ def convert_coord(u:Tensor, v:Tensor, w:Tensor, original_coord:str, target_coord
         x, y, z = u, v, w
     
     # then convert to desired coordinates
-    if target_coord == 'car':
-        return x, y, z
-    elif target_coord == 'sph':
+    if target_coord == 'sph':
         return car2sph(x, y, z)
     elif target_coord == 'cyl':
         return car2cyl(x, y, z)
+    else: # target_coord == 'car':
+        return x, y, z
 
 def abi2modarg(t: Tensor) -> tuple[Tensor, Tensor]:
     '''Change a complex tensor from a+bi expression
