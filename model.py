@@ -513,6 +513,12 @@ class Part(Model):
         else:
             I = self.get_sas(*qi)
         return I
+    
+    def __call__(self, *qi: Tensor, orientation_average_offset: int = 100) -> Tensor:
+        '''Same as self.measure()
+        '''
+        return self.measure(*qi, orientation_average_offset=orientation_average_offset)
+
 
 class StlPart(Part):
     '''class for part from stl file.
