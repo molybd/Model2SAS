@@ -482,6 +482,18 @@ class Part(Model):
         I1d = -1 * torch.ones_like(s_input, device=output_device)
         I1d[s_input<=smax] = I
         return I1d
+    
+    def clone(self, deepcopy: bool = True) -> 'Part':
+        '''Clone self object. Use copy.deepcopy when deepcopy==True.
+        But the self.geo_transform list will always be deepcopied.
+        Use copy.copy() if absolute shallow copy needed.
+        '''
+        if deepcopy:
+            new_part = copy.deepcopy(self)
+        else:
+            new_part = copy.copy(self)
+            new_part.geo_transform = copy.deepcopy(self.geo_transform)
+        return new_part
 
     #========================================================
     #   functions for convinient and intuitionistic usage
