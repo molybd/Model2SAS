@@ -11,9 +11,9 @@ import numpy as np
 import torch
 from torch import Tensor
 
-import calc_func
-from calc_func import euler_rodrigues_rotate
-from utility import timer, convert_coord, abi2modarg, modarg2abi
+import calcfunc
+from calcfunc import euler_rodrigues_rotate
+from utils import timer, convert_coord, abi2modarg, modarg2abi
 
 
 class Model:
@@ -381,7 +381,7 @@ class Part(Model):
         ################################################
         
         # 直接复数插值
-        F_value = calc_func.trilinear_interp(
+        F_value = calcfunc.trilinear_interp(
             sx, sy, sz, self.s1d, self.s1d, self.s1dz, self.F_half, ds
         )
         # 模与辐角分别插值
@@ -459,7 +459,7 @@ class Part(Model):
         # 每一个q值对应的球面取多少个取向进行平均
         n_on_sphere = s # s**2 increase too fast if use quadratic... time-consuming and unnecessary
         n_on_sphere = torch.round(n_on_sphere/n_on_sphere[0]) + orientation_average_offset
-        sx, sy, sz = calc_func.sampling_points(s, n_on_sphere)
+        sx, sy, sz = calcfunc.sampling_points(s, n_on_sphere)
 
         #### interpolate ####
         reciprocal_coord = torch.stack([sx, sy, sz], dim=-1)
@@ -574,7 +574,7 @@ class StlPart(Part):
         ray = ray.to(self.device)
         vectors = self.mesh.vectors.copy()
         triangles = torch.from_numpy(vectors).to(torch.float32).to(self.device)
-        intersect_count = calc_func.moller_trumbore_intersect_count(origins, ray, triangles)
+        intersect_count = calcfunc.moller_trumbore_intersect_count(origins, ray, triangles)
         index = intersect_count % 2   # 1 is in, 0 is out
         sld = self.sld_value * index
         sld = sld.reshape(x.size())

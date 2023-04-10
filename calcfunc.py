@@ -8,7 +8,7 @@ from torch import Tensor
 import taichi as ti
 import taichi.math as tm
 
-from utility import timer
+from utils import timer
 
 ti.init(ti.gpu)
 
