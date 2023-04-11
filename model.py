@@ -407,7 +407,7 @@ class Part(Model):
         smax = min(torch.abs(self.s1d.min()).item(), torch.abs(self.s1d.max()).item())
         return smax
 
-    def get_real_lattice(self, output_device: str = 'cpu') -> tuple[Tensor, Tensor, Tensor, Tensor]:
+    def get_real_lattice_sld(self, output_device: str = 'cpu') -> tuple[Tensor, Tensor, Tensor, Tensor]:
         '''Return real lattice with sld values
         '''
         x = self.x.clone()
