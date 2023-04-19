@@ -121,7 +121,7 @@ class Part(Model):
         Lmax = max(xmax-xmin, ymax-ymin, zmax-zmin)
         if real_size is not None:
             spacing = self._get_suggested_spacing(Lmin, Lmax, real_size=real_size)
-        elif real_size is None and spacing is None:
+        elif spacing is None:
             spacing = self._get_suggested_spacing(Lmin, Lmax)
         # print('real spacing: {}'.format(spacing))
         # ensure equally spacing lattice
@@ -425,10 +425,10 @@ class Part(Model):
         according to given q coordinates (qx, qy, qz). No orientation
         average.
         Output dims of intensity and device will be same as input qx.
-        Attention:
-        The assumed q unit will still be the reverse of model
-        unit. So be careful when generate q2d by detector geometry,
-        should match that of model unit.
+        #! Attention:
+        #! The assumed q unit will still be the reverse of model
+        #! unit. So be careful when generate q2d by detector geometry,
+        #! should match that of model unit.
         '''
         smax = self.get_s_max()
         input_shape = qx.shape
@@ -446,10 +446,11 @@ class Part(Model):
         output_device = qx.device
         return I.to(output_device)
 
-    def get_sas_1d(self, q1d: Tensor, orientation_average_offset: int = 100) -> Tensor:
+    def get_1d_sas(self, q1d: Tensor, orientation_average_offset: int = 100) -> Tensor:
         '''Calculate 1d SAS intensity curve from reciprocal lattice.
         Orientation averaged.
         Device of output tensor is the same as input q1d.
+        #* The unit of q is assumed to be the reverse of model's length unit.
         '''
         s_input = q1d.to(self.device)/(2*torch.pi)
         smax = self.get_s_max()
@@ -519,9 +520,13 @@ class Part(Model):
         q, return scattering intensity like real SAS measurements.
         Input should be either 1d q, which will return orientation averaged 1d I;
         or qx, qy, qz, which will return I(qx, qy, qz) with same shape.
+        #! Attention:
+        #! The assumed q unit will still be the reverse of model
+        #! unit. So be careful when generate q2d by detector geometry,
+        #! should match that of model unit.
         '''
         if len(qi) == 1:
-            I = self.get_sas_1d(*qi, orientation_average_offset=orientation_average_offset)
+            I = self.get_1d_sas(*qi, orientation_average_offset=orientation_average_offset)
         else:
             I = self.get_sas(*qi)
         return I
