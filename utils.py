@@ -105,3 +105,84 @@ def modarg2abi(mod: Tensor, arg: Tensor) -> Tensor:
     expression to a+bi expression.
     '''
     return mod * torch.complex(torch.cos(arg), torch.sin(arg))
+
+
+class MathModelClassBase:
+    '''to generate a 3D model from a mathematical description
+    for example: a spherical shell is "x**2+y**2+z**2 >= R_core**2 and x**2+y**2+z**2 <= (R_core+thickness)**2
+    also, in spherical coordinates, a hollow sphere is (r >= R_core) and (r <= R_core+thickness)
+
+    coord:
+    - 'car' |in (x, y, z)
+    - 'sph' |in (r, theta, phi) |theta: 0~2pi ; phi: 0~pi
+    - 'cyl' |in (rho, phi, z) |theta:0-2pi
+    '''
+    def __init__(self) -> None:
+        '''must at least have these 2 attributes
+        '''
+        self.params = {}
+        self.coord = 'car'  # 'car' or 'sph' or 'cyl'
+
+    def get_bound(self) -> tuple[tuple|list, tuple|list]:
+        '''re-generate boundary for every method call
+        in case that params are altered in software.
+        return coordinates in Cartesian coordinates.
+        '''
+        return (-1*torch.ones(3)).tolist(), torch.ones(3).tolist()
+
+    def sld(self, u: Tensor, v: Tensor, w: Tensor) -> Tensor:
+        ''' calculate sld values of certain coordinates
+        Args:
+            u, v, w: coordinates in self.coord
+                x, y, z if self.coord = 'car'
+                r, theta, phi if self.coord = 'sph'
+                rho, theta, z if self.coord = 'cyl'
+        '''
+        return torch.zeros_like(u)
+
+
+def gen_math_model_class(
+        name: str = 'SpecificMathModel',
+        params: dict | None = None,
+        coord: str = 'car', 
+        bound_point: tuple[str, str, str] = ('1', '1', '1'),
+        shape_description: str = ':',
+        sld_description: str = 'False',
+    ):
+    '''Generate a math modol class dynamically.
+    '''
+    if params is None:
+        params = {}
+        
+    def init(self):
+        self.params = params
+        self.coord = coord
+
+    def get_bound(self):
+        for key, value in self.params.items():
+            exec('{} = {}'.format(key, value))
+        bound_max = torch.ones(3)
+        bound_max[0] = eval(bound_point[0])
+        bound_max[1] = eval(bound_point[1])
+        bound_max[2] = eval(bound_point[2])
+        bound_min = -1 * bound_max
+        return bound_min.tolist(), bound_max.tolist()
+    
+    def sld(self, u: Tensor, v: Tensor, w: Tensor) -> Tensor:
+        device = u.device
+        for key, value in self.params.items():
+            exec('{} = {}'.format(key, value))
+        shape_index = torch.zeros_like(u, device=device)
+        exec('shape_index[{}] = 1.0'.format(shape_description))
+        sld = torch.ones_like(u, device=device)
+        sld = eval('({}) * sld'.format(sld_description))
+        sld = shape_index * sld
+        return sld
+
+    attr = dict(
+        __init__ = init,
+        get_bound = get_bound,
+        sld = sld,
+    )
+    math_model_class = type(name, (MathModelClassBase,), attr)
+    return math_model_class

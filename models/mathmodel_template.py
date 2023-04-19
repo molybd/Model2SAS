@@ -1,19 +1,17 @@
-# -*- coding: UTF-8 -*-
+'''
+A template of hollow sphere math model
+with various sld equal to the x coordinate of certain point
+
+# ! Do not change the class name, attributes name or method name !
+'''
 
 import torch
 from torch import Tensor
 
-# =========================================================
-# A template of hollow sphere math model
-# with various sld equal to the x coordinate of certain point
-# =========================================================
 
-# =========================== ! ===========================
-# Do not change the class name, attributes name or method name !
-# =========================================================
-class MathDescription:
+class MathModelClass:
     '''to generate a 3D model from a mathematical description
-    for example: a spherical shell is "x**2+y**2+z**2 >= R_core**2 and x**2+y**2+z**2 <= (R_core+thickness)**2
+    for example: a spherical shell is x**2+y**2+z**2 >= R_core**2 and x**2+y**2+z**2 <= (R_core+thickness)**2
     also, in spherical coordinates, a hollow sphere is (r >= R_core) and (r <= R_core+thickness)
 
     coord:
@@ -44,7 +42,7 @@ class MathDescription:
         ''' calculate sld values of certain coordinates
         Args:
             u, v, w: coordinates in self.coord
-                x, y, z if self.coord = 'cat'
+                x, y, z if self.coord = 'car'
                 r, theta, phi if self.coord = 'sph'
                 rho, theta, z if self.coord = 'cyl'
         '''

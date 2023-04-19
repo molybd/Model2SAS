@@ -13,7 +13,7 @@ from torch import Tensor
 
 import calcfunc
 from calcfunc import euler_rodrigues_rotate
-from utils import timer, convert_coord, abi2modarg, modarg2abi
+from utils import timer, convert_coord, abi2modarg, modarg2abi, MathModelClassBase
 
 
 class Model:
@@ -588,30 +588,30 @@ class MathPart(Part):
     '''class for part from math description.
     Rewrite get_bound and gen_real_lattice_sld methods.
     '''
-    def __init__(self, filename: str | None = None, partname: str | None = None, is_isolated: bool = True, device: str = 'cpu') -> None:
-        '''load math object from py file
-        TODO: or directly pass through?
+    def __init__(self, math_model_class: type | None = None, filename: str | None = None, partname: str | None = None, is_isolated: bool = True, device: str = 'cpu') -> None:
+        '''load math object from a specific math model class
+        or py file
         '''
         super().__init__(filename=filename, is_isolated=is_isolated, device=device)
-        if filename is not None:
+        if math_model_class is not None:
+            self.math_model: MathModelClassBase = math_model_class()
+        elif filename is not None:
             abspath = os.path.abspath(filename)
             dirname = os.path.dirname(abspath)
             sys.path.append(dirname)
             module = __import__(self.partname)
-            self.math_description = module.MathDescription()
+            self.math_model = module.MathModelClass()
 
     def set_params(self, **kwargs) -> None:
         '''Set params in mathpart, change default param values.
         '''
-        for key, value in kwargs.items():
-            self.math_description.params[key] = value
-                
+        self.math_model.params.update(kwargs)                
 
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         '''Get boundary of part model. Return 2 points which
         determine a cuboid fully containing the whole part model.
         '''
-        bound_min, bound_max = self.math_description.get_bound()
+        bound_min, bound_max = self.math_model.get_bound()
         bound_min, bound_max = tuple(bound_min), tuple(bound_max)
         self.bound_min, self.bound_max = bound_min, bound_max
         return bound_min, bound_max
@@ -622,9 +622,9 @@ class MathPart(Part):
         lattice meshgrid point. From math description.
         '''
         x, y, z = self.x, self.y, self.z
-        part_coord = self.math_description.coord
+        part_coord = self.math_model.coord
         u, v, w = convert_coord(x, y, z, 'car', part_coord)
-        sld = self.math_description.sld(u, v, w) # will deal with device in function automatically
+        sld = self.math_model.sld(u, v, w) # will deal with device in function automatically
         if isinstance(sld, np.ndarray):
             sld = torch.from_numpy(sld).to(torch.float32).to(self.device)
 
@@ -687,7 +687,7 @@ class Assembly(Part):
         l_xmin, l_ymin, l_zmin, l_xmax, l_ymax, l_zmax = [], [], [], [], [], []
         for part in self.parts.values():
             spacing = part.real_spacing
-            x, y, z, _ = part.get_real_lattice()
+            x, y, z, _ = part.get_real_lattice_sld()
             l_xmin.append(x.min().item()-spacing/2)
             l_ymin.append(y.min().item()-spacing/2)
             l_zmin.append(z.min().item()-spacing/2)
@@ -728,7 +728,7 @@ if __name__ == '__main__':
     from detector import Detector
 
     part1 = MathPart(filename=r'test_models/cylinder_z.py', device='cpu')
-    part1.math_description.params = {
+    part1.math_model.params = {
             'R': 10,
             'H': 30,
             'sld_value': 1
