@@ -142,7 +142,7 @@ class MathModelClassBase:
 
 
 def gen_math_model_class(
-        name: str = 'SpecificMathModel',
+        name: str = 'SpecificMathModelClass',
         params: dict | None = None,
         coord: str = 'car', 
         bound_point: tuple[str, str, str] = ('1', '1', '1'),
@@ -154,11 +154,11 @@ def gen_math_model_class(
     if params is None:
         params = {}
         
-    def init(self):
+    def init(self) -> None:
         self.params = params
         self.coord = coord
 
-    def get_bound(self):
+    def get_bound(self) -> tuple[tuple|list, tuple|list]:
         for key, value in self.params.items():
             exec('{} = {}'.format(key, value))
         bound_max = torch.ones(3)
@@ -183,6 +183,69 @@ def gen_math_model_class(
         __init__ = init,
         get_bound = get_bound,
         sld = sld,
+        info = dict(
+            params = params,
+            coord = coord, 
+            bound_point = bound_point,
+            shape_description = shape_description,
+            sld_description = sld_description,
+        )
     )
     math_model_class = type(name, (MathModelClassBase,), attr)
     return math_model_class
+
+
+def gen_math_model_class_sourcecode(
+        params: dict,
+        coord: str, 
+        bound_point: tuple[str, str, str],
+        shape_description: str,
+        sld_description: str,
+        ) -> str:
+    '''Generate source code string of math model class
+    for file saving.
+    '''
+
+    source_code = """
+import torch
+from torch import Tensor
+
+class MathModelClass:
+    
+    def __init__(self) -> None:
+        self.params = {{
+{}
+        }}
+        self.coord = '{}'
+    """.format(
+        '\n'.join(['{}"{}": {},'.format(' '*12, str(key), str(value)) for key, value in params.items()]),
+        coord,
+    )
+
+    source_code += """
+    def get_bound(self) -> tuple[tuple|list, tuple|list]:
+{}
+        bound_max = torch.tensor(({}, {}, {}), dtype=torch.float32)
+        bound_min = -1 * bound_max
+        return bound_min.tolist(), bound_max.tolist()
+    """.format(
+        '\n'.join(['{}{} = self.params["{}"]'.format(' '*8, str(key), str(key)) for key in params.keys()]),
+        *bound_point,
+    )
+
+    source_code += """
+    def sld(self, u: Tensor, v: Tensor, w: Tensor) -> Tensor:
+        device = u.device
+{}
+        shape_index = torch.zeros_like(u, device=device)
+        shape_index[{}] = 1.0
+        sld = torch.ones_like(u, device=device)
+        sld = ({}) * sld
+        sld = shape_index * sld
+        return sld
+    """.format(
+        '\n'.join(['{}{} = self.params["{}"]'.format(' '*8, str(key), str(key)) for key in params.keys()]),
+        shape_description,
+        sld_description,
+    )
+    return source_code
