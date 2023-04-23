@@ -152,6 +152,22 @@ def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Ten
     return x.to(device), y.to(device), z.to(device)
 
 @timer(level=2)
+def nearest_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tensor, c:Tensor, d:float | Tensor) -> Tensor:
+    '''对等间距网格进行最近邻插值
+    ATTENTION:
+        当网格值c是复数时，根据我这里的实际测试结果，这个函数等效于对实部和虚部分别进行插值
+    Parameters:
+        x, y, z: 待插值的三个坐标序列，(x[i], y[i], z[i])代表待插值的某点坐标
+        px, py, pz: 已知数值的点的三个坐标序列，只有一维，也就是说没有进行meshgrid
+        c: 每个坐标点的值, shape=(px.size, py.size, pz.size)
+        d: float 网格间距, 所有格点都是等间距的
+    '''
+    ix, iy, iz = (x-px[0]+d/2)/d, (y-py[0]+d/2)/d, (z-pz[0]+d/2)/d
+    ix, iy, iz = ix.to(torch.int64), iy.to(torch.int64), iz.to(torch.int64) # tensors used as indices must be long, byte or bool tensors
+    c_interp = c[ix, iy, iz]
+    return c_interp
+
+@timer(level=2)
 def trilinear_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tensor, c:Tensor, d:float | Tensor) -> Tensor:
     '''对等间距网格进行三线性插值
     ATTENTION:

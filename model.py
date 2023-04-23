@@ -349,7 +349,7 @@ class Part(Model):
         self.geo_transform = []
 
     @timer(level=1)
-    def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
+    def get_F_value(self, reciprocal_coord: Tensor, interpolation_method: str = 'trilinear') -> Tensor:
         '''Get F value (scattering amplitude) of certain coordinates
         in reciprocal space.
         Parameters:
@@ -381,7 +381,13 @@ class Part(Model):
         ################################################
         
         # 直接复数插值
-        F_value = calcfunc.trilinear_interp(
+        if interpolation_method == 'trilinear':
+            interp_func = calcfunc.trilinear_interp
+        elif interpolation_method == 'nearest':
+            interp_func = calcfunc.nearest_interp
+        else:
+            raise ValueError('unsupported interpolation method')
+        F_value = interp_func(
             sx, sy, sz, self.s1d, self.s1d, self.s1dz, self.F_half, ds
         )
         # 模与辐角分别插值
@@ -420,7 +426,7 @@ class Part(Model):
         x, y, z, sld = x.to(output_device), y.to(output_device), z.to(output_device), sld.to(output_device)
         return x, y, z, sld
     
-    def get_sas(self, qx: Tensor, qy: Tensor, qz: Tensor) -> Tensor:
+    def get_sas(self, qx: Tensor, qy: Tensor, qz: Tensor, interpolation_method: str = 'trilinear') -> Tensor:
         '''Calculate SAS intensity pattern from reciprocal lattice
         according to given q coordinates (qx, qy, qz). No orientation
         average.
@@ -438,7 +444,7 @@ class Part(Model):
         s = torch.sqrt(sx**2 + sy**2 + sz**2)
         sx[s>=smax], sy[s>=smax], sz[s>=smax] = 0., 0., 0.  # set value larger than smax to 0
         reciprocal_coord = torch.stack([sx, sy, sz], dim=-1)
-        F = self.get_F_value(reciprocal_coord)
+        F = self.get_F_value(reciprocal_coord, interpolation_method=interpolation_method)
         F[s>=smax] = 0. # set value larger than smax to 0
         I = F.real**2 + F.imag**2
         I = I.reshape(input_shape)
@@ -446,7 +452,7 @@ class Part(Model):
         output_device = qx.device
         return I.to(output_device)
 
-    def get_1d_sas(self, q1d: Tensor, orientation_average_offset: int = 100) -> Tensor:
+    def get_1d_sas(self, q1d: Tensor, orientation_average_offset: int = 100, interpolation_method: str = 'trilinear') -> Tensor:
         '''Calculate 1d SAS intensity curve from reciprocal lattice.
         Orientation averaged.
         Device of output tensor is the same as input q1d.
@@ -462,9 +468,9 @@ class Part(Model):
         n_on_sphere = torch.round(n_on_sphere/n_on_sphere[0]) + orientation_average_offset
         sx, sy, sz = calcfunc.sampling_points(s, n_on_sphere)
 
-        #### interpolate ####
+        #### get value ####
         reciprocal_coord = torch.stack([sx, sy, sz], dim=-1)
-        F = self.get_F_value(reciprocal_coord)
+        F = self.get_F_value(reciprocal_coord, interpolation_method=interpolation_method)
         I = F.real**2 + F.imag**2
 
         #### orientation average ####
@@ -514,7 +520,7 @@ class Part(Model):
         self.gen_reciprocal_lattice(reciprocal_size=reciprocal_size)
 
     @timer(level=0)
-    def measure(self, *qi: Tensor, orientation_average_offset: int = 100) -> Tensor:
+    def measure(self, *qi: Tensor, orientation_average_offset: int = 100, interpolation_method: str = 'trilinear') -> Tensor:
         '''Simulate measurement process. The full scatter pattern is generated
         in self.scatter() process, this method gives measured result of certain
         q, return scattering intensity like real SAS measurements.
@@ -526,9 +532,9 @@ class Part(Model):
         #! should match that of model unit.
         '''
         if len(qi) == 1:
-            I = self.get_1d_sas(*qi, orientation_average_offset=orientation_average_offset)
+            I = self.get_1d_sas(*qi, orientation_average_offset=orientation_average_offset, interpolation_method=interpolation_method)
         else:
-            I = self.get_sas(*qi)
+            I = self.get_sas(*qi, interpolation_method=interpolation_method)
         return I
     
     def __call__(self, *qi: Tensor, orientation_average_offset: int = 100) -> Tensor:
