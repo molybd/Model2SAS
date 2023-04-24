@@ -1,6 +1,8 @@
 '''Simulation of a 2d detector.
 '''
 
+from typing import Literal
+
 import torch
 from torch import Tensor
 
@@ -58,7 +60,7 @@ class Detector:
         x_rotated = x + 2*a*wx + 2*(-torch.linalg.cross(wx, w.expand_as(wx), dim=-1))
         return x_rotated
 
-    def _rotate(self, rotation_type: str, angle: float) -> None:
+    def _rotate(self, rotation_type: Literal['pitch', 'yaw', 'roll'], angle: float) -> None:
         if rotation_type == 'pitch':
             axis = self.pitch_axis
             self.yaw_axis = self._euler_rodrigues_rotate(self.yaw_axis, axis, angle)
@@ -71,6 +73,8 @@ class Detector:
             axis = self.roll_axis
             self.pitch_axis = self._euler_rodrigues_rotate(self.pitch_axis, axis, angle)
             self.yaw_axis = self._euler_rodrigues_rotate(self.yaw_axis, axis, angle)
+        else:
+            raise ValueError('Unsupported rotation type: {}'.format(rotation_type))
         center = self.get_center()
 
         x1d, y1d, z1d = self.x.flatten(), self.y.flatten(), self.z.flatten()
@@ -81,7 +85,7 @@ class Detector:
         )
         rotated_coord = rotated_coord + center
         x, y, z = torch.unbind(rotated_coord, dim=-1)
-        self.x, self.y, self.z = x.reshape(self.resolution), y.reshape(self.resolution), z.reshape(self.resolution)        
+        self.x, self.y, self.z = x.reshape(self.resolution), y.reshape(self.resolution), z.reshape(self.resolution)
 
     def pitch(self, angle: float) -> None:
         self._rotate('pitch', angle)

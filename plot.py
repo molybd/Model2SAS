@@ -1,6 +1,8 @@
 '''All kinds of plot, from 1d to 3d.
 '''
 
+from typing import Literal
+
 import torch
 from torch import Tensor
 import functools

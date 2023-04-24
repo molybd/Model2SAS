@@ -1,5 +1,8 @@
 '''some useful utility functions
 '''
+
+from typing import Literal
+
 import time
 import functools
 
@@ -30,7 +33,7 @@ def timer(level: int = 0):
         return wrapper
     return timer_decorator
 
-def convert_coord(u:Tensor, v:Tensor, w:Tensor, original_coord:str, target_coord:str) -> tuple[Tensor, Tensor, Tensor]:
+def convert_coord(u:Tensor, v:Tensor, w:Tensor, original_coord: Literal['car', 'sph', 'cyl'], target_coord: Literal['car', 'sph', 'cyl']) -> tuple[Tensor, Tensor, Tensor]:
     ''' Convert coordinates
     car: Cartesian coordinates, in (x, y, z)
     sph: spherical coordinates, in (r, theta, phi) | theta: 0~2pi ; phi: 0~pi
@@ -81,16 +84,20 @@ def convert_coord(u:Tensor, v:Tensor, w:Tensor, original_coord:str, target_coord
         x, y, z = sph2car(u, v, w)
     elif original_coord == 'cyl':
         x, y, z = cyl2car(u, v, w)
-    else:
+    elif original_coord == 'car':
         x, y, z = u, v, w
+    else:
+        raise ValueError('Unsupported coordinates: {}'.format(original_coord))
     
     # then convert to desired coordinates
     if target_coord == 'sph':
         return car2sph(x, y, z)
     elif target_coord == 'cyl':
         return car2cyl(x, y, z)
-    else: # target_coord == 'car':
+    elif target_coord == 'car':
         return x, y, z
+    else:
+        raise ValueError('Unsupported coordinates: {}'.format(target_coord))
 
 def abi2modarg(t: Tensor) -> tuple[Tensor, Tensor]:
     '''Change a complex tensor from a+bi expression
@@ -120,8 +127,8 @@ class MathModelClassBase:
     def __init__(self) -> None:
         '''must at least have these 2 attributes
         '''
-        self.params = {}
-        self.coord = 'car'  # 'car' or 'sph' or 'cyl'
+        self.params: dict = {}
+        self.coord: Literal['car', 'sph', 'cyl'] = 'car'  # 'car' or 'sph' or 'cyl'
 
     def get_bound(self) -> tuple[tuple|list, tuple|list]:
         '''re-generate boundary for every method call
@@ -144,7 +151,7 @@ class MathModelClassBase:
 def gen_math_model_class(
         name: str = 'SpecificMathModelClass',
         params: dict | None = None,
-        coord: str = 'car', 
+        coord: Literal['car', 'sph', 'cyl'] = 'car',
         bound_point: tuple[str, str, str] = ('1', '1', '1'),
         shape_description: str = ':',
         sld_description: str = 'False',
@@ -197,7 +204,7 @@ def gen_math_model_class(
 
 def gen_math_model_class_sourcecode(
         params: dict,
-        coord: str, 
+        coord: Literal['car', 'sph', 'cyl'], 
         bound_point: tuple[str, str, str],
         shape_description: str,
         sld_description: str,

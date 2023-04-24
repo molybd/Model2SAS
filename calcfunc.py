@@ -2,6 +2,8 @@
 All based on pytorch instead of numpy.
 '''
 
+from typing import Literal
+
 # import numpy as np
 import torch
 from torch import Tensor
@@ -47,12 +49,12 @@ def _torch_moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangl
 
 @ti.func
 def _one_ray_one_triangle_intersect(
-    O: tm.vec3,
-    D: tm.vec3,
-    V0: tm.vec3,
-    V1: tm.vec3,
-    V2: tm.vec3
- ) -> ti.int32:
+        O: tm.vec3,
+        D: tm.vec3,
+        V0: tm.vec3,
+        V1: tm.vec3,
+        V2: tm.vec3
+    ) -> ti.int32:
     E1 = V1 - V0
     E2 = V2 - V0
     T = O - V0
@@ -107,7 +109,7 @@ def _taichi_moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triang
     return intersect_count
 
 @timer(level=2)
-def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor, backend: str = 'torch') -> Tensor:
+def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor, backend: Literal['torch', 'taichi'] = 'torch') -> Tensor:
     '''Calculate all the points intersect with 1 triangle
     using Möller-Trumbore intersection algorithm
     see paper https://doi.org/10.1080/10867651.1997.10487468
@@ -122,8 +124,10 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
     '''
     if backend == 'taichi':
         intersect_count = _taichi_moller_trumbore_intersect_count(origins, ray, triangles)
-    else:
+    elif backend == 'torch':
         intersect_count = _torch_moller_trumbore_intersect_count(origins, ray, triangles)
+    else:
+        raise ValueError('Unsupported backend: {}'.format(backend))
     return intersect_count
 
 @timer(level=2)

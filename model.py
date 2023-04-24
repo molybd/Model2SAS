@@ -5,6 +5,7 @@ For the convenience of using CUDA
 import os
 import sys
 import copy
+from typing import Literal
 
 from stl import mesh
 import numpy as np
@@ -349,7 +350,7 @@ class Part(Model):
         self.geo_transform = []
 
     @timer(level=1)
-    def get_F_value(self, reciprocal_coord: Tensor, interpolation_method: str = 'trilinear') -> Tensor:
+    def get_F_value(self, reciprocal_coord: Tensor, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
         '''Get F value (scattering amplitude) of certain coordinates
         in reciprocal space.
         Parameters:
@@ -386,7 +387,7 @@ class Part(Model):
         elif interpolation_method == 'nearest':
             interp_func = calcfunc.nearest_interp
         else:
-            raise ValueError('unsupported interpolation method')
+            raise ValueError('Unsupported interpolation method: {}'.format(interpolation_method))
         F_value = interp_func(
             sx, sy, sz, self.s1d, self.s1d, self.s1dz, self.F_half, ds
         )
@@ -426,7 +427,7 @@ class Part(Model):
         x, y, z, sld = x.to(output_device), y.to(output_device), z.to(output_device), sld.to(output_device)
         return x, y, z, sld
     
-    def get_sas(self, qx: Tensor, qy: Tensor, qz: Tensor, interpolation_method: str = 'trilinear') -> Tensor:
+    def get_sas(self, qx: Tensor, qy: Tensor, qz: Tensor, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
         '''Calculate SAS intensity pattern from reciprocal lattice
         according to given q coordinates (qx, qy, qz). No orientation
         average.
@@ -452,7 +453,7 @@ class Part(Model):
         output_device = qx.device
         return I.to(output_device)
 
-    def get_1d_sas(self, q1d: Tensor, orientation_average_offset: int = 100, interpolation_method: str = 'trilinear') -> Tensor:
+    def get_1d_sas(self, q1d: Tensor, orientation_average_offset: int = 100, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
         '''Calculate 1d SAS intensity curve from reciprocal lattice.
         Orientation averaged.
         Device of output tensor is the same as input q1d.
@@ -520,7 +521,7 @@ class Part(Model):
         self.gen_reciprocal_lattice(reciprocal_size=reciprocal_size)
 
     @timer(level=0)
-    def measure(self, *qi: Tensor, orientation_average_offset: int = 100, interpolation_method: str = 'trilinear') -> Tensor:
+    def measure(self, *qi: Tensor, orientation_average_offset: int = 100, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
         '''Simulate measurement process. The full scatter pattern is generated
         in self.scatter() process, this method gives measured result of certain
         q, return scattering intensity like real SAS measurements.
@@ -650,7 +651,7 @@ class Assembly(Part):
     The own real lattice is for sld volume plot by using less points.
     '''
     def __init__(self, *part: Part, device: str = 'cpu') -> None:
-        '''???All part model must in same device.
+        '''part models can be in different devices.
         '''
         self.parts: dict[int, Part] = {}
         self.add_part(*part)
