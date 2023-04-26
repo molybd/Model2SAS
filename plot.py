@@ -149,7 +149,7 @@ def plot_sas2d(
 @plot_utils
 def plot_model(
     *model: Part | Assembly,
-    type: str | None = None,
+    type: Literal['volume', 'voxel'] | None = None,
     title: str | None = None,
     colorscale: str = 'Plasma',
     show: bool = True,
@@ -159,8 +159,6 @@ def plot_model(
     type: voxel | volume | None
         if None, voxel for part model, volume for assembly model
     '''
-    if type is not None:
-        type = type.lower()
     fig = go.Figure()
     for modeli in model:
         if isinstance(modeli, Assembly):
@@ -196,6 +194,8 @@ def plot_model(
                 surface_count=21,
                 coloraxis='coloraxis'
             ))
+        else:
+            raise ValueError('Unsupported plot type: {}'.format(type))
 
     fig.update_layout(scene_aspectmode='data') # make equal aspect
     if type == 'volume':
