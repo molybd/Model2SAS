@@ -1,6 +1,6 @@
-'''All based on pytorch instead of numpy.
+"""All based on pytorch instead of numpy.
 For the convenience of using CUDA
-'''
+"""
 
 import os
 import sys
@@ -18,34 +18,47 @@ from utils import timer, convert_coord, abi2modarg, modarg2abi, MathModelClassBa
 
 
 class Model:
-    '''Parent class for model, including Part and Assembly,
+    """Parent class for model, including Part and Assembly,
     which should overwrite get_F_value() and get_smax()
     method. Then, both can be treated equally in SAS calculation.
-    '''
+    """
     def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
-        '''Core method for model class, including Part and
-        Assembly.
-        Parameters:
-            reciprocal_coord: shape=(n, 3)
+        """Get F value (scattering amplitude) of certain coordinates
+        in reciprocal space.
         #* To be overwritten.
-        '''
+
+        Args:
+            reciprocal_coord (Tensor): shape=(n, 3)
+
+        Returns:
+            Tensor: F value of corresponding coordinates
+        """
         F_value = torch.ones(reciprocal_coord.shape[0], dtype=torch.complex64)
         return F_value
 
     def get_s_max(self) -> float:
-        '''Return maximum s value of a part or assembly.
-        '''
+        """Return maximum s value of a part or assembly.
+
+        Returns:
+            float: _description_
+        """
         smax = 0.
         return smax
 
 
 class Part(Model):
-    '''Parent class for part model.
+    """Parent class for part model.
     Subclass: StlPart and MathPart
-    '''
+    """
     def __init__(self, filename: str | None = None, partname: str | None = None, is_isolated: bool = True, device: str = 'cpu') -> None:
-        '''Init function
-        '''
+        """Init function of Part class
+
+        Args:
+            filename (str | None, optional): model file path, either .stl or .py file. Defaults to None.
+            partname (str | None, optional): name of the part model, set to filename without extension if not given. Defaults to None.
+            is_isolated (bool, optional): True for form factor only, False for structure factor. Defaults to True.
+            device (str, optional): device of the model to be stored and calculated. Defaults to 'cpu'.
+        """
         self.device = device
         self.partname = partname
         if filename is not None:
@@ -76,45 +89,53 @@ class Part(Model):
         self.sy: Tensor
         self.sz_half: Tensor
 
-    def auto_process(self, real_lattice_1d_size: int | None = None, spacing: float | None = None,  reciprocal_lattice_1d_size: int | None = None) -> None:
-        '''Automatically do the pre-processing of part model
-        to than can use get_F_value method.
-        '''
-        self.gen_real_lattice_meshgrid(real_lattice_1d_size=real_lattice_1d_size, spacing=spacing)
-        self.gen_real_lattice_sld()
-        self.gen_reciprocal_lattice(reciprocal_lattice_1d_size=reciprocal_lattice_1d_size)
-
     def _get_suggested_spacing(self, Lmin: float, Lmax:float, real_lattice_1d_size: int = 50) -> float:
-        '''Calculate optimal real_lattice_spacing and n_s values
+        """Calculate optimal real_lattice_spacing and n_s values
         for the generation of reciprocal spacing. Based on my
         experience and test, the meshgrid density is set to be
         40 on Lmax. But must ensure that the lattice number in
         Lmin is lerger than 10. n_s the larger the better, but
         may use too much RAM or VRAM, speed is also slow.
 
-        Parameters:
-            Lmin: minimum real space scale of a model
-            Lmax: maximum real space scale of a model
-        '''
+        Args:
+            Lmin (float): minimum real space scale of a model
+            Lmax (float): maximum real space scale of a model
+            real_lattice_1d_size (int, optional): number of points of real lattice in 1d. Defaults to 50.
+
+        Returns:
+            float: suggested spacing value
+        """        
         n_d = real_lattice_1d_size
         real_lattice_spacing = Lmax / n_d
         real_lattice_spacing = min(real_lattice_spacing, Lmin/10)
         return real_lattice_spacing
 
     def set_real_lattice_meshgrid(self, x: Tensor, y: Tensor, z: Tensor) -> None:
-        '''Import lattice meshgrid from outside of class.
+        """Import lattice meshgrid from outside of class.
         For the need of some other function.
         Must be evenly spaced in all 3 dimensions.
-        '''
+
+        Args:
+            x (Tensor): _description_
+            y (Tensor): _description_
+            z (Tensor): _description_
+        """
         spacing = x[1,0,0].item() - x[0,0,0].item()
         self.real_lattice_spacing = spacing
         self.x, self.y, self.z = x.to(self.device), y.to(self.device), z.to(self.device)
         self.real_lattice_1d_size = max(x.shape)
 
     def gen_real_lattice_meshgrid(self, real_lattice_1d_size: int | None = None, spacing: float | None = None) -> tuple[Tensor, Tensor, Tensor]:
-        '''Generate equally spaced meshgrid in 3d real space.
+        """Generate equally spaced meshgrid in 3d real space.
         Can be assigned either real_lattice_1d_size or spacing.
-        '''
+
+        Args:
+            real_lattice_1d_size (int | None, optional): _description_. Defaults to None.
+            spacing (float | None, optional): _description_. Defaults to None.
+
+        Returns:
+            tuple[Tensor, Tensor, Tensor]: _description_
+        """
         bound_min, bound_max = self.get_bound()
         xmin, ymin, zmin = bound_min
         xmax, ymax, zmax = bound_max
@@ -145,19 +166,28 @@ class Part(Model):
         return x, y, z
 
     def set_real_lattice_sld(self, x: Tensor, y: Tensor, z: Tensor, sld: Tensor) -> None:
-        '''To directly import a real lattice, jump over StlPart or MathPart,
+        """To directly import a real lattice with sld values, jump over StlPart or MathPart,
         Mainly for test use.
-        '''
+
+        Args:
+            x (Tensor): _description_
+            y (Tensor): _description_
+            z (Tensor): _description_
+            sld (Tensor): _description_
+        """
         self.real_lattice_spacing = x[1,0,0].item() - x[0,0,0].item()
         self.x, self.y, self.z = x.to(self.device), y.to(self.device), z.to(self.device)
         self.sld = sld.to(self.device)
         self._store_original_real_lattice(x, y, z, sld)
 
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-        '''Get boundary of part model. Return 2 points which
+        """Get boundary of part model. Return 2 points which
         determine a cuboid fully containing the whole part model.
         #* To be overwritten.
-        '''
+
+        Returns:
+            tuple[tuple[float, float, float], tuple[float, float, float]]: _description_
+        """
         xmin, ymin, zmin = self.x.min().item(), self.y.min().item(), self.z.min().item()
         xmax, ymax, zmax = self.x.max().item(), self.y.max().item(), self.z.max().item()
         bound_min, bound_max = (xmin, ymin, zmin), (xmax, ymax, zmax)
@@ -165,16 +195,27 @@ class Part(Model):
         return bound_min, bound_max
 
     def gen_real_lattice_sld(self) -> Tensor:
-        '''Generate SLD lattice of this part model.
+        """Generate SLD lattice of this part model.
         Values at lattice points are corresponding SLD.
         Store original real lattice at last.
         #* To be overwritten.
-        '''
+
+        Returns:
+            Tensor: sld values
+        """
         x, y, z, sld = self.x, self.y, self.z, self.sld
         self._store_original_real_lattice(x, y, z, sld)
         return sld
 
     def _store_original_real_lattice(self, x: Tensor, y: Tensor, z: Tensor, sld: Tensor) -> None:
+        """Store original real lattice in case of restore them
+
+        Args:
+            x (Tensor): _description_
+            y (Tensor): _description_
+            z (Tensor): _description_
+            sld (Tensor): _description_
+        """
         self.x_original = x.clone()
         self.y_original = y.clone()
         self.z_original = z.clone()
@@ -183,7 +224,7 @@ class Part(Model):
 
     @timer(level=1)
     def gen_reciprocal_lattice(self, reciprocal_lattice_1d_size: int | None = None, need_centering: bool = True) -> Tensor:
-        '''Generate reciprocal lattice from real lattice.
+        """Generate reciprocal lattice from real lattice.
         The actual real lattice begins with bound_min, but
         FFT algorithm treats real space lattice as it begins
         with (0,0,0), which will make it different on
@@ -200,7 +241,14 @@ class Part(Model):
             too many memory since F increases in ^3. When n_s
             not specified, the calculation is controlled by
             scale factor in smin.
-        '''
+
+        Args:
+            reciprocal_lattice_1d_size (int | None, optional): _description_. Defaults to None.
+            need_centering (bool, optional): _description_. Defaults to True.
+
+        Returns:
+            Tensor: scattering amplitude (F value)
+        """
         # determine n_s in reciprocal space
         bound_min, bound_max = self.get_bound()
         xmin, ymin, zmin = bound_min
@@ -261,7 +309,7 @@ class Part(Model):
         return F_half
 
     def _translate_on_reciprocal_lattice(self, F: Tensor, sx_1d: Tensor, sy_1d: Tensor, sz_1d: Tensor, vx: float, vy:float, vz:float) -> Tensor:
-        '''Default model center is at (0, 0, 0), referring to
+        """Default model center is at (0, 0, 0), referring to
         self.bound_min, self.bound_max. But real lattice bound
         for fft is (0, 0, 0) & self.bound_max-self.bound_min.
         So shift_vector = self.bound_min,
@@ -269,7 +317,19 @@ class Part(Model):
         Shift_multiplier only change complex argument, so
         corresponding method is used here.
         Will generate reciprocal meshgrid sx, sy, sz.
-        '''
+
+        Args:
+            F (Tensor): _description_
+            sx_1d (Tensor): _description_
+            sy_1d (Tensor): _description_
+            sz_1d (Tensor): _description_
+            vx (float): _description_
+            vy (float): _description_
+            vz (float): _description_
+
+        Returns:
+            Tensor: translated F values
+        """
         sx, sy, sz_half = torch.meshgrid(sx_1d, sy_1d, sz_1d, indexing='ij')
         multiplier_arg = -1 * 2*torch.pi * (sx*vx + sy*vy + sz_half*vz)
         F_mod, F_arg = abi2modarg(F)
@@ -280,14 +340,22 @@ class Part(Model):
 
     @timer(level=0)
     def translate(self, vx: float, vy: float, vz: float) -> None:
-        '''Translate model by vector.
+        """Translate model by vector.
         Change real space lattice directly;
         But in reciprocal space, change also depends on input
         coordinates. So transform methods like translate and
         rotate will return a closure function which will act
         on coordinates and reciprocal lattice in the later call.
         Method refer to self._translate_on_reciprocal_lattice()
-        '''
+
+        Args:
+            vx (float): x component of translate vector
+            vy (float): y component of translate vector
+            vz (float): z component of translate vector
+
+        Returns:
+            no return
+        """
         # real space
         def func_for_real(x, y, z, sld):
             return x+vx, y+vy, z+vz, sld
@@ -295,9 +363,9 @@ class Part(Model):
         # reciprocal
         v = torch.tensor([vx, vy, vz], dtype=torch.float32, device=self.device) # must claim dtype, or will raise error
         def func_for_reciprocal(reciprocal_coord: Tensor, multiplier_arg: Tensor) -> tuple[Tensor, Tensor]:
-            '''reciprocal_coord.shape == (n,3)
+            """reciprocal_coord.shape == (n,3)
             multiplier_arg.shape = (n,)
-            '''
+            """
             arg = -2 * torch.pi * (reciprocal_coord @ v)  # only calculate argument of multiplier which is a complex number with mod=1
             return reciprocal_coord, arg+multiplier_arg
 
@@ -310,7 +378,7 @@ class Part(Model):
 
     @timer(level=0)
     def rotate(self, axis: tuple[float, float, float], angle: float) -> None:
-        '''Rotate model around an axis passing origin by angle.
+        """Rotate model around an axis passing origin by angle.
         Change real space lattice directly;
         But in reciprocal space, change also depends on input
         coordinates. So transform methods like translate and
@@ -318,10 +386,14 @@ class Part(Model):
         on coordinates and reciprocal lattice in the later call.
         Uses the Euler-Rodrigues formula. see
         https://en.wikipedia.org/wiki/Euler%E2%80%93Rodrigues_formula
-        Parameters:
-            axis: vector describing direction of the axis
-            angle: float, rotation angle in radians
-        '''
+
+        Args:
+            axis (tuple[float, float, float]): vector describing direction of the axis
+            angle (float): rotation angle in radians
+
+        Returns:
+            _type_: _description_
+        """
         # real space
         def func_for_real(x, y, z, sld):
             points = torch.stack([x, y, z], dim=-1)
@@ -330,9 +402,15 @@ class Part(Model):
 
         # reciprocal
         def func_for_reciprocal(reciprocal_coord: Tensor, multiplier_arg: Tensor) -> tuple[Tensor, Tensor]:
-            '''reciprocal_coord.shape == (n,3)
-            multiplier_arg.shape = (n,)
-            '''
+            """_summary_
+
+            Args:
+                reciprocal_coord (Tensor): shape = (n,3)
+                multiplier_arg (Tensor): shape = (n,)
+
+            Returns:
+                tuple[Tensor, Tensor]: _description_
+            """
             new_reciprocal_coord = euler_rodrigues_rotate(reciprocal_coord, axis, -angle)
             return new_reciprocal_coord, multiplier_arg
 
@@ -344,18 +422,22 @@ class Part(Model):
         ))
 
     def clear_geo_transform(self) -> None:
-        '''Clear all geometric transforms. Set part model to default.
-        '''
+        """Clear all geometric transforms. Set part model to default.
+        """
         self.x, self.y, self.z = self.x_original.clone(), self.y_original.clone(), self.z_original.clone()
         self.geo_transform = []
 
     @timer(level=1)
     def get_F_value(self, reciprocal_coord: Tensor, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
-        '''Get F value (scattering amplitude) of certain coordinates
+        """Get F value (scattering amplitude) of certain coordinates
         in reciprocal space.
-        Parameters:
-            reciprocal_coord: shape=(n, 3)
-        '''
+
+        Args:
+            reciprocal_coord (Tensor): shape=(n, 3)
+
+        Returns:
+            Tensor: F value of corresponding coordinates
+        """
         new_coord = reciprocal_coord.to(self.device)
         multiplier_arg = torch.zeros(reciprocal_coord.shape[0], device=self.device)
         # apply transform function for reciprocal
@@ -409,14 +491,23 @@ class Part(Model):
         return F_value.to(output_device)
 
     def get_s_max(self) -> float:
-        '''Return maximum s value available for a part model.
-        '''
+        """Return maximum s value available for a part model.
+
+        Returns:
+            float: maximum s value
+        """
         smax = min(torch.abs(self.s1d.min()).item(), torch.abs(self.s1d.max()).item())
         return smax
 
     def get_real_lattice_sld(self, output_device: str = 'cpu') -> tuple[Tensor, Tensor, Tensor, Tensor]:
-        '''Return real lattice with sld values
-        '''
+        """Return real lattice with sld values
+
+        Args:
+            output_device (str, optional): _description_. Defaults to 'cpu'.
+
+        Returns:
+            tuple[Tensor, Tensor, Tensor, Tensor]: real lattice with sld values
+        """
         x = self.x.clone()
         y = self.y.clone()
         z = self.z.clone()
@@ -428,7 +519,7 @@ class Part(Model):
         return x, y, z, sld
     
     def get_sas(self, qx: Tensor, qy: Tensor, qz: Tensor, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
-        '''Calculate SAS intensity pattern from reciprocal lattice
+        """Calculate SAS intensity pattern from reciprocal lattice
         according to given q coordinates (qx, qy, qz). No orientation
         average.
         Output dims of intensity and device will be same as input qx.
@@ -436,7 +527,16 @@ class Part(Model):
         #! The assumed q unit will still be the reverse of model
         #! unit. So be careful when generate q2d by detector geometry,
         #! should match that of model unit.
-        '''
+
+        Args:
+            qx (Tensor): _description_
+            qy (Tensor): _description_
+            qz (Tensor): _description_
+            interpolation_method (Literal[&#39;trilinear&#39;, &#39;nearest&#39;], optional): _description_. Defaults to 'trilinear'.
+
+        Returns:
+            Tensor: corresponding SAS values with same shape as input q values
+        """
         smax = self.get_s_max()
         input_shape = qx.shape
         sx = qx.to(self.device).flatten()/(2*torch.pi)
@@ -454,11 +554,19 @@ class Part(Model):
         return I.to(output_device)
 
     def get_1d_sas(self, q1d: Tensor, orientation_average_offset: int = 100, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
-        '''Calculate 1d SAS intensity curve from reciprocal lattice.
+        """Calculate 1d SAS intensity curve from reciprocal lattice.
         Orientation averaged.
         Device of output tensor is the same as input q1d.
         #* The unit of q is assumed to be the reverse of model's length unit.
-        '''
+
+        Args:
+            q1d (Tensor): 1d tensor
+            orientation_average_offset (int, optional): _description_. Defaults to 100.
+            interpolation_method (Literal[&#39;trilinear&#39;, &#39;nearest&#39;], optional): _description_. Defaults to 'trilinear'.
+
+        Returns:
+            Tensor: _description_
+        """
         s_input = q1d.to(self.device)/(2*torch.pi)
         smax = self.get_s_max()
         s = s_input[torch.where(s_input<=smax)] # only calculate within available range
@@ -492,10 +600,16 @@ class Part(Model):
         return I1d
     
     def clone(self, deepcopy: bool = True) -> 'Part':
-        '''Clone self object. Use copy.deepcopy when deepcopy==True.
+        """Clone self object. Use copy.deepcopy when deepcopy==True.
         But the self.geo_transform list will always be deepcopied.
         Use copy.copy() if absolute shallow copy needed.
-        '''
+
+        Args:
+            deepcopy (bool, optional): _description_. Defaults to True.
+
+        Returns:
+            Part: _description_
+        """
         if deepcopy:
             new_part = copy.deepcopy(self)
         else:
@@ -508,21 +622,28 @@ class Part(Model):
     #========================================================
     @timer(level=0)
     def sampling(self, real_lattice_1d_size: int | None = None, spacing: float | None = None) -> None:
-        '''Simulate the real sample preparation process. To build the
-        part model in real space.
-        '''
+        """To build the part model in real space.
+        generate lattice model of a part model.
+
+        Args:
+            real_lattice_1d_size (int | None, optional): _description_. Defaults to None.
+            spacing (float | None, optional): _description_. Defaults to None.
+        """
         self.gen_real_lattice_meshgrid(real_lattice_1d_size=real_lattice_1d_size, spacing=spacing)
         self.gen_real_lattice_sld()
 
     @timer(level=0)
     def scatter(self, reciprocal_lattice_1d_size: int | None = None) -> None:
-        '''Simulate the scattering process to generate full reciprocal lattice.
-        '''
+        """Simulate the scattering process to generate full reciprocal lattice.
+
+        Args:
+            reciprocal_lattice_1d_size (int | None, optional): _description_. Defaults to None.
+        """
         self.gen_reciprocal_lattice(reciprocal_lattice_1d_size=reciprocal_lattice_1d_size)
 
     @timer(level=0)
     def measure(self, *qi: Tensor, orientation_average_offset: int = 100, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
-        '''Simulate measurement process. The full scatter pattern is generated
+        """Simulate measurement process. The full scatter pattern is generated
         in self.scatter() process, this method gives measured result of certain
         q, return scattering intensity like real SAS measurements.
         Input should be either 1d q, which will return orientation averaged 1d I;
@@ -531,7 +652,14 @@ class Part(Model):
         #! The assumed q unit will still be the reverse of model
         #! unit. So be careful when generate q2d by detector geometry,
         #! should match that of model unit.
-        '''
+
+        Args:
+            orientation_average_offset (int, optional): _description_. Defaults to 100.
+            interpolation_method (Literal[&#39;trilinear&#39;, &#39;nearest&#39;], optional): _description_. Defaults to 'trilinear'.
+
+        Returns:
+            Tensor: _description_
+        """
         if len(qi) == 1:
             I = self.get_1d_sas(*qi, orientation_average_offset=orientation_average_offset, interpolation_method=interpolation_method)
         else:
@@ -539,18 +667,29 @@ class Part(Model):
         return I
     
     def __call__(self, *qi: Tensor, orientation_average_offset: int = 100) -> Tensor:
-        '''Same as self.measure()
-        '''
+        """Same as self.measure()
+
+        Args:
+            orientation_average_offset (int, optional): _description_. Defaults to 100.
+
+        Returns:
+            Tensor: _description_
+        """
         return self.measure(*qi, orientation_average_offset=orientation_average_offset)
 
 
 class StlPart(Part):
-    '''class for part from stl file.
+    """class for part from stl file.
     Rewrite get_bound and gen_real_lattice_sld methods.
-    '''
+    """
     def __init__(self, filename: str | None = None, partname: str | None = None, is_isolated: bool = True, sld_value: float = 1.0, mesh_centering : bool = True, device: str = 'cpu') -> None:
-        '''load mesh from stl file
-        '''
+        """Load mesh from stl file
+
+        Args:
+            sld_value (float, optional): sld value of the whole model. Defaults to 1.0.
+            mesh_centering (bool, optional): whether to center stl mesh to origin. Defaults to True.
+            other args same as Part.__init__()
+        """
         super().__init__(filename=filename, partname=partname, is_isolated=is_isolated, device=device)
         if filename is not None:
             self.mesh = mesh.Mesh.from_file(self.filename)
@@ -561,9 +700,12 @@ class StlPart(Part):
         self.sld_value = sld_value
 
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-        '''Get boundary of part model. Return 2 points which
+        """Get boundary of part model. Return 2 points which
         determine a cuboid fully containing the whole part model.
-        '''
+
+        Returns:
+            tuple[tuple[float, float, float], tuple[float, float, float]]: min point and max point
+        """
         vec = self.mesh.vectors
         vec = vec.reshape((vec.shape[0]*vec.shape[1], vec.shape[2]))
         bound_min = vec.min(axis=0)
@@ -574,9 +716,13 @@ class StlPart(Part):
 
     @timer(level=1)
     def gen_real_lattice_sld(self) -> Tensor:
-        '''Generate sld in real lattice, which is sld value on each
-        lattice meshgrid point. From stl mesh.
-        '''
+        """Generate SLD lattice of this stl part model.
+        All same sld value inside stl part.
+        Store original real lattice at last.
+
+        Returns:
+            Tensor: _description_
+        """
         x, y, z = self.x, self.y, self.z
         origins = torch.stack(
             [x.flatten(), y.flatten(), z.flatten()],
@@ -597,13 +743,17 @@ class StlPart(Part):
 
 
 class MathPart(Part):
-    '''class for part from math description.
+    """class for part from math description.
     Rewrite get_bound and gen_real_lattice_sld methods.
-    '''
-    def __init__(self, math_model_class: type | None = None, filename: str | None = None, partname: str | None = None, is_isolated: bool = True, device: str = 'cpu') -> None:
-        '''load math object from a specific math model class
-        or py file
-        '''
+    """
+    def __init__(self, math_model_class: type | None = None, filename: str | None = None, partname: str | None = None, is_isolated: bool = True, device: str = 'cpu') -> None:        
+        """Load math object from a specific math model class
+        or py file. Provide either math_model_class or filename.
+
+        Args:
+            math_model_class (type | None, optional): direct import a math model class, child class of MathModelClassBase. Defaults to None.
+            other args same as Part.__init__()
+        """
         super().__init__(filename=filename, is_isolated=is_isolated, device=device)
         if math_model_class is not None:
             self.math_model: MathModelClassBase = math_model_class()
@@ -615,14 +765,20 @@ class MathPart(Part):
             self.math_model = module.MathModelClass()
 
     def set_params(self, **kwargs) -> None:
-        '''Set params in mathpart, change default param values.
-        '''
+        """Set params in mathpart, change default param values.
+
+        Args:
+            keyword args: param_name = param_value
+        """
         self.math_model.params.update(kwargs)                
 
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-        '''Get boundary of part model. Return 2 points which
+        """Get boundary of part model. Return 2 points which
         determine a cuboid fully containing the whole part model.
-        '''
+
+        Returns:
+            tuple[tuple[float, float, float], tuple[float, float, float]]: min point and max point
+        """
         bound_min, bound_max = self.math_model.get_bound()
         bound_min, bound_max = tuple(bound_min), tuple(bound_max)
         self.bound_min, self.bound_max = bound_min, bound_max
@@ -630,9 +786,12 @@ class MathPart(Part):
 
     @timer(level=1)
     def gen_real_lattice_sld(self) -> Tensor:
-        '''Generate sld in real lattice, which is sld value on each
+        """Generate sld in real lattice, which is sld value on each
         lattice meshgrid point. From math description.
-        '''
+
+        Returns:
+            Tensor: sld values
+        """
         x, y, z = self.x, self.y, self.z
         part_coord = self.math_model.coord
         u, v, w = convert_coord(x, y, z, 'car', part_coord)
@@ -646,29 +805,39 @@ class MathPart(Part):
 
 
 class Assembly(Part):
-    '''Assembly of several part model.
+    """Assembly of several part model.
     For SAS calculation, use get_F_value for each part model.
     The own real lattice is for sld volume plot by using less points.
-    '''
+    """
     def __init__(self, *part: Part, device: str = 'cpu') -> None:
-        '''part models can be in different devices.
-        '''
+        """Initiate assembly model by several part models. Part models can be in different devices.
+
+        Args:
+            device (str, optional): device for assembly model, independent of any part model's device. Defaults to 'cpu'.
+        """
         self.parts: dict[int, Part] = {}
         self.add_part(*part)
         self.device = device
         self.geo_transform = []  # should always be empty
 
     def add_part(self, *part: Part) -> None:
-        '''Add part object or list of part object to self.parts dictionary'''
+        """Add part object or list of part object to self.parts dictionary
+        """
         for p in part:
             i = len(self.parts)
             self.parts[i] = p
 
     @timer(level=1)
     def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
-        '''Get F value (scattering amplitude) of certain coordinates
-        in reciprocal space. Sum over all parts.
-        '''
+        """Get F value (scattering amplitude) of certain coordinates
+        in reciprocal space.
+
+        Args:
+            reciprocal_coord (Tensor): shape=(n, 3)
+
+        Returns:
+            Tensor: F value of corresponding coordinates
+        """
         new_coord = reciprocal_coord.to(self.device)
         F_value = torch.zeros(new_coord.shape[0], dtype=torch.complex64, device=self.device)
         for part in self.parts.values():
@@ -677,8 +846,11 @@ class Assembly(Part):
         return F_value.to(output_device)
 
     def get_s_max(self) -> float:
-        '''Return maximum s value of assembly model.
-        '''
+        """Maximum s value of assembly model.
+
+        Returns:
+            float: s_max value.
+        """
         smax_list = []
         for part in self.parts.values():
             smax_list.append(part.get_s_max())
@@ -693,9 +865,12 @@ class Assembly(Part):
     #  generate own real lattice, only for sld volume plot
     #========================================================
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-        '''Get maximum boundary containing all the parts.
+        """Get maximum boundary containing all the parts.
         It is after all parts' transform
-        '''
+
+        Returns:
+            tuple[tuple[float, float, float], tuple[float, float, float]]: _description_
+        """
         l_xmin, l_ymin, l_zmin, l_xmax, l_ymax, l_zmax = [], [], [], [], [], []
         for part in self.parts.values():
             spacing = part.real_lattice_spacing
@@ -712,10 +887,13 @@ class Assembly(Part):
         return bound_min, bound_max
 
     def gen_real_lattice_sld(self) -> Tensor:
-        '''Generate lattice sld of assembly model's own.
-        For sld volume plot use only, not used in sas calculation.
+        """Generate lattice sld of assembly model's own.
+        For sld volume plot use only, will not be used in sas calculation.
         Call self.gen_real_lattice_meshgrid() first.
-        '''
+
+        Returns:
+            Tensor: _description_
+        """
         sld = torch.zeros_like(self.x, dtype=torch.float32, device=self.device)
         for part in self.parts.values():
             #* restore to untransformed

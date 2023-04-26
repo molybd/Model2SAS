@@ -1,5 +1,5 @@
-'''All kinds of plot, from 1d to 3d.
-'''
+"""All kinds of plot, from 1d to 3d.
+"""
 
 from typing import Literal
 
@@ -37,11 +37,19 @@ def plot_utils(func):
     return wrapper
 
 def write_html(filename: str, htmlstr: str, encoding: str = 'utf-8') -> str:
-    '''Write html string to a html file.
+    """Write html string to a html file.
     Reason of implementing this instead of using plotly.io.write_html()
     is that plotly method doesn't support encoding option, will causs
     error on Windows.
-    '''
+
+    Args:
+        filename (str): _description_
+        htmlstr (str): _description_
+        encoding (str, optional): _description_. Defaults to 'utf-8'.
+
+    Returns:
+        str: _description_
+    """
     with open(filename, 'w', encoding=encoding) as f:
         f.write(htmlstr)
         return os.path.abspath(filename)
@@ -51,7 +59,19 @@ class Voxel(go.Mesh3d):
         x, y, z, i, j, k = self.gen_vertices_triangles(xc, yc, zc, spacing)
         super().__init__(arg, alphahull, autocolorscale, cauto, cmax, cmid, cmin, color, coloraxis, colorbar, colorscale, contour, customdata, customdatasrc, delaunayaxis, facecolor, facecolorsrc, flatshading, hoverinfo, hoverinfosrc, hoverlabel, hovertemplate, hovertemplatesrc, hovertext, hovertextsrc, i, ids, idssrc, intensity, intensitymode, intensitysrc, isrc, j, jsrc, k, ksrc, legendgroup, legendgrouptitle, legendrank, legendwidth, lighting, lightposition, meta, metasrc, name, opacity, reversescale, scene, showlegend, showscale, stream, text, textsrc, uid, uirevision, vertexcolor, vertexcolorsrc, visible, x, xcalendar, xhoverformat, xsrc, y, ycalendar, yhoverformat, ysrc, z, zcalendar, zhoverformat, zsrc, **kwargs)
 
-    def gen_vertices_triangles(self, xc, yc, zc, spacing):
+    def gen_vertices_triangles(self, xc, yc, zc, spacing) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
+        """Generate vertices and triangles for mesh plot.
+        For each point (xc, yc, zc), generate a cubic box with edge_length = spacing
+
+        Args:
+            xc: x coordinates of center point
+            yc: y coordinates of center point
+            zc: z coordinates of center point
+            spacing: spacing of mesh grid, and cubic box edge length
+
+        Returns:
+            tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]: _description_
+        """
         s = spacing
         xv = torch.stack((xc-s/2, xc+s/2, xc+s/2, xc-s/2, xc-s/2, xc+s/2, xc+s/2, xc-s/2), dim=1).flatten()
         yv = torch.stack((yc-s/2, yc-s/2, yc+s/2, yc+s/2, yc-s/2, yc-s/2, yc+s/2, yc+s/2), dim=1).flatten()
@@ -81,11 +101,25 @@ def plot_sas1d(
     show: bool = True,
     savename: str | None = None
     ) -> go.Figure:
-    '''plot 1d SAS curve(s).
+    """plot 1d SAS curve(s).
     q, I, name combinations: 1q, 1I, 1name | 1q, I list, name list | q list, I list, name list
     name: can be None
     mode options: lines | markers | lines+markers, same as q,I,name, can be assigned to each trace by list
-    '''
+
+    Args:
+        q (Tensor | list[Tensor]): _description_
+        I (Tensor | list[Tensor]): _description_
+        name (str | list[str] | None, optional): _description_. Defaults to None.
+        mode (str | list[str], optional): lines | markers | lines+markers, same as q,I,name, can be assigned to each trace by list. Defaults to 'lines+markers'.
+        logx (bool, optional): _description_. Defaults to True.
+        logy (bool, optional): _description_. Defaults to True.
+        title (str | None, optional): _description_. Defaults to None.
+        show (bool, optional): _description_. Defaults to True.
+        savename (str | None, optional): _description_. Defaults to None.
+
+    Returns:
+        go.Figure
+    """
     def gen_list(x, length:int) -> list:
         if isinstance(x, list):
             x_list = x
@@ -126,8 +160,19 @@ def plot_sas2d(
     show: bool = True,
     savename: str | None = None
     ) -> go.Figure:
-    '''plot a 2d SAS pattern.
-    '''
+    """Plot a 2d SAS pattern.
+
+    Args:
+        I2d (Tensor): _description_
+        logI (bool, optional): _description_. Defaults to True.
+        title (str | None, optional): _description_. Defaults to None.
+        colorscale (str | None, optional): _description_. Defaults to None.
+        show (bool, optional): _description_. Defaults to True.
+        savename (str | None, optional): _description_. Defaults to None.
+
+    Returns:
+        go.Figure
+    """
     fig = go.Figure()
     if logI:
         data = torch.log(I2d)
@@ -155,10 +200,24 @@ def plot_model(
     show: bool = True,
     savename: str | None = None
     ) -> go.Figure:
-    '''plot models in 3d
-    type: voxel | volume | None
-        if None, voxel for part model, volume for assembly model
-    '''
+    """Plot models in 3d
+    If type not specified, voxel for part model, volume for assembly model.
+    Voxel plot is better to inspect shape without sld;
+    Volume plot can see through model with sld distribution.
+
+    Args:
+        type (Literal[&#39;volume&#39;, &#39;voxel&#39;] | None, optional): type of plot. Defaults to None.
+        title (str | None, optional): _description_. Defaults to None.
+        colorscale (str, optional): _description_. Defaults to 'Plasma'.
+        show (bool, optional): _description_. Defaults to True.
+        savename (str | None, optional): _description_. Defaults to None.
+
+    Raises:
+        ValueError: _description_
+
+    Returns:
+        go.Figure
+    """
     fig = go.Figure()
     for modeli in model:
         if isinstance(modeli, Assembly):
@@ -212,10 +271,20 @@ def plot_surface(
     show: bool = True,
     savename: str | None = None
     ) -> go.Figure:
-    '''plot a surface in real or reciprocal space by coordinates, such as detector surface
-    in reciprocal space
-    data: (x, y, z) | (x, y, z, I2d), all Tensor should be 2d
-    '''
+    """Plot a surface in real or reciprocal space by coordinates,
+    such as detector surface in reciprocal space.
+
+    Args:
+        data (tuple[Tensor, ...]): (x, y, z) or (x, y, z, I2d), all Tensor should be 2d
+        logI (bool, optional): _description_. Defaults to True.
+        title (str | None, optional): _description_. Defaults to None.
+        colorscale (str, optional): _description_. Defaults to 'Plasma'.
+        show (bool, optional): _description_. Defaults to True.
+        savename (str | None, optional): _description_. Defaults to None.
+
+    Returns:
+        go.Figure: _description_
+    """
     if len(data[0]) == 4:
         value_provided = True
     else:
@@ -252,10 +321,20 @@ def plot_real_detector(
     show: bool = True,
     savename: str | None = None
     ) -> go.Figure:
-    '''plot detector(s) surface in realspace, also display direct beam
+    """Plot detector(s) surface in realspace, also display direct beam
     and covered solid angle by detector
-    data: (x, y, z) | (x, y, z, I2d), all Tensor should be 2d
-    '''
+
+    Args:
+        data (tuple[Tensor, ...]): (x, y, z) | (x, y, z, I2d), all Tensor should be 2d
+        logI (bool, optional): _description_. Defaults to True.
+        title (str | None, optional): _description_. Defaults to None.
+        colorscale (str, optional): _description_. Defaults to 'Plasma'.
+        show (bool, optional): _description_. Defaults to True.
+        savename (str | None, optional): _description_. Defaults to None.
+
+    Returns:
+        go.Figure: _description_
+    """
     # plot detector surface
     fig = plot_surface(*data, logI=logI, colorscale=colorscale, show=False)
 

@@ -1,6 +1,6 @@
-'''Compute-intensive functions in model2sas.
+"""Compute-intensive functions in model2sas.
 All based on pytorch instead of numpy.
-'''
+"""
 
 from typing import Literal
 
@@ -18,18 +18,18 @@ ti.init(ti.gpu)
 # * same api remains
 # @timer(level=2)
 def _torch_moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor) -> Tensor:
-    '''Calculate all the points intersect with 1 triangle
+    """Calculate all the points intersect with 1 triangle
     using Möller-Trumbore intersection algorithm
     see paper https://doi.org/10.1080/10867651.1997.10487468
 
     Args:
-        origins: Tensor, size=(n, 3)
-        ray: Tensor, size=(3,), direction of ray
-        triangles: Tensor, size=(m,3,3) vertices of a triangle
+        origins (Tensor): shape=(n, 3), points to be determined
+        ray (Tensor): shape=(3,), direction of ray
+        triangles (Tensor): shape=(m,3,3) vertices of a triangle
 
     Returns:
-        Tensor, size=(n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
-    '''
+        Tensor: size=(n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
+    """
     device = origins.device
     n = origins.size()[0]
     intersect_count = torch.zeros(n, dtype=torch.int32, device=device)
@@ -70,18 +70,18 @@ def _one_ray_one_triangle_intersect(
 
 # @timer(level=2)
 def _taichi_moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor) -> Tensor:
-    '''Calculate all the points intersect with 1 triangle
+    """Calculate all the points intersect with 1 triangle
     using Möller-Trumbore intersection algorithm
     see paper https://doi.org/10.1080/10867651.1997.10487468
 
     Args:
-        origins: Tensor, size=(n, 3)
-        ray: Tensor, size=(3,), direction of ray
-        triangles: Tensor, size=(m,3,3) vertices of a triangle
+        origins (Tensor): shape=(n, 3), points to be determined
+        ray (Tensor): shape=(3,), direction of ray
+        triangles (Tensor): shape=(m,3,3) vertices of a triangle
 
     Returns:
-        Tensor, size=(n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
-    '''
+        Tensor: size=(n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
+    """
     device = origins.device
     # if device.type == 'cuda':
     #     ti.init(ti.cuda)
@@ -110,18 +110,19 @@ def _taichi_moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triang
 
 @timer(level=2)
 def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor, backend: Literal['torch', 'taichi'] = 'torch') -> Tensor:
-    '''Calculate all the points intersect with 1 triangle
+    """Calculate all the points intersect with 1 triangle
     using Möller-Trumbore intersection algorithm
     see paper https://doi.org/10.1080/10867651.1997.10487468
 
     Args:
-        origins: Tensor, size=(n, 3)
-        ray: Tensor, size=(3,), direction of ray
-        triangles: Tensor, size=(m,3,3) vertices of a triangle
+        origins (Tensor): shape=(n, 3), points to be determined
+        ray (Tensor): shape=(3,), direction of ray
+        triangles (Tensor): shape=(m,3,3) vertices of a triangle
+        backend (Literal[&#39;torch&#39;, &#39;taichi&#39;], optional): calculation backend, taichi is faster. Defaults to 'torch'.
 
     Returns:
-        Tensor, size=(n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
-    '''
+        Tensor: size=(n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
+    """
     if backend == 'taichi':
         intersect_count = _taichi_moller_trumbore_intersect_count(origins, ray, triangles)
     elif backend == 'torch':
@@ -132,11 +133,18 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
 
 @timer(level=2)
 def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Tensor]:
-    ''' Generate sampling points for orientation average
+    """Generate sampling points for orientation average
     using fibonacci grid
     s and n_on_sphere should have same shape
     Calculate on cpu for convinience, transfered to designate device
-    '''
+
+    Args:
+        s (Tensor): shape=(n,), list of radius of spherical shells in reciprocal space
+        n_on_sphere (Tensor): shape=(n,), number of points on each shell
+
+    Returns:
+        tuple[Tensor, Tensor, Tensor]: coordinates in reciprocal space x, y, z
+    """
     device = s.device
     s = s.to('cpu')
     n_on_sphere = n_on_sphere.to('cpu')
@@ -157,15 +165,22 @@ def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Ten
 
 @timer(level=2)
 def nearest_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tensor, c:Tensor, d:float | Tensor) -> Tensor:
-    '''对等间距网格进行最近邻插值
-    ATTENTION:
-        当网格值c是复数时，根据我这里的实际测试结果，这个函数等效于对实部和虚部分别进行插值
-    Parameters:
-        x, y, z: 待插值的三个坐标序列，(x[i], y[i], z[i])代表待插值的某点坐标
-        px, py, pz: 已知数值的点的三个坐标序列，只有一维，也就是说没有进行meshgrid
-        c: 每个坐标点的值, shape=(px.size, py.size, pz.size)
-        d: float 网格间距, 所有格点都是等间距的
-    '''
+    """Conduct nearest interpolate on equally spaced meshgrid.
+    当网格值c是复数时等效于对实部和虚部分别进行插值
+
+    Args:
+        x (Tensor): shape=(n,), x coordinates of points to be interpolated
+        y (Tensor): shape=(n,), y coordinates of points to be interpolated
+        z (Tensor): shape=(n,), z coordinates of points to be interpolated
+        px (Tensor): shape=(m1,), x edge grid of meshgrid with known values
+        py (Tensor): shape=(m2,), y edge grid of meshgrid with known values
+        pz (Tensor): shape=(m3,), z edge grid of meshgrid with known values
+        c (Tensor): shape=(m1, m2, m3), values of each of in meshgrid(px, py, pz)
+        d (float | Tensor): spacing of meshgrid(px, py, pz), equally spaced
+
+    Returns:
+        Tensor: shape=(n,), interpolated values of (x, y, z)
+    """
     ix, iy, iz = (x-px[0]+d/2)/d, (y-py[0]+d/2)/d, (z-pz[0]+d/2)/d
     ix, iy, iz = ix.to(torch.int64), iy.to(torch.int64), iz.to(torch.int64) # tensors used as indices must be long, byte or bool tensors
     c_interp = c[ix, iy, iz]
@@ -173,15 +188,22 @@ def nearest_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tensor
 
 @timer(level=2)
 def trilinear_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tensor, c:Tensor, d:float | Tensor) -> Tensor:
-    '''对等间距网格进行三线性插值
-    ATTENTION:
-        当网格值c是复数时，根据我这里的实际测试结果，这个函数等效于对实部和虚部分别进行插值
-    Parameters:
-        x, y, z: 待插值的三个坐标序列，(x[i], y[i], z[i])代表待插值的某点坐标
-        px, py, pz: 已知数值的点的三个坐标序列，只有一维，也就是说没有进行meshgrid
-        c: 每个坐标点的值, shape=(px.size, py.size, pz.size)
-        d: float 网格间距, 所有格点都是等间距的
-    '''
+    """Conduct trilinear interpolate on equally spaced meshgrid.
+    当网格值c是复数时等效于对实部和虚部分别进行插值
+
+    Args:
+        x (Tensor): shape=(n,), x coordinates of points to be interpolated
+        y (Tensor): shape=(n,), y coordinates of points to be interpolated
+        z (Tensor): shape=(n,), z coordinates of points to be interpolated
+        px (Tensor): shape=(m1,), x edge grid of meshgrid with known values
+        py (Tensor): shape=(m2,), y edge grid of meshgrid with known values
+        pz (Tensor): shape=(m3,), z edge grid of meshgrid with known values
+        c (Tensor): shape=(m1, m2, m3), values of each of in meshgrid(px, py, pz)
+        d (float | Tensor): spacing of meshgrid(px, py, pz), equally spaced
+
+    Returns:
+        Tensor: shape=(n,), interpolated values of (x, y, z)
+    """
     ix, iy, iz = (x-px[0])/d, (y-py[0])/d, (z-pz[0])/d
     ix, iy, iz = ix.to(torch.int64), iy.to(torch.int64), iz.to(torch.int64) # tensors used as indices must be long, byte or bool tensors
 

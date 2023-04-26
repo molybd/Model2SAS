@@ -1,5 +1,5 @@
-'''some useful utility functions
-'''
+"""some useful utility functions
+"""
 
 from typing import Literal
 
@@ -34,21 +34,25 @@ def timer(level: int = 0):
     return timer_decorator
 
 def convert_coord(u:Tensor, v:Tensor, w:Tensor, original_coord: Literal['car', 'sph', 'cyl'], target_coord: Literal['car', 'sph', 'cyl']) -> tuple[Tensor, Tensor, Tensor]:
-    ''' Convert coordinates
+    """Convert coordinates
     car: Cartesian coordinates, in (x, y, z)
-    sph: spherical coordinates, in (r, theta, phi) | theta: 0~2pi ; phi: 0~pi
-    cyl: cylindrical coordinates, in (rho, phi, z) | theta:0-2pi
+    sph: spherical coordinates, in (r, theta, phi); theta: 0~2pi ; phi: 0~pi
+    cyl: cylindrical coordinates, in (rho, theta, z); theta: 0-2pi
 
-    Attributes:
-        u: 1st coord
-        v: 2nd coord
-        w: 3rd coord
-        original_coord: 'car' or 'sph' or 'cyl'
-        target_coord: 'car' or 'sph' or 'cyl'
-    
-    Return:
-        converted u, v, w
-    '''
+    Args:
+        u (Tensor): 1st coord
+        v (Tensor): 2nd coord
+        w (Tensor): 3rd coord
+        original_coord (Literal[&#39;car&#39;, &#39;sph&#39;, &#39;cyl&#39;]): original coordinate type to be converted
+        target_coord (Literal[&#39;car&#39;, &#39;sph&#39;, &#39;cyl&#39;]): target coordinate type
+
+    Raises:
+        ValueError: _description_
+        ValueError: _description_
+
+    Returns:
+        tuple[Tensor, Tensor, Tensor]: converted coordinates
+    """
     def car2sph(x:Tensor, y:Tensor, z:Tensor) -> tuple[Tensor, Tensor, Tensor]:
         '''convert cartesian coordinates to spherical coordinates
         '''
@@ -100,17 +104,30 @@ def convert_coord(u:Tensor, v:Tensor, w:Tensor, original_coord: Literal['car', '
         raise ValueError('Unsupported coordinates: {}'.format(target_coord))
 
 def abi2modarg(t: Tensor) -> tuple[Tensor, Tensor]:
-    '''Change a complex tensor from a+bi expression
+    """Change a complex tensor from a+bi expression
     to mod*exp(i*arg) expression.
-    '''
+
+    Args:
+        t (Tensor): complex tensor, with a+bi expresion
+
+    Returns:
+        tuple[Tensor, Tensor]: mod and argument of complex number
+    """
     mod = torch.sqrt(t.real**2 + t.imag**2)
     arg = torch.arctan2(t.imag, t.real)
     return mod, arg
 
 def modarg2abi(mod: Tensor, arg: Tensor) -> Tensor:
-    '''Change a complex tensor from mod*exp(i*arg)
+    """Change a complex tensor from mod*exp(i*arg)
     expression to a+bi expression.
-    '''
+
+    Args:
+        mod (Tensor): mod of complex number
+        arg (Tensor): argument of complex number
+
+    Returns:
+        Tensor: complex tensor
+    """
     return mod * torch.complex(torch.cos(arg), torch.sin(arg))
 
 
@@ -122,29 +139,41 @@ class MathModelClassBase:
     coord:
     - 'car' |in (x, y, z)
     - 'sph' |in (r, theta, phi) |theta: 0~2pi ; phi: 0~pi
-    - 'cyl' |in (rho, phi, z) |theta:0-2pi
+    - 'cyl' |in (rho, theta, z) |theta:0-2pi
     '''
     def __init__(self) -> None:
-        '''must at least have these 2 attributes
-        '''
+        """must at least have these 2 attributes:
+        self.params: dict
+        self.coord: Literal['car', 'sph', 'cyl']
+        """
         self.params: dict = {}
-        self.coord: Literal['car', 'sph', 'cyl'] = 'car'  # 'car' or 'sph' or 'cyl'
+        self.coord: Literal['car', 'sph', 'cyl'] = 'car'
 
     def get_bound(self) -> tuple[tuple|list, tuple|list]:
-        '''re-generate boundary for every method call
+        """re-generate boundary for every method call
         in case that params are altered in software.
         return coordinates in Cartesian coordinates.
-        '''
+
+        Returns:
+            tuple[tuple|list, tuple|list]: min and max points
+        """
         return (-1*torch.ones(3)).tolist(), torch.ones(3).tolist()
 
     def sld(self, u: Tensor, v: Tensor, w: Tensor) -> Tensor:
-        ''' calculate sld values of certain coordinates
+        """Calculate sld values of certain coordinates.
+        u, v, w means:
+        x, y, z if self.coord=='car';
+        r, theta, phi if self.coord=='sph';
+        rho, theta, z if self.coord=='cyl';
+
         Args:
-            u, v, w: coordinates in self.coord
-                x, y, z if self.coord = 'car'
-                r, theta, phi if self.coord = 'sph'
-                rho, theta, z if self.coord = 'cyl'
-        '''
+            u (Tensor): 1st coord
+            v (Tensor): 2nd coord
+            w (Tensor): 3rd coord
+
+        Returns:
+            Tensor: sld values of each coordinates
+        """
         return torch.zeros_like(u)
 
 
@@ -156,8 +185,19 @@ def gen_math_model_class(
         shape_description: str = ':',
         sld_description: str = 'False',
     ):
-    '''Generate a math modol class dynamically.
-    '''
+    """Generate a math modol class dynamically by description strings.
+
+    Args:
+        name (str, optional): name of math model class. Defaults to 'SpecificMathModelClass'.
+        params (dict | None, optional): params dict. Defaults to None.
+        coord (Literal[&#39;car&#39;, &#39;sph&#39;, &#39;cyl&#39;], optional): coordination type. Defaults to 'car'.
+        bound_point (tuple[str, str, str], optional): max point of the box containing the whole model. Can be expressions by params. Defaults to ('1', '1', '1').
+        shape_description (_type_, optional): describe shape by coordinates and params. Defaults to ':'.
+        sld_description (str, optional): describe sld values by coordinates and params. Defaults to 'False'.
+
+    Returns:
+        MathModelClassBase: math model class
+    """
     if params is None:
         params = {}
         
@@ -209,9 +249,19 @@ def gen_math_model_class_sourcecode(
         shape_description: str,
         sld_description: str,
         ) -> str:
-    '''Generate source code string of math model class
-    for file saving.
-    '''
+    """Generate source code string of math model class for file saving.
+    Args mainly get from MathModelClass.info dict.
+
+    Args:
+        params (dict): _description_
+        coord (Literal[&#39;car&#39;, &#39;sph&#39;, &#39;cyl&#39;]): _description_
+        bound_point (tuple[str, str, str]): _description_
+        shape_description (str): _description_
+        sld_description (str): _description_
+
+    Returns:
+        str: source code string of MathModelClass
+    """
 
     source_code = """
 import torch
