@@ -57,9 +57,9 @@ class Part(Model):
         self.geo_transform: list[dict] = []
         self.bound_min: tuple[float, float, float]
         self.bound_max: tuple[float, float, float]
-        self.real_spacing: float
-        self.real_size: int
-        self.reciprocal_size: int
+        self.real_lattice_spacing: float
+        self.real_lattice_1d_size: int
+        self.reciprocal_lattice_1d_size: int
         self.x: Tensor
         self.y: Tensor
         self.z: Tensor
@@ -76,16 +76,16 @@ class Part(Model):
         self.sy: Tensor
         self.sz_half: Tensor
 
-    def auto_process(self, real_size: int | None = None, spacing: float | None = None,  reciprocal_size: int | None = None) -> None:
+    def auto_process(self, real_lattice_1d_size: int | None = None, spacing: float | None = None,  reciprocal_lattice_1d_size: int | None = None) -> None:
         '''Automatically do the pre-processing of part model
         to than can use get_F_value method.
         '''
-        self.gen_real_lattice_meshgrid(real_size=real_size, spacing=spacing)
+        self.gen_real_lattice_meshgrid(real_lattice_1d_size=real_lattice_1d_size, spacing=spacing)
         self.gen_real_lattice_sld()
-        self.gen_reciprocal_lattice(reciprocal_size=reciprocal_size)
+        self.gen_reciprocal_lattice(reciprocal_lattice_1d_size=reciprocal_lattice_1d_size)
 
-    def _get_suggested_spacing(self, Lmin: float, Lmax:float, real_size: int = 50) -> float:
-        '''Calculate optimal real_spacing and n_s values
+    def _get_suggested_spacing(self, Lmin: float, Lmax:float, real_lattice_1d_size: int = 50) -> float:
+        '''Calculate optimal real_lattice_spacing and n_s values
         for the generation of reciprocal spacing. Based on my
         experience and test, the meshgrid density is set to be
         40 on Lmax. But must ensure that the lattice number in
@@ -96,10 +96,10 @@ class Part(Model):
             Lmin: minimum real space scale of a model
             Lmax: maximum real space scale of a model
         '''
-        n_d = real_size
-        real_spacing = Lmax / n_d
-        real_spacing = min(real_spacing, Lmin/10)
-        return real_spacing
+        n_d = real_lattice_1d_size
+        real_lattice_spacing = Lmax / n_d
+        real_lattice_spacing = min(real_lattice_spacing, Lmin/10)
+        return real_lattice_spacing
 
     def set_real_lattice_meshgrid(self, x: Tensor, y: Tensor, z: Tensor) -> None:
         '''Import lattice meshgrid from outside of class.
@@ -107,21 +107,21 @@ class Part(Model):
         Must be evenly spaced in all 3 dimensions.
         '''
         spacing = x[1,0,0].item() - x[0,0,0].item()
-        self.real_spacing = spacing
+        self.real_lattice_spacing = spacing
         self.x, self.y, self.z = x.to(self.device), y.to(self.device), z.to(self.device)
-        self.real_size = max(x.shape)
+        self.real_lattice_1d_size = max(x.shape)
 
-    def gen_real_lattice_meshgrid(self, real_size: int | None = None, spacing: float | None = None) -> tuple[Tensor, Tensor, Tensor]:
+    def gen_real_lattice_meshgrid(self, real_lattice_1d_size: int | None = None, spacing: float | None = None) -> tuple[Tensor, Tensor, Tensor]:
         '''Generate equally spaced meshgrid in 3d real space.
-        Can be assigned either real_size or spacing.
+        Can be assigned either real_lattice_1d_size or spacing.
         '''
         bound_min, bound_max = self.get_bound()
         xmin, ymin, zmin = bound_min
         xmax, ymax, zmax = bound_max
         Lmin = min(xmax-xmin, ymax-ymin, zmax-zmin)
         Lmax = max(xmax-xmin, ymax-ymin, zmax-zmin)
-        if real_size is not None:
-            spacing = self._get_suggested_spacing(Lmin, Lmax, real_size=real_size)
+        if real_lattice_1d_size is not None:
+            spacing = self._get_suggested_spacing(Lmin, Lmax, real_lattice_1d_size=real_lattice_1d_size)
         elif spacing is None:
             spacing = self._get_suggested_spacing(Lmin, Lmax)
         # print('real spacing: {}'.format(spacing))
@@ -139,8 +139,8 @@ class Part(Model):
         y1d = torch.linspace(ymin, ymax, ynum, device=self.device)
         z1d = torch.linspace(zmin, zmax, znum, device=self.device)
         x, y, z = torch.meshgrid(x1d, y1d, z1d, indexing='ij')
-        self.real_size = max(xnum, ynum, znum)
-        self.real_spacing = spacing
+        self.real_lattice_1d_size = max(xnum, ynum, znum)
+        self.real_lattice_spacing = spacing
         self.x, self.y, self.z = x, y, z
         return x, y, z
 
@@ -148,7 +148,7 @@ class Part(Model):
         '''To directly import a real lattice, jump over StlPart or MathPart,
         Mainly for test use.
         '''
-        self.real_spacing = x[1,0,0].item() - x[0,0,0].item()
+        self.real_lattice_spacing = x[1,0,0].item() - x[0,0,0].item()
         self.x, self.y, self.z = x.to(self.device), y.to(self.device), z.to(self.device)
         self.sld = sld.to(self.device)
         self._store_original_real_lattice(x, y, z, sld)
@@ -182,7 +182,7 @@ class Part(Model):
 
 
     @timer(level=1)
-    def gen_reciprocal_lattice(self, reciprocal_size: int | None = None, need_centering: bool = True) -> Tensor:
+    def gen_reciprocal_lattice(self, reciprocal_lattice_1d_size: int | None = None, need_centering: bool = True) -> Tensor:
         '''Generate reciprocal lattice from real lattice.
         The actual real lattice begins with bound_min, but
         FFT algorithm treats real space lattice as it begins
@@ -205,23 +205,23 @@ class Part(Model):
         bound_min, bound_max = self.get_bound()
         xmin, ymin, zmin = bound_min
         xmax, ymax, zmax = bound_max
-        if reciprocal_size is None:
+        if reciprocal_lattice_1d_size is None:
             if self.is_isolated:
-                reciprocal_size = 10 * self.real_size
-                reciprocal_size = min(600, reciprocal_size)  # in case of using too much resource
+                reciprocal_lattice_1d_size = 10 * self.real_lattice_1d_size
+                reciprocal_lattice_1d_size = min(600, reciprocal_lattice_1d_size)  # in case of using too much resource
             else:
-                reciprocal_size = self.real_size
+                reciprocal_lattice_1d_size = self.real_lattice_1d_size
         else:
-            reciprocal_size = max(reciprocal_size, self.real_size)
-        n_s = reciprocal_size
+            reciprocal_lattice_1d_size = max(reciprocal_lattice_1d_size, self.real_lattice_1d_size)
+        n_s = reciprocal_lattice_1d_size
         # print('n_s: {}'.format(n_s))
         # larger n_s get more precise in low q,
         # but may use too many memory since F increases in ^3
 
         # size at z (3rd dim) is different with x & y (dim1&2)
-        s1d = torch.fft.fftfreq(n_s, d=self.real_spacing, device=self.device)
+        s1d = torch.fft.fftfreq(n_s, d=self.real_lattice_spacing, device=self.device)
         s1d = torch.fft.fftshift(s1d)
-        s1dz = torch.fft.rfftfreq(n_s, d=self.real_spacing, device=self.device)
+        s1dz = torch.fft.rfftfreq(n_s, d=self.real_lattice_spacing, device=self.device)
 
         # using rfft to save time. so only upper half (qz>=0)
         F_half = torch.fft.rfftn(self.sld, s=(n_s, n_s, n_s))
@@ -230,7 +230,7 @@ class Part(Model):
         # shift center to (0, 0, 0)
         # time-consuming part
         if need_centering:
-            xmin, ymin, zmin = xmin+self.real_spacing/2, ymin+self.real_spacing/2, zmin+self.real_spacing/2
+            xmin, ymin, zmin = xmin+self.real_lattice_spacing/2, ymin+self.real_lattice_spacing/2, zmin+self.real_lattice_spacing/2
             F_half = self._translate_on_reciprocal_lattice(F_half, s1d, s1d, s1dz, xmin, ymin, zmin)
             self.centered = True
         else:
@@ -247,14 +247,14 @@ class Part(Model):
         #   larger deviation from -4 slope line.
         #
         # BEFORE: voxel volume correction
-        # F_half = self.real_spacing**3 * F_half
-        d = self.real_spacing
+        # F_half = self.real_lattice_spacing**3 * F_half
+        d = self.real_lattice_spacing
         sinc = lambda t: torch.nan_to_num(torch.sin(t)/t, nan=1.)
         qxd2, qyd2, qzd2 = 2*torch.pi*s1d*d/2, 2*torch.pi*s1d*d/2, 2*torch.pi*s1dz*d/2
         box_scatt = torch.einsum('i,j,k->ijk', sinc(qxd2), sinc(qyd2), sinc(qzd2))
         F_half = F_half * d**3 * box_scatt
 
-        self.reciprocal_size = reciprocal_size
+        self.reciprocal_lattice_1d_size = reciprocal_lattice_1d_size
         self.s1d = s1d
         self.s1dz = s1dz
         self.F_half = F_half
@@ -507,18 +507,18 @@ class Part(Model):
     #   functions for convinient and intuitionistic usage
     #========================================================
     @timer(level=0)
-    def sampling(self, real_size: int | None = None, spacing: float | None = None) -> None:
+    def sampling(self, real_lattice_1d_size: int | None = None, spacing: float | None = None) -> None:
         '''Simulate the real sample preparation process. To build the
         part model in real space.
         '''
-        self.gen_real_lattice_meshgrid(real_size=real_size, spacing=spacing)
+        self.gen_real_lattice_meshgrid(real_lattice_1d_size=real_lattice_1d_size, spacing=spacing)
         self.gen_real_lattice_sld()
 
     @timer(level=0)
-    def scatter(self, reciprocal_size: int | None = None) -> None:
+    def scatter(self, reciprocal_lattice_1d_size: int | None = None) -> None:
         '''Simulate the scattering process to generate full reciprocal lattice.
         '''
-        self.gen_reciprocal_lattice(reciprocal_size=reciprocal_size)
+        self.gen_reciprocal_lattice(reciprocal_lattice_1d_size=reciprocal_lattice_1d_size)
 
     @timer(level=0)
     def measure(self, *qi: Tensor, orientation_average_offset: int = 100, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
@@ -698,7 +698,7 @@ class Assembly(Part):
         '''
         l_xmin, l_ymin, l_zmin, l_xmax, l_ymax, l_zmax = [], [], [], [], [], []
         for part in self.parts.values():
-            spacing = part.real_spacing
+            spacing = part.real_lattice_spacing
             x, y, z, _ = part.get_real_lattice_sld()
             l_xmin.append(x.min().item()-spacing/2)
             l_ymin.append(y.min().item()-spacing/2)

@@ -166,13 +166,13 @@ def plot_model(
         if isinstance(modeli, Assembly):
             modeli.sampling()
             x, y, z, sld = modeli.get_real_lattice_sld(output_device='cpu')
-            spacing = modeli.real_spacing
+            spacing = modeli.real_lattice_spacing
             name = 'assembly'
             if type is None:
                 type = 'volume'
         else: # isinstance(modeli, Part)
             x, y, z, sld = modeli.get_real_lattice_sld(output_device='cpu')
-            spacing = modeli.real_spacing
+            spacing = modeli.real_lattice_spacing
             name = modeli.partname
             if type is None:
                 type = 'voxel'
