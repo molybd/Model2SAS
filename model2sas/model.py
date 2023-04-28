@@ -666,16 +666,10 @@ class Part(Model):
             I = self.get_sas(*qi, interpolation_method=interpolation_method)
         return I
     
-    def __call__(self, *qi: Tensor, orientation_average_offset: int = 100) -> Tensor:
-        """Same as self.measure()
-
-        Args:
-            orientation_average_offset (int, optional): _description_. Defaults to 100.
-
-        Returns:
-            Tensor: _description_
+    def __call__(self, *args, **kwargs) -> Tensor:
+        """Same as self.measure(), for convinience.
         """
-        return self.measure(*qi, orientation_average_offset=orientation_average_offset)
+        return self.measure(*args, **kwargs)
 
 
 class StlPart(Part):
@@ -828,12 +822,13 @@ class Assembly(Part):
             self.parts[i] = p
 
     @timer(level=1)
-    def get_F_value(self, reciprocal_coord: Tensor) -> Tensor:
+    def get_F_value(self, reciprocal_coord: Tensor, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
         """Get F value (scattering amplitude) of certain coordinates
         in reciprocal space.
 
         Args:
             reciprocal_coord (Tensor): shape=(n, 3)
+            interpolation_method (Literal[&#39;trilinear&#39;, &#39;nearest&#39;], optional): _description_. Defaults to 'trilinear'.
 
         Returns:
             Tensor: F value of corresponding coordinates
@@ -841,7 +836,7 @@ class Assembly(Part):
         new_coord = reciprocal_coord.to(self.device)
         F_value = torch.zeros(new_coord.shape[0], dtype=torch.complex64, device=self.device)
         for part in self.parts.values():
-            F_value = F_value + part.get_F_value(new_coord)
+            F_value = F_value + part.get_F_value(new_coord, interpolation_method=interpolation_method)
         output_device = reciprocal_coord.device
         return F_value.to(output_device)
 
