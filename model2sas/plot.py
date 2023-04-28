@@ -1,16 +1,16 @@
 """All kinds of plot, from 1d to 3d.
 """
 
+import functools
+import os
 from typing import Literal
 
 import torch
 from torch import Tensor
-import functools
-import os
+
 import plotly.graph_objects as go
 
-from model import Part, Assembly
-from detector import Detector
+from .model import Part, Assembly
 
 
 #==================================
@@ -90,7 +90,7 @@ class Voxel(go.Mesh3d):
 # Plot functions below
 #==================================
 @plot_utils
-def plot_sas1d(
+def plot_1d_sas(
     q: Tensor | list[Tensor],
     I: Tensor | list[Tensor],
     name: str | list[str] | None = None,
@@ -152,7 +152,7 @@ def plot_sas1d(
 
 
 @plot_utils
-def plot_sas2d(
+def plot_2d_sas(
     I2d: Tensor,
     logI: bool = True,
     title: str | None = None,

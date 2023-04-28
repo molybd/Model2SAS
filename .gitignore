@@ -150,9 +150,6 @@ discarded design/
 # vscode configurations
 .vscode/
 
-# unfinished documents
-doc_temp/
-
 # temp folder
 .TEMP_Model2SAS/
 
@@ -165,5 +162,5 @@ doc_temp/
 # temporary folder
 temp/
 
-# tips for myself
-MEMO.md
+# local files for myself
+local/

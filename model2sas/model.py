@@ -12,9 +12,9 @@ import numpy as np
 import torch
 from torch import Tensor
 
-import calcfunc
-from calcfunc import euler_rodrigues_rotate
-from utils import timer, convert_coord, abi2modarg, modarg2abi, MathModelClassBase
+from . import calcfunc
+from .calcfunc import euler_rodrigues_rotate
+from .utils import timer, convert_coord, abi2modarg, modarg2abi, MathModelClassBase
 
 
 class Model:
@@ -912,37 +912,3 @@ class Assembly(Part):
             sld = sld + temp_part.gen_real_lattice_sld().to(self.device) # part models may be at different devices
         self.sld = sld
         return sld
-
-
-if __name__ == '__main__':
-    from detector import Detector
-
-    part1 = MathPart(filename=r'test_models/cylinder_z.py', device='cpu')
-    part1.math_model.params = {
-            'R': 10,
-            'H': 30,
-            'sld_value': 1
-        }
-    part1.sampling()
-    part1.scatter()
-    q = torch.linspace(0.01, 1, steps=200)
-    I = part1.measure(q)
-
-    part2 = StlPart(filename=r'test_models/torus.stl', device='cpu', sld_value=2)
-    part2.sampling()
-    part2.scatter()
-
-    assembly = Assembly(part1, part2)
-    I = assembly.measure(q)
-
-    det1 = Detector((981, 1043), 172e-6)
-    det1.set_sdd(1.5)
-    det1.translate(0, -50e-3)
-    wavelength = 1.342
-    qcoord1 = det1.get_reciprocal_coord(wavelength)
-    I2d1 = assembly.measure(*qcoord1)
-
-
-
-
-
