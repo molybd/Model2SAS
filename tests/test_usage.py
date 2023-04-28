@@ -2,20 +2,25 @@ import torch
 
 from model2sas import *
 
+
 def test_normal_flow():
     part1 = MathPart(filename=r'resources/exp_models/cylinder_z.py', device='cpu')
-    part1.sampling()
     part1.set_params(R=10, H=30, sld_value=1)
+    part1.sampling()
     part1.scatter()
 
     part2 = StlPart(filename=r'resources/exp_models/torus.stl', device='cpu', sld_value=2)
     part2.sampling()
     part2.scatter()
 
-    plot_model(part1, part2, type='voxel')
+    plot_model(part1, part2)
 
     assembly = Assembly(part1, part2)
     plot_model(assembly)
+
+    q = torch.linspace(0.01, 2, steps=200)
+    I = assembly.measure(q)
+    plot_1d_sas(q, [I, 10*I], name='cylinder', mode=['markers', 'lines'], title='test')
 
     det1 = Detector((981, 1043), 172e-6)
     det1.set_sdd(1.5)
@@ -24,22 +29,13 @@ def test_normal_flow():
     det2.set_sdd(0.2)
     det2.pitch(torch.pi/6)
     det2.translate(0, 60e-3)
-    
-    plot_real_detector(
-        (det1.x, det1.y, det1.z), (det2.x, det2.y, det2.z)
-    )
-
-    q = torch.linspace(0.01, 2, steps=200)
-    I = assembly.measure(q)
-    plot_1d_sas(q, [I, 10*I], name='cylinder', mode=['markers', 'lines'], title='test')
 
     wavelength = 1.342
     qcoord1 = det1.get_reciprocal_coord(wavelength)
     qcoord2 = det2.get_reciprocal_coord(wavelength)
     I2d1 = assembly.get_sas(*qcoord1)
     I2d2 = assembly.get_sas(*qcoord2)
-    plot_2d_sas(I2d1, savename='test_2dhtml.html', show=False, title='2d plot')
-
+    plot_2d_sas(I2d1, savename='temp/test_2dhtml.html', show=True, title='2d plot')
     plot_surface((*qcoord1, I2d1), (*qcoord2, I2d2))
 
 
@@ -47,16 +43,17 @@ def test_transform():
     part1 = MathPart(filename=r'resources/exp_models/cylinder_z.py', device='cpu')
     part1.set_params(R=10, H=20, sld_value=1)
     part1.sampling()
-    part1.rotate((1.3,0,0), torch.pi/5.4)
+    part1.rotate((1,0,0), torch.pi/5.4)
+    part1.translate(120, 34, -103)
     part1.scatter()
 
     part2 = StlPart(filename=r'resources/exp_models/torus.stl', device='cpu', sld_value=2)
-    part2.translate(11, 3, 6)
+    part2.rotate((1,1,0), torch.pi/3.1)
+    part2.translate(131, 37, -97)
     part2.sampling()
     part2.scatter()
 
     plot_model(part1, part2, type='voxel')
-    plot_model(part1,  type='volume')
 
     assembly = Assembly(part1, part2)
     plot_model(assembly)
@@ -105,3 +102,22 @@ def test_detector_simulation():
     plot_real_detector(
         (det1.x, det1.y, det1.z), (det2.x, det2.y, det2.z)
     )
+
+    part1 = MathPart(filename=r'resources/exp_models/cylinder_z.py', device='cpu')
+    part1.set_params(R=10, H=30, sld_value=1)
+    part1.sampling()
+    part1.scatter()
+    part2 = StlPart(filename=r'resources/exp_models/torus.stl', device='cpu', sld_value=2)
+    part2.sampling()
+    part2.scatter()
+    assembly = Assembly(part1, part2)
+
+    wavelength = 1.342
+    qcoord1 = det1.get_reciprocal_coord(wavelength)
+    qcoord2 = det2.get_reciprocal_coord(wavelength)
+    I1 = assembly.get_sas(*qcoord1)
+    I2 = assembly.get_sas(*qcoord2)
+    plot_real_detector(
+        (det1.x, det1.y, det1.z, I1), (det2.x, det2.y, det2.z, I2)
+    )
+
