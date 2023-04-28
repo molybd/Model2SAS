@@ -134,9 +134,7 @@ dmypy.json
 *.svg
 *.jpg
 *.tif
-
-# test files
-test*
+*.html
 
 # experimental codes
 exp_*
