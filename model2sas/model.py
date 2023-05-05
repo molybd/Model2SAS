@@ -13,8 +13,8 @@ import torch
 from torch import Tensor
 
 from . import calcfunc
-from .calcfunc import euler_rodrigues_rotate
-from .utils import timer, convert_coord, abi2modarg, modarg2abi, MathModelClassBase
+from .calcfunc import euler_rodrigues_rotate, convert_coord, abi2modarg, modarg2abi
+from .utils import timer, MathModelClassBase
 
 
 class Model:
