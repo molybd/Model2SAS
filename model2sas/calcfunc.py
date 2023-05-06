@@ -7,12 +7,17 @@ from typing import Literal
 # import numpy as np
 import torch
 from torch import Tensor
-import taichi as ti
-import taichi.math as tm
 
 from .utils import timer
 
-ti.init(ti.gpu)
+try:
+    import taichi as ti
+    import taichi.math as tm
+    ti.init(ti.gpu)
+    TAICHI_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    TAICHI_AVAILABLE = False
+    print('❌ taichi not available')
 
 
 def convert_coord(u:Tensor, v:Tensor, w:Tensor, original_coord: Literal['car', 'sph', 'cyl'], target_coord: Literal['car', 'sph', 'cyl']) -> tuple[Tensor, Tensor, Tensor]:
@@ -223,7 +228,10 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
         Tensor: size=(n,), 与输入的点(origins)一一对应, 分别为相应点与所有三角形相交的次数
     """
     if backend == 'taichi':
-        intersect_count = _taichi_moller_trumbore_intersect_count(origins, ray, triangles)
+        if TAICHI_AVAILABLE:
+            intersect_count = _taichi_moller_trumbore_intersect_count(origins, ray, triangles)
+        else:
+            raise ValueError('taichi not available')
     elif backend == 'torch':
         intersect_count = _torch_moller_trumbore_intersect_count(origins, ray, triangles)
     else:
