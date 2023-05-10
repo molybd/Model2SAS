@@ -1,0 +1,600 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1068</width>
+    <height>810</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Model2SAS</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="0" column="0">
+     <widget class="QMdiArea" name="mdiArea"/>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1068</width>
+     <height>22</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QDockWidget" name="dockWidget_main">
+   <property name="features">
+    <set>QDockWidget::DockWidgetClosable|QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
+   <property name="windowTitle">
+    <string>Main</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>1</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents">
+    <layout class="QGridLayout" name="gridLayout_7">
+     <item row="2" column="0">
+      <widget class="QTreeWidget" name="treeWidget_models">
+       <column>
+        <property name="text">
+         <string notr="true">1</string>
+        </property>
+       </column>
+      </widget>
+     </item>
+     <item row="0" column="0">
+      <widget class="QGroupBox" name="groupBox_part">
+       <property name="title">
+        <string>Part Model</string>
+       </property>
+       <layout class="QGridLayout" name="gridLayout_5">
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_part_device">
+          <property name="text">
+           <string>Device</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QComboBox" name="comboBox_part_device">
+          <item>
+           <property name="text">
+            <string>cpu</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item row="1" column="0" colspan="2">
+         <widget class="QPushButton" name="pushButton_part_from_files">
+          <property name="text">
+           <string>Load From File(s)</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0" colspan="2">
+         <widget class="QPushButton" name="pushButton_build_math_model">
+          <property name="text">
+           <string>Build Math Model</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item row="3" column="0">
+      <layout class="QHBoxLayout" name="horizontalLayout_7">
+       <item>
+        <widget class="QLabel" name="label_length_unit">
+         <property name="text">
+          <string>Length Unit</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="comboBox_length_unit">
+         <item>
+          <property name="text">
+           <string>Å</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item row="1" column="0">
+      <widget class="QGroupBox" name="groupBox_assembly">
+       <property name="title">
+        <string>Assembly Model</string>
+       </property>
+       <layout class="QGridLayout" name="gridLayout_6">
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_assembly_device">
+          <property name="text">
+           <string>Device</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QComboBox" name="comboBox_assembly_device">
+          <item>
+           <property name="text">
+            <string>cpu</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item row="2" column="0" colspan="2">
+         <widget class="QPushButton" name="pushButton_add_to_assembly">
+          <property name="text">
+           <string>Add to Assembly Model</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0" colspan="2">
+         <widget class="QPushButton" name="pushButton_new_assembly">
+          <property name="text">
+           <string>New Assembly Model</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item row="0" column="1" rowspan="4">
+      <widget class="QTabWidget" name="tabWidget_settings">
+       <property name="currentIndex">
+        <number>0</number>
+       </property>
+       <widget class="QWidget" name="tabPage_model">
+        <attribute name="title">
+         <string>Model Settings</string>
+        </attribute>
+        <layout class="QGridLayout" name="gridLayout_8">
+         <item row="0" column="0" colspan="2">
+          <widget class="QLabel" name="label_model_params">
+           <property name="text">
+            <string>Model Parameters</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0" colspan="4">
+          <widget class="QTableView" name="tableView_model_params"/>
+         </item>
+         <item row="2" column="0" colspan="2">
+          <widget class="QLabel" name="label_real_lattice_1d_size">
+           <property name="text">
+            <string>Points in longest edge</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="2">
+          <widget class="QLineEdit" name="lineEdit_real_lattice_1d_size">
+           <property name="text">
+            <string>50</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="3">
+          <widget class="QPushButton" name="pushButton_sampling">
+           <property name="text">
+            <string>Sampling</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="0" colspan="4">
+          <widget class="QGroupBox" name="groupBox_transform">
+           <property name="title">
+            <string>Transform</string>
+           </property>
+           <layout class="QGridLayout" name="gridLayout_4">
+            <item row="0" column="0" colspan="2">
+             <widget class="QComboBox" name="comboBox_transform_type">
+              <item>
+               <property name="text">
+                <string>Translate</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Rotate</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QPushButton" name="pushButton_add_transform">
+              <property name="text">
+               <string>Add</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QPushButton" name="pushButton_delete_transform">
+              <property name="text">
+               <string>Delete</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="0" colspan="2">
+             <widget class="QTableView" name="tableView_transform"/>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item row="4" column="0">
+          <widget class="QCheckBox" name="checkBox">
+           <property name="text">
+            <string>Voxel</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="1">
+          <widget class="QCheckBox" name="checkBox_2">
+           <property name="text">
+            <string>Volume</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="2" colspan="2">
+          <widget class="QPushButton" name="pushButton_show_model">
+           <property name="text">
+            <string>Show</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="tabPage_scattering">
+        <attribute name="title">
+         <string>Scattering Settings</string>
+        </attribute>
+        <layout class="QGridLayout" name="gridLayout_3">
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_reciprocal_lattice_1d_size">
+           <property name="text">
+            <string>Edge points in reciprocal grid</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="lineEdit_reciprocal_lattice_1d_size">
+           <property name="text">
+            <string>default</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0" colspan="2">
+          <widget class="QTabWidget" name="tabWidget_measure">
+           <property name="currentIndex">
+            <number>0</number>
+           </property>
+           <widget class="QWidget" name="tabPage_direct_measure">
+            <attribute name="title">
+             <string>Direct Measure</string>
+            </attribute>
+            <layout class="QVBoxLayout" name="verticalLayout_3">
+             <item>
+              <widget class="QGroupBox" name="groupBox_1d_measure">
+               <property name="title">
+                <string>1D</string>
+               </property>
+               <property name="checkable">
+                <bool>false</bool>
+               </property>
+               <layout class="QVBoxLayout" name="verticalLayout">
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout">
+                  <item>
+                   <widget class="QLabel" name="label_q1d_range">
+                    <property name="text">
+                     <string>Q range</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLineEdit" name="lineEdit_q1d_min"/>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="label_dash">
+                    <property name="text">
+                     <string>-</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLineEdit" name="lineEdit_q1d_max"/>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="label_q1d_unit">
+                    <property name="text">
+                     <string>Å^-1</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_2">
+                  <item>
+                   <widget class="QLabel" name="label_q1d_num">
+                    <property name="text">
+                     <string>Q num</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLineEdit" name="lineEdit_q1d_num"/>
+                  </item>
+                  <item>
+                   <widget class="QCheckBox" name="checkBox_q1d_log_spaced">
+                    <property name="text">
+                     <string>Log Spaced</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="pushButton_1d_measure">
+                  <property name="text">
+                   <string>Measure</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QGroupBox" name="groupBox_2d_measure">
+               <property name="title">
+                <string>2D</string>
+               </property>
+               <layout class="QVBoxLayout" name="verticalLayout_2">
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_3">
+                  <item>
+                   <widget class="QLabel" name="label_q2d_resolution">
+                    <property name="text">
+                     <string>Resolution </string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLineEdit" name="lineEdit_q2d_resolution_h"/>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="label_times">
+                    <property name="text">
+                     <string>×</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLineEdit" name="lineEdit_q2d_resolution_v"/>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_4">
+                  <item>
+                   <widget class="QLabel" name="label_q2d_spacing">
+                    <property name="text">
+                     <string>Q spacing</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLineEdit" name="lineEdit_q2d_spacing"/>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="label_q2d_unit">
+                    <property name="text">
+                     <string>Å^-1</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_6">
+                  <item>
+                   <widget class="QLabel" name="label_q2d_normal_vector">
+                    <property name="text">
+                     <string>Normal vector</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLineEdit" name="lineEdit_q2d_normal_x">
+                    <property name="maximumSize">
+                     <size>
+                      <width>40</width>
+                      <height>16777215</height>
+                     </size>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLineEdit" name="lineEdit_q2d_normal_y">
+                    <property name="maximumSize">
+                     <size>
+                      <width>40</width>
+                      <height>16777215</height>
+                     </size>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLineEdit" name="lineEdit_q2d_normal_z">
+                    <property name="maximumSize">
+                     <size>
+                      <width>40</width>
+                      <height>16777215</height>
+                     </size>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_5">
+                  <item>
+                   <widget class="QCheckBox" name="checkBox_2d_show_3d">
+                    <property name="text">
+                     <string>Show in 3D Q Space</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QPushButton" name="pushButton_2d_measure">
+                    <property name="text">
+                     <string>Measure</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <spacer name="verticalSpacer">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>228</width>
+                 <height>132</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="tabPage_virtual_detector">
+            <attribute name="title">
+             <string>Virtual Detector</string>
+            </attribute>
+           </widget>
+          </widget>
+         </item>
+         <item row="1" column="0" colspan="2">
+          <widget class="QPushButton" name="pushButton_scattering">
+           <property name="text">
+            <string>Virtual Scattering</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QDockWidget" name="dockWidget_log">
+   <property name="features">
+    <set>QDockWidget::DockWidgetClosable|QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
+   <property name="windowTitle">
+    <string>Log</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>8</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents_2">
+    <layout class="QGridLayout" name="gridLayout_2">
+     <item row="0" column="0">
+      <widget class="QTextBrowser" name="textBrowser_log"/>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+ </widget>
+ <tabstops>
+  <tabstop>comboBox_part_device</tabstop>
+  <tabstop>pushButton_part_from_files</tabstop>
+  <tabstop>pushButton_build_math_model</tabstop>
+  <tabstop>tabWidget_settings</tabstop>
+  <tabstop>comboBox_transform_type</tabstop>
+  <tabstop>pushButton_add_transform</tabstop>
+  <tabstop>tableView_transform</tabstop>
+  <tabstop>pushButton_delete_transform</tabstop>
+  <tabstop>lineEdit_real_lattice_1d_size</tabstop>
+  <tabstop>pushButton_show_model</tabstop>
+  <tabstop>tableView_model_params</tabstop>
+  <tabstop>pushButton_sampling</tabstop>
+  <tabstop>lineEdit_reciprocal_lattice_1d_size</tabstop>
+  <tabstop>pushButton_scattering</tabstop>
+  <tabstop>tabWidget_measure</tabstop>
+  <tabstop>lineEdit_q1d_min</tabstop>
+  <tabstop>lineEdit_q1d_max</tabstop>
+  <tabstop>lineEdit_q1d_num</tabstop>
+  <tabstop>checkBox_q1d_log_spaced</tabstop>
+  <tabstop>pushButton_1d_measure</tabstop>
+  <tabstop>lineEdit_q2d_resolution_h</tabstop>
+  <tabstop>lineEdit_q2d_resolution_v</tabstop>
+  <tabstop>lineEdit_q2d_spacing</tabstop>
+  <tabstop>lineEdit_q2d_normal_x</tabstop>
+  <tabstop>lineEdit_q2d_normal_y</tabstop>
+  <tabstop>lineEdit_q2d_normal_z</tabstop>
+  <tabstop>checkBox_2d_show_3d</tabstop>
+  <tabstop>pushButton_2d_measure</tabstop>
+  <tabstop>comboBox_assembly_device</tabstop>
+  <tabstop>pushButton_new_assembly</tabstop>
+  <tabstop>pushButton_add_to_assembly</tabstop>
+  <tabstop>treeWidget_models</tabstop>
+  <tabstop>comboBox_length_unit</tabstop>
+  <tabstop>textBrowser_log</tabstop>
+ </tabstops>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>pushButton_part_from_files</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>browse_model_files()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>154</x>
+     <y>122</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>123</x>
+     <y>-2</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_build_math_model</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>build_math_model()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>214</x>
+     <y>153</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>195</x>
+     <y>-6</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>browse_model_files()</slot>
+  <slot>build_math_model()</slot>
+ </slots>
+</ui>
