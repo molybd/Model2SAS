@@ -59,6 +59,7 @@ class Part(Model):
             is_isolated (bool, optional): True for form factor only, False for structure factor. Defaults to True.
             device (str, optional): device of the model to be stored and calculated. Defaults to 'cpu'.
         """
+        self.model_type = 'general'
         self.device = device
         self.partname = partname
         if filename is not None:
@@ -685,6 +686,7 @@ class StlPart(Part):
             other args same as Part.__init__()
         """
         super().__init__(filename=filename, partname=partname, is_isolated=is_isolated, device=device)
+        self.model_type = 'stl'
         if filename is not None:
             self.mesh = mesh.Mesh.from_file(self.filename)
             self.bound_min, self.bound_max = self.get_bound()
@@ -748,7 +750,8 @@ class MathPart(Part):
             math_model_class (type | None, optional): direct import a math model class, child class of MathModelClassBase. Defaults to None.
             other args same as Part.__init__()
         """
-        super().__init__(filename=filename, is_isolated=is_isolated, device=device)
+        super().__init__(filename=filename, partname=partname, is_isolated=is_isolated, device=device)
+        self.model_type = 'math'
         if math_model_class is not None:
             self.math_model: MathModelClassBase = math_model_class()
         elif filename is not None:
@@ -809,7 +812,8 @@ class Assembly(Part):
         Args:
             device (str, optional): device for assembly model, independent of any part model's device. Defaults to 'cpu'.
         """
-        self.parts: dict[int, Part] = {}
+        self.model_type = 'assembly'
+        self.parts: list[Part] = []
         self.add_part(*part)
         self.device = device
         self.geo_transform = []  # should always be empty
@@ -818,8 +822,7 @@ class Assembly(Part):
         """Add part object or list of part object to self.parts dictionary
         """
         for p in part:
-            i = len(self.parts)
-            self.parts[i] = p
+            self.parts.append(p)
 
     @timer(level=1)
     def get_F_value(self, reciprocal_coord: Tensor, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
@@ -835,7 +838,7 @@ class Assembly(Part):
         """
         new_coord = reciprocal_coord.to(self.device)
         F_value = torch.zeros(new_coord.shape[0], dtype=torch.complex64, device=self.device)
-        for part in self.parts.values():
+        for part in self.parts:
             F_value = F_value + part.get_F_value(new_coord, interpolation_method=interpolation_method)
         output_device = reciprocal_coord.device
         return F_value.to(output_device)
@@ -847,12 +850,12 @@ class Assembly(Part):
             float: s_max value.
         """
         smax_list = []
-        for part in self.parts.values():
+        for part in self.parts:
             smax_list.append(part.get_s_max())
         return min(smax_list)
     
     def clear_geo_transform(self) -> None:
-        for part in self.parts.values():
+        for part in self.parts:
             part.clear_geo_transform()
     
 
@@ -867,7 +870,7 @@ class Assembly(Part):
             tuple[tuple[float, float, float], tuple[float, float, float]]: _description_
         """
         l_xmin, l_ymin, l_zmin, l_xmax, l_ymax, l_zmax = [], [], [], [], [], []
-        for part in self.parts.values():
+        for part in self.parts:
             spacing = part.real_lattice_spacing
             x, y, z, _ = part.get_real_lattice_sld()
             l_xmin.append(x.min().item()-spacing/2)
@@ -890,7 +893,7 @@ class Assembly(Part):
             Tensor: _description_
         """
         sld = torch.zeros_like(self.x, dtype=torch.float32, device=self.device)
-        for part in self.parts.values():
+        for part in self.parts:
             #* restore to untransformed
             x, y, z = self.x.clone(), self.y.clone(), self.z.clone()
             for transform in reversed(part.geo_transform):
