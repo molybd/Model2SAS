@@ -12,7 +12,7 @@ class ModelContainer:
     def __init__(self) -> None:
         self.q1d_min: float = 0.01
         self.q1d_max: float = 1.0
-        self.q1d_num: int = 100
+        self.q1d_num: int = 200
         self.q1d_log_spaced: bool = False
         self.real_lattice_1d_size: int = 50
         
@@ -24,6 +24,7 @@ class PartContainer(ModelContainer):
         super().__init__()
         self.key = key
         self.model = model
+        self.type = 'part'
         
         
 class AssemblyContainer(ModelContainer):
@@ -33,6 +34,7 @@ class AssemblyContainer(ModelContainer):
         super().__init__()
         self.key = key
         self.model = model
+        self.type = 'assembly'
 
 
 class Project:

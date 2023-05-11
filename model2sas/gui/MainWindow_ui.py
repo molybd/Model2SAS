@@ -460,7 +460,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_4.setObjectName(u"verticalLayout_4")
         self.textBrowser_log = QTextBrowser(self.dockWidgetContents_4)
         self.textBrowser_log.setObjectName(u"textBrowser_log")
-        self.textBrowser_log.setEnabled(False)
+        self.textBrowser_log.setEnabled(True)
 
         self.verticalLayout_4.addWidget(self.textBrowser_log)
 
@@ -562,5 +562,6 @@ class Ui_MainWindow(object):
         self.comboBox_assembly_device.setItemText(0, QCoreApplication.translate("MainWindow", u"cpu", None))
 
         self.pushButton_add_to_assembly.setText(QCoreApplication.translate("MainWindow", u"Add to Assembly", None))
+        self.dockWidget_log.setWindowTitle(QCoreApplication.translate("MainWindow", u"Log", None))
     # retranslateUi
 

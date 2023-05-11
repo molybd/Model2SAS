@@ -618,6 +618,9 @@
    </widget>
   </widget>
   <widget class="QDockWidget" name="dockWidget_log">
+   <property name="windowTitle">
+    <string>Log</string>
+   </property>
    <attribute name="dockWidgetArea">
     <number>1</number>
    </attribute>
@@ -626,7 +629,7 @@
      <item>
       <widget class="QTextBrowser" name="textBrowser_log">
        <property name="enabled">
-        <bool>false</bool>
+        <bool>true</bool>
        </property>
       </widget>
      </item>
