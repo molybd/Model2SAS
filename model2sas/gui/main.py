@@ -56,7 +56,7 @@ class MainWindow(QMainWindow):
         # ]
         print(filename_list)
         for filename in filename_list:
-            self.project.add_part(filename, self.ui.comboBox_part_device.currentText())
+            self.project.add_part(filename, 'cpu')
         
         # assmb = Assembly(device='cuda')
         # assmb.add_part(
