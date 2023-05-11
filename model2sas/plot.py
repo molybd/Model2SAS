@@ -175,7 +175,7 @@ def plot_2d_sas(
     """
     fig = go.Figure()
     if logI:
-        data = torch.log(I2d)
+        data = torch.log10(I2d)
         data = torch.nan_to_num(data, nan=0., neginf=0.) # incase 0 in data, cause log(0) output
     else:
         data = I2d
@@ -295,7 +295,7 @@ def plot_surface(
         if value_provided:
             x, y, z, I2d = datai
             if logI:
-                surfacecolor = torch.log(I2d)
+                surfacecolor = torch.log10(I2d)
                 surfacecolor = torch.nan_to_num(surfacecolor, nan=0., neginf=0.) # incase 0 in data, cause log(0) output
             else:
                 surfacecolor = I2d
