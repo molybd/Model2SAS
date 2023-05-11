@@ -758,7 +758,8 @@ class MathPart(Part):
             abspath = os.path.abspath(filename)
             dirname = os.path.dirname(abspath)
             sys.path.append(dirname)
-            module = __import__(self.partname)
+            stripped_name = os.path.splitext(self.basename)[0]
+            module = __import__(stripped_name)
             self.math_model = module.MathModelClass()
 
     def set_params(self, **kwargs) -> None:
