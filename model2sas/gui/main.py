@@ -5,14 +5,14 @@ import tempfile, time
 from typing import Optional
 
 import torch
-from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow
 
 from .MainWindow_ui import Ui_MainWindow
 from .SubWindow_buildmath_ui import Ui_subWindow_build_math_model
 from .SubWindow_htmlview_ui import Ui_subWindow_html_view
-from .utils import PartContainer, AssemblyContainer, Project
+from .utils import ModelContainer, Project
+
 
 from ..model import Part, StlPart, MathPart, Assembly
 from .. import plot
@@ -36,11 +36,11 @@ class ConsolePrintStream:
 
 class MainWindow(QMainWindow):
     
-    def __init__(self, app) -> None:
+    def __init__(self) -> None:
         
-        self.app = app
         # ui related
         super().__init__()
+        
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         self.show()
@@ -51,24 +51,29 @@ class MainWindow(QMainWindow):
         
         # data related
         self.project = Project()
-        self.project.new_assembly()
+        self.project.new_assembly('assembly') #* only prelimilary
         self.qmodel_for_treeview = QStandardItemModel()
         self.ui.treeView_models.setModel(self.qmodel_for_treeview)
-        self.active_model: PartContainer | AssemblyContainer
+        self.active_model: ModelContainer
         
         self.update_ui_models_tree_changed()
         
         
     def load_model_files(self):
-        # filename_list, _ = QFileDialog.getOpenFileNames(self, caption='Select Model File(s)', dir='./', filter="All Files (*);;stl Files (*.stl);;math model Files (*.py)")
-        filename_list = [
-            r'D:\Research\my_programs\Model2SAS\resources\exp_models\torus.stl',
-            r'D:\Research\my_programs\Model2SAS\resources\exp_models\cylinder.py',
-            r'D:\Research\my_programs\Model2SAS\resources\exp_models\sphere.py',
-        ]
+        filename_list, _ = QFileDialog.getOpenFileNames(self, caption='Select Model File(s)', dir='./', filter="All Files (*);;stl Files (*.stl);;math model Files (*.py)")
+        # filename_list = [
+        #     r'D:\Research\my_programs\Model2SAS\resources\exp_models\torus.stl',
+        #     r'D:\Research\my_programs\Model2SAS\resources\exp_models\cylinder.py',
+        #     r'D:\Research\my_programs\Model2SAS\resources\exp_models\sphere.py',
+        # ]
         print(filename_list)
         for filename in filename_list:
-            self.project.add_part(filename, 'cpu')
+            self.project.load_part_from_file(filename)
+        
+        #* only prelimilary
+        first_assembly_key = list(self.project.assemblies.keys())[0]
+        for part_key in self.project.parts:
+            self.project.add_part_to_assembly(part_key, first_assembly_key)
         
         self.update_ui_models_tree_changed()
         
@@ -78,24 +83,39 @@ class MainWindow(QMainWindow):
         self.qmodel_for_treeview.clear()
         self.qmodel_for_treeview.setHorizontalHeaderLabels(['Models', 'Info'])
         
-        # top level
-        model = self.project.assembly.model
-        qitem_assembly = QStandardItem('assembly')
-        self.qmodel_for_treeview.appendRow(qitem_assembly)
-        self.qmodel_for_treeview.setItem(
-            self.qmodel_for_treeview.indexFromItem(qitem_assembly).row(),
-            1,
-            QStandardItem('{} model @{}'.format(model.model_type, model.device))
-        )
-        for i, item in enumerate(self.project.parts.items()):
-            partname, model = item[0], item[1].model
-            qitem_part = QStandardItem(partname)
-            qitem_assembly.appendRow(qitem_part)
-            qitem_assembly.setChild(
-                i,
+        def add_root_item(key: str, model: ModelContainer) -> QStandardItem:
+            qitem_root = QStandardItem(key)
+            self.qmodel_for_treeview.appendRow(qitem_root)
+            self.qmodel_for_treeview.setItem(
+                self.qmodel_for_treeview.indexFromItem(qitem_root).row(),
                 1,
-                QStandardItem('{} model @{}'.format(model.model_type, model.device))
+                QStandardItem('{} @{}'.format(model.model.model_type, model.model.device))
             )
+            return qitem_root
+            
+        def add_child_item(root_item: QStandardItem, index: int, key: str, model: ModelContainer):
+            qitem_child = QStandardItem(key)
+            root_item.appendRow(qitem_child)
+            root_item.setChild(
+                index,
+                1,
+                QStandardItem('{} @{}'.format(model.model.model_type, model.model.device))
+            )
+            return qitem_child
+            
+        # top level
+        for key, model in self.project.parts.items():
+            if len(model.parent) == 0:
+                add_root_item(key, model)
+        for key, model in self.project.assemblies.items():
+            qitem_root = add_root_item(key, model)
+            for i, child_part_key in enumerate(model.children):
+                add_child_item(
+                    qitem_root,
+                    i,
+                    child_part_key,
+                    self.project.parts[child_part_key]
+                )
         self.ui.treeView_models.expandAll()
         
         # update combobox_assembly_list
@@ -111,31 +131,28 @@ class MainWindow(QMainWindow):
         subwindow_build_math_model.show()
     
     def selected_model_settings(self):
-        if self.ui.treeView_models.selectedIndexes()[0].parent().row() == -1:
-            # selected assembly
-            # print('selected assembly')
-            self.ui.label_active_model.setText('Active Model: assembly')
-            self.active_model = self.project.assembly
-            self.ui.tableView_model_params.setDisabled(True)
-            self.ui.pushButton_sampling.setDisabled(False)
-            self.ui.pushButton_sampling.setText('Sampling All Sub-Parts')
-            self.ui.pushButton_plot_model.setDisabled(False)
-            self.ui.pushButton_scattering.setDisabled(False)
-            self.ui.pushButton_scattering.setText('Virtual Scattering All Sub-Parts')
-            self.ui.pushButton_1d_measure.setDisabled(False)
-        else:
+        # print(self.ui.treeView_models.selectedIndexes()[0].data())
+        selected_key = self.ui.treeView_models.selectedIndexes()[0].data()
+        self.ui.label_active_model.setText('Active Model: {}'.format(selected_key))
+        if selected_key in self.project.parts.keys():
             # selected part
-            index = self.ui.treeView_models.selectedIndexes()[0].row()
-            partname = self.ui.treeView_models.selectedIndexes()[0].data()
-            # print('selected part with index={}'.format(index))
-            self.ui.label_active_model.setText('Active Model: {}'.format(partname))
-            self.active_model = self.project.parts[partname]
+            self.active_model = self.project.parts[selected_key]
             self.ui.tableView_model_params.setDisabled(False)
             self.ui.pushButton_sampling.setDisabled(False)
             self.ui.pushButton_sampling.setText('Sampling')
             self.ui.pushButton_plot_model.setDisabled(False)
             self.ui.pushButton_scattering.setDisabled(False)
             self.ui.pushButton_scattering.setText('Virtual Scattering')
+            self.ui.pushButton_1d_measure.setDisabled(False)
+        else:
+            # selected assembly
+            self.active_model = self.project.assemblies[selected_key]
+            self.ui.tableView_model_params.setDisabled(True)
+            self.ui.pushButton_sampling.setDisabled(False)
+            self.ui.pushButton_sampling.setText('Sampling All Sub-Parts')
+            self.ui.pushButton_plot_model.setDisabled(False)
+            self.ui.pushButton_scattering.setDisabled(False)
+            self.ui.pushButton_scattering.setText('Virtual Scattering All Sub-Parts')
             self.ui.pushButton_1d_measure.setDisabled(False)
         self.display_model_settings()
             
@@ -147,28 +164,30 @@ class MainWindow(QMainWindow):
         self.ui.checkBox_q1d_log_spaced.setChecked(self.active_model.q1d_log_spaced)
         
         
-        if isinstance(self.active_model, PartContainer):
+        if self.active_model.type == 'part':
             self.qmodel_for_params = QStandardItemModel()
             self.qmodel_for_params.setHorizontalHeaderLabels(['Param', 'Value'])
         
-        
-            
     def sampling(self):
-        
-        def part_sampling(part: PartContainer):
+        def part_sampling(part: ModelContainer):
             real_lattice_1d_size = int(self.ui.lineEdit_real_lattice_1d_size.text())
             part.real_lattice_1d_size = real_lattice_1d_size
             part.model.sampling(real_lattice_1d_size=real_lattice_1d_size)
         
-        if isinstance(self.active_model, AssemblyContainer):
-            for part in self.active_model.model.parts:
-                part_sampling(self.project.parts[part.partname])
-            self.active_model.real_lattice_1d_size = int(self.ui.lineEdit_real_lattice_1d_size.text())
-        else:
+        if self.active_model.type == 'part':
             part_sampling(self.active_model)
+        else:
+            for part_key in self.active_model.children:
+                part_sampling(self.project.parts[part_key])
+            self.active_model.real_lattice_1d_size = int(self.ui.lineEdit_real_lattice_1d_size.text())
         self.plot_model()
         
     def plot_model(self):
+        if self.active_model.type == 'assembly':
+            #* rebuild assembly every time used
+            self.active_model.model.parts = [
+                self.project.parts[key].model for key in self.active_model.children
+            ]
         html_filename = os.path.join(tempfile.gettempdir(), 'model2sas_plot.html'.format(time.time()))
         # html_filename = './temp.html'
         plot.plot_model(
@@ -187,11 +206,11 @@ class MainWindow(QMainWindow):
         subwindow_html_view.show()
         
     def virtual_scattering(self):
-        if isinstance(self.active_model, AssemblyContainer):
-            for part in self.active_model.model.parts:
-                part.scatter()
-        else:
+        if self.active_model.type == 'part':
             self.active_model.model.scatter()
+        else:
+            for part_key in self.active_model.children:
+                self.project.parts[part_key].model.scatter()
         
     def measure_1d(self):
         q1d_min = float(self.ui.lineEdit_q1d_min.text())
@@ -211,7 +230,15 @@ class MainWindow(QMainWindow):
             )
         else:
             q1d = torch.linspace(q1d_min, q1d_max, steps=q1d_num)
-        I1d = self.active_model.model.measure(q1d)
+            
+        if self.active_model.type == 'part':
+            I1d = self.active_model.model.measure(q1d)
+        else:
+            #* rebuild assembly every time used
+            self.active_model.model.parts = [
+                self.project.parts[key].model for key in self.active_model.children
+            ]
+            I1d = self.active_model.model.measure(q1d)
         
         html_filename = os.path.join(tempfile.gettempdir(), 'model2sas_plot.html'.format(time.time()))
         # html_filename = './temp.html'
@@ -232,7 +259,6 @@ class MainWindow(QMainWindow):
         subwindow_html_view.ui.webEngineView.setUrl(html_filename.replace('\\', '/'))
         self.ui.mdiArea.addSubWindow(subwindow_html_view)
         subwindow_html_view.show()
-        
         
         
 class SubWindowBuildMathModel(QWidget):
