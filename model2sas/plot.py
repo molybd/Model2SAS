@@ -24,6 +24,9 @@ def plot_utils(func):
         title = kwargs.pop('title', None)
         show = kwargs.pop('show', True)
         savename = kwargs.pop('savename', None)
+        plotly_template = kwargs.pop('plotly_template', 'plotly')
+        
+        fig.update_layout(template=plotly_template)
         if title is not None:
             fig.update_layout(title_text=title)
         if show:
@@ -99,7 +102,8 @@ def plot_1d_sas(
     logy: bool = True,
     title: str | None = None,
     show: bool = True,
-    savename: str | None = None
+    savename: str | None = None,
+    plotly_template: str | dict = 'plotly',
     ) -> go.Figure:
     """plot 1d SAS curve(s).
     q, I, name combinations: 1q, 1I, 1name | 1q, I list, name list | q list, I list, name list
@@ -158,7 +162,8 @@ def plot_2d_sas(
     title: str | None = None,
     colorscale: str | None = None,
     show: bool = True,
-    savename: str | None = None
+    savename: str | None = None,
+    plotly_template: str | dict = 'plotly',
     ) -> go.Figure:
     """Plot a 2d SAS pattern.
 
@@ -198,7 +203,8 @@ def plot_model(
     title: str | None = None,
     colorscale: str = 'Plasma',
     show: bool = True,
-    savename: str | None = None
+    savename: str | None = None,
+    plotly_template: str | dict = 'plotly',
     ) -> go.Figure:
     """Plot models in 3d
     If type not specified, voxel for part model, volume for assembly model.
@@ -269,7 +275,8 @@ def plot_surface(
     title: str | None = None,
     colorscale: str = 'Plasma',
     show: bool = True,
-    savename: str | None = None
+    savename: str | None = None,
+    plotly_template: str | dict = 'plotly',
     ) -> go.Figure:
     """Plot a surface in real or reciprocal space by coordinates,
     such as detector surface in reciprocal space.
@@ -319,7 +326,8 @@ def plot_real_detector(
     title: str | None = None,
     colorscale: str = 'Plasma',
     show: bool = True,
-    savename: str | None = None
+    savename: str | None = None,
+    plotly_template: str | dict = 'plotly',
     ) -> go.Figure:
     """Plot detector(s) surface in realspace, also display direct beam
     and covered solid angle by detector
