@@ -159,6 +159,12 @@
              <verstretch>0</verstretch>
             </sizepolicy>
            </property>
+           <property name="alternatingRowColors">
+            <bool>true</bool>
+           </property>
+           <attribute name="horizontalHeaderCascadingSectionResizes">
+            <bool>true</bool>
+           </attribute>
           </widget>
          </item>
          <item row="5" column="0" colspan="4">
@@ -630,6 +636,11 @@
       <widget class="QTextBrowser" name="textBrowser_log">
        <property name="enabled">
         <bool>true</bool>
+       </property>
+       <property name="font">
+        <font>
+         <family>Consolas</family>
+        </font>
        </property>
       </widget>
      </item>

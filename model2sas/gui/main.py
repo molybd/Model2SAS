@@ -5,8 +5,9 @@ import tempfile, time
 from typing import Optional
 
 import torch
+from PySide6 import QtCore
 from PySide6.QtGui import QStandardItemModel, QStandardItem
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow, QHeaderView
 
 from .MainWindow_ui import Ui_MainWindow
 from .SubWindow_buildmath_ui import Ui_subWindow_build_math_model
@@ -53,19 +54,22 @@ class MainWindow(QMainWindow):
         self.project = Project()
         self.project.new_assembly('assembly') #* only prelimilary
         self.qmodel_for_treeview = QStandardItemModel()
+        self.qmodel_for_model_params_tableview = QStandardItemModel()
         self.ui.treeView_models.setModel(self.qmodel_for_treeview)
+        self.ui.tableView_model_params.setModel(self.qmodel_for_model_params_tableview)
+        self.ui.tableView_model_params.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.active_model: ModelContainer
         
-        self.update_ui_models_tree_changed()
+        self.build_qtmodel_for_model_treeview()
         
         
     def load_model_files(self):
-        filename_list, _ = QFileDialog.getOpenFileNames(self, caption='Select Model File(s)', dir='./', filter="All Files (*);;stl Files (*.stl);;math model Files (*.py)")
-        # filename_list = [
-        #     r'D:\Research\my_programs\Model2SAS\resources\exp_models\torus.stl',
-        #     r'D:\Research\my_programs\Model2SAS\resources\exp_models\cylinder.py',
-        #     r'D:\Research\my_programs\Model2SAS\resources\exp_models\sphere.py',
-        # ]
+        # filename_list, _ = QFileDialog.getOpenFileNames(self, caption='Select Model File(s)', dir='./', filter="All Files (*);;stl Files (*.stl);;math model Files (*.py)")
+        filename_list = [
+            r'D:\Research\my_programs\Model2SAS\resources\exp_models\torus.stl',
+            r'D:\Research\my_programs\Model2SAS\resources\exp_models\cylinder.py',
+            r'D:\Research\my_programs\Model2SAS\resources\exp_models\sphere.py',
+        ]
         print(filename_list)
         for filename in filename_list:
             self.project.load_part_from_file(filename)
@@ -75,10 +79,10 @@ class MainWindow(QMainWindow):
         for part_key in self.project.parts:
             self.project.add_part_to_assembly(part_key, first_assembly_key)
         
-        self.update_ui_models_tree_changed()
+        self.build_qtmodel_for_model_treeview()
         
     
-    def update_ui_models_tree_changed(self):
+    def build_qtmodel_for_model_treeview(self):
         # update treeview
         self.qmodel_for_treeview.clear()
         self.qmodel_for_treeview.setHorizontalHeaderLabels(['Models', 'Info'])
@@ -144,9 +148,11 @@ class MainWindow(QMainWindow):
             self.ui.pushButton_scattering.setDisabled(False)
             self.ui.pushButton_scattering.setText('Virtual Scattering')
             self.ui.pushButton_1d_measure.setDisabled(False)
+            self.build_qtmodel_for_model_params_tableview()
         else:
             # selected assembly
             self.active_model = self.project.assemblies[selected_key]
+            self.qmodel_for_model_params_tableview.clear()
             self.ui.tableView_model_params.setDisabled(True)
             self.ui.pushButton_sampling.setDisabled(False)
             self.ui.pushButton_sampling.setText('Sampling All Sub-Parts')
@@ -155,7 +161,38 @@ class MainWindow(QMainWindow):
             self.ui.pushButton_scattering.setText('Virtual Scattering All Sub-Parts')
             self.ui.pushButton_1d_measure.setDisabled(False)
         self.display_model_settings()
+        
+    def build_qtmodel_for_model_params_tableview(self):
+        self.qmodel_for_model_params_tableview.clear()
+        self.qmodel_for_model_params_tableview.setHorizontalHeaderLabels(['Param', 'Value'])
+        
+        if isinstance(self.active_model.model, StlPart):
+            params = dict(sld_value=self.active_model.model.sld_value)
+        elif isinstance(self.active_model.model, MathPart):
+            params = self.active_model.model.get_params()
+        else:
+            params = dict()
+        
+        for i, tp in enumerate(params.items()):
+            param_name, param_value = tp
+            qitem_param_name = QStandardItem(param_name)
+            self.qmodel_for_model_params_tableview.setItem(i, 0, qitem_param_name)
+            self.qmodel_for_model_params_tableview.setItem(i, 1, QStandardItem(str(param_value)))
+            # set param name not editable
+            qitem_param_name.setFlags(QtCore.Qt.ItemFlag(0))
+            qitem_param_name.setFlags(QtCore.Qt.ItemIsEnabled)
             
+    def read_params_from_tableview_qmodel(self):
+        if isinstance(self.active_model.model, StlPart):
+            sld_value = float(self.qmodel_for_model_params_tableview.index(0, 1).data())
+            self.active_model.model.sld_value = sld_value
+        elif isinstance(self.active_model.model, MathPart):
+            for i in range(self.qmodel_for_model_params_tableview.rowCount()):
+                param_name = self.qmodel_for_model_params_tableview.index(i, 0).data()
+                param_value = float(self.qmodel_for_model_params_tableview.index(i, 1).data())
+                self.active_model.model.math_model.params[param_name] = param_value
+        
+        
     def display_model_settings(self):
         self.ui.lineEdit_real_lattice_1d_size.setText(str(self.active_model.real_lattice_1d_size))
         self.ui.lineEdit_q1d_min.setText(str(self.active_model.q1d_min))
@@ -174,6 +211,8 @@ class MainWindow(QMainWindow):
             part.real_lattice_1d_size = real_lattice_1d_size
             part.model.sampling(real_lattice_1d_size=real_lattice_1d_size)
         
+        self.read_params_from_tableview_qmodel()
+        
         if self.active_model.type == 'part':
             part_sampling(self.active_model)
         else:
@@ -182,12 +221,17 @@ class MainWindow(QMainWindow):
             self.active_model.real_lattice_1d_size = int(self.ui.lineEdit_real_lattice_1d_size.text())
         self.plot_model()
         
+    def rebuild_parts_in_assembly(self, assembly_model: ModelContainer):
+        #* rebuild assembly every time used
+        if assembly_model.type == 'assembly':
+            assembly_model.model.parts = [
+                self.project.parts[key].model for key in self.active_model.children
+            ]
+        
     def plot_model(self):
         if self.active_model.type == 'assembly':
             #* rebuild assembly every time used
-            self.active_model.model.parts = [
-                self.project.parts[key].model for key in self.active_model.children
-            ]
+            self.rebuild_parts_in_assembly(self.active_model)
         html_filename = os.path.join(tempfile.gettempdir(), 'model2sas_plot.html'.format(time.time()))
         # html_filename = './temp.html'
         plot.plot_model(
@@ -235,9 +279,7 @@ class MainWindow(QMainWindow):
             I1d = self.active_model.model.measure(q1d)
         else:
             #* rebuild assembly every time used
-            self.active_model.model.parts = [
-                self.project.parts[key].model for key in self.active_model.children
-            ]
+            self.rebuild_parts_in_assembly(self.active_model)
             I1d = self.active_model.model.measure(q1d)
         
         html_filename = os.path.join(tempfile.gettempdir(), 'model2sas_plot.html'.format(time.time()))

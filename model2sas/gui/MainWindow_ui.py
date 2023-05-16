@@ -124,6 +124,8 @@ class Ui_MainWindow(object):
         sizePolicy2.setVerticalStretch(0)
         sizePolicy2.setHeightForWidth(self.tableView_model_params.sizePolicy().hasHeightForWidth())
         self.tableView_model_params.setSizePolicy(sizePolicy2)
+        self.tableView_model_params.setAlternatingRowColors(True)
+        self.tableView_model_params.horizontalHeader().setCascadingSectionResizes(True)
 
         self.gridLayout_8.addWidget(self.tableView_model_params, 3, 0, 1, 4)
 
@@ -461,6 +463,9 @@ class Ui_MainWindow(object):
         self.textBrowser_log = QTextBrowser(self.dockWidgetContents_4)
         self.textBrowser_log.setObjectName(u"textBrowser_log")
         self.textBrowser_log.setEnabled(True)
+        font = QFont()
+        font.setFamilies([u"Consolas"])
+        self.textBrowser_log.setFont(font)
 
         self.verticalLayout_4.addWidget(self.textBrowser_log)
 

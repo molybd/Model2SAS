@@ -8,7 +8,7 @@ class ModelContainer:
     """Container for part model or assembly model.
     Record params for GUI
     """    
-    def __init__(self, key: str, model: Part | Assembly) -> None:
+    def __init__(self, key: str, model: StlPart | MathPart | Part | Assembly) -> None:
         self.key = key
         self.model = model
         self.type: Literal['part', 'assembly']
