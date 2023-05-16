@@ -32,6 +32,9 @@ class RedirectedPrintStream(QObject):
     def write(self, text: str):
         self.write_text.emit(text)
         
+    def flush(self):
+        pass
+        
         
 class GeneralThread(QThread):
     
