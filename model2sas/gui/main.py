@@ -2,10 +2,11 @@ import sys
 import os
 import math
 import tempfile, time
-from typing import Optional
+from typing import Literal, Optional
 
 import torch
 from PySide6 import QtCore
+from PySide6.QtCore import QThread, Signal, QObject
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow, QHeaderView
 
@@ -24,16 +25,52 @@ from .. import plot
 '''
 
 
-class ConsolePrintStream:
-    def __init__(self, text_browser, system_print) -> None:
-        self.text_browser = text_browser
-        self.system_print = system_print
+class RedirectedPrintStream(QObject):
+    
+    write_text = Signal(str)
+    
+    def write(self, text: str):
+        self.write_text.emit(text)
         
-    def write(self, text):
-        if text != '\n': # print() func will print a \n afterwards
-            self.text_browser.append(text)
-        self.system_print.write(text)
+        
+class GeneralThread(QThread):
+    
+    thread_end = Signal()
+    
+    def __init__(self, func, *args, **kwargs) -> None:
+        super().__init__()
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        
+    def run(self):
+        self.func(*self.args, **self.kwargs)
+        self.thread_end.emit()
+        
 
+class PlotThread(GeneralThread):
+    
+    thread_end = Signal(str)
+    
+    def run(self):
+        print('ploting')
+        if 'savename' in self.kwargs.keys():
+            html_filename = self.kwargs['savename']
+        else:
+            html_filename = os.path.join(tempfile.gettempdir(), 'model2sas_plot.html')
+        self.func(*self.args, savename=html_filename, **self.kwargs)
+        self.thread_end.emit(html_filename)
+        
+
+class MeasureThread(GeneralThread):
+    
+    thread_end = Signal(tuple)
+    
+    def run(self):
+        I = self.func(*self.args, **self.kwargs)
+        q = self.args
+        self.thread_end.emit((*q, I))
+        
 
 class MainWindow(QMainWindow):
     
@@ -47,8 +84,11 @@ class MainWindow(QMainWindow):
         self.show()
         
         # redirect print output and error
-        sys.stdout = ConsolePrintStream(self.ui.textBrowser_log, sys.stdout)
-        sys.stderr = ConsolePrintStream(self.ui.textBrowser_log, sys.stderr)
+        self.system_stdout, self.system_stderr = sys.stdout, sys.stderr
+        sys.stdout = RedirectedPrintStream()
+        sys.stdout.write_text.connect(self.write_log)
+        sys.stderr = RedirectedPrintStream()
+        sys.stderr.write_text.connect(self.write_log)
         
         # data related
         self.project = Project()
@@ -59,18 +99,24 @@ class MainWindow(QMainWindow):
         self.ui.tableView_model_params.setModel(self.qmodel_for_model_params_tableview)
         self.ui.tableView_model_params.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.active_model: ModelContainer
+        self.thread: QThread
         
         self.build_qtmodel_for_model_treeview()
         
+    def write_log(self, text: str):
+        if text != '\n': # print() func will print a \n afterwards
+            self.ui.textBrowser_log.append(text)
+        self.system_stdout.write(text)
+        
         
     def load_model_files(self):
-        # filename_list, _ = QFileDialog.getOpenFileNames(self, caption='Select Model File(s)', dir='./', filter="All Files (*);;stl Files (*.stl);;math model Files (*.py)")
-        filename_list = [
-            r'D:\Research\my_programs\Model2SAS\resources\exp_models\torus.stl',
-            r'D:\Research\my_programs\Model2SAS\resources\exp_models\cylinder.py',
-            r'D:\Research\my_programs\Model2SAS\resources\exp_models\sphere.py',
-        ]
-        print(filename_list)
+        filename_list, _ = QFileDialog.getOpenFileNames(self, caption='Select Model File(s)', dir='./', filter="All Files (*);;stl Files (*.stl);;math model Files (*.py)")
+        # filename_list = [
+        #     r'D:\Research\my_programs\Model2SAS\resources\exp_models\torus.stl',
+        #     r'D:\Research\my_programs\Model2SAS\resources\exp_models\cylinder.py',
+        #     r'D:\Research\my_programs\Model2SAS\resources\exp_models\sphere.py',
+        # ]
+        # print(filename_list)
         for filename in filename_list:
             self.project.load_part_from_file(filename)
         
@@ -206,19 +252,37 @@ class MainWindow(QMainWindow):
             self.qmodel_for_params.setHorizontalHeaderLabels(['Param', 'Value'])
         
     def sampling(self):
-        def part_sampling(part: ModelContainer):
-            real_lattice_1d_size = int(self.ui.lineEdit_real_lattice_1d_size.text())
-            part.real_lattice_1d_size = real_lattice_1d_size
-            part.model.sampling(real_lattice_1d_size=real_lattice_1d_size)
-        
         self.read_params_from_tableview_qmodel()
+        real_lattice_1d_size = int(self.ui.lineEdit_real_lattice_1d_size.text())
+        self.active_model.real_lattice_1d_size = real_lattice_1d_size
         
         if self.active_model.type == 'part':
-            part_sampling(self.active_model)
+            self.thread = GeneralThread(
+                self.active_model.model.sampling,
+                real_lattice_1d_size=real_lattice_1d_size
+            )
         else:
-            for part_key in self.active_model.children:
-                part_sampling(self.project.parts[part_key])
-            self.active_model.real_lattice_1d_size = int(self.ui.lineEdit_real_lattice_1d_size.text())
+            def assembly_sampling(
+                assembly: ModelContainer,
+                parts: dict[str, ModelContainer],
+                real_lattice_1d_size: int
+                ):
+                for part_key in assembly.children:
+                    # print(part_key)
+                    part = parts[part_key]
+                    part.real_lattice_1d_size = real_lattice_1d_size
+                    part.model.sampling(real_lattice_1d_size=real_lattice_1d_size)
+            self.thread = GeneralThread(
+                assembly_sampling,
+                self.active_model,
+                self.project.parts,
+                real_lattice_1d_size
+            )
+        self.thread.thread_end.connect(self.sampling_thread_end)
+        self.thread.start()
+            
+    def sampling_thread_end(self):
+        # print('sampling done')
         self.plot_model()
         
     def rebuild_parts_in_assembly(self, assembly_model: ModelContainer):
@@ -232,29 +296,49 @@ class MainWindow(QMainWindow):
         if self.active_model.type == 'assembly':
             #* rebuild assembly every time used
             self.rebuild_parts_in_assembly(self.active_model)
-        html_filename = os.path.join(tempfile.gettempdir(), 'model2sas_plot.html'.format(time.time()))
-        # html_filename = './temp.html'
-        plot.plot_model(
+        
+        self.thread = PlotThread(
+            plot.plot_model,
             self.active_model.model,
-            title=self.active_model.key,
+            title='Model Plot: {}'.format(self.active_model.key),
             show=False,
-            savename=html_filename
         )
+        self.thread.thread_end.connect(self.display_html)
+        self.thread.start()
+        
+    def display_html(self, html_filename: str):
         # * Known issues
         # * (Solved) must use forward slashes in file path, or will be blank or error
         # * (Solved) begin size can't be too small or plot will be blank
         subwindow_html_view = SubWindowHtmlView()
-        subwindow_html_view.setWindowTitle('Plot Model: {}'.format(self.active_model.key))
+        # subwindow_html_view.setWindowTitle('Plot Model: {}'.format(self.active_model.key))
+        subwindow_html_view.setWindowTitle('Plot')
         subwindow_html_view.ui.webEngineView.setUrl(html_filename.replace('\\', '/'))
         self.ui.mdiArea.addSubWindow(subwindow_html_view)
         subwindow_html_view.show()
         
+        
     def virtual_scattering(self):
         if self.active_model.type == 'part':
-            self.active_model.model.scatter()
+            # self.active_model.model.scatter()
+            self.thread = GeneralThread(self.active_model.model.scatter)
         else:
-            for part_key in self.active_model.children:
-                self.project.parts[part_key].model.scatter()
+            # for part_key in self.active_model.children:
+            #     self.project.parts[part_key].model.scatter()
+            def assembly_scatter(
+                assembly: ModelContainer,
+                parts: dict[str, ModelContainer],
+                ):
+                for part_key in assembly.children:
+                    # print(part_key)
+                    part = parts[part_key]
+                    part.model.scatter()
+            self.thread = GeneralThread(assembly_scatter, self.active_model, self.project.parts)
+        self.thread.thread_end.connect(self.virtual_scattering_thread_end)
+        self.thread.start()
+                
+    def virtual_scattering_thread_end(self):
+        print('virtual scattering done')
         
     def measure_1d(self):
         q1d_min = float(self.ui.lineEdit_q1d_min.text())
@@ -275,32 +359,38 @@ class MainWindow(QMainWindow):
         else:
             q1d = torch.linspace(q1d_min, q1d_max, steps=q1d_num)
             
-        if self.active_model.type == 'part':
-            I1d = self.active_model.model.measure(q1d)
-        else:
-            #* rebuild assembly every time used
+        if self.active_model.type == 'assembly':
             self.rebuild_parts_in_assembly(self.active_model)
-            I1d = self.active_model.model.measure(q1d)
         
-        html_filename = os.path.join(tempfile.gettempdir(), 'model2sas_plot.html'.format(time.time()))
-        # html_filename = './temp.html'
-        plot.plot_1d_sas(
-            q1d,
-            I1d,
-            mode='lines',
-            name=self.active_model.key,
-            title=self.active_model.key,
-            show=False,
-            savename=html_filename
+        self.thread = MeasureThread(
+            self.active_model.model.measure,
+            q1d
         )
-        # * Known issues
-        # * (Solved) must use forward slashes in file path, or will be blank or error
-        # * (Solved) begin size can't be too small or plot will be blank
-        subwindow_html_view = SubWindowHtmlView()
-        subwindow_html_view.setWindowTitle('Plot Scattering: {}'.format(self.active_model.key))
-        subwindow_html_view.ui.webEngineView.setUrl(html_filename.replace('\\', '/'))
-        self.ui.mdiArea.addSubWindow(subwindow_html_view)
-        subwindow_html_view.show()
+        self.thread.thread_end.connect(self.measure_thread_end)
+        self.thread.start()
+        
+    def measure_thread_end(self, qI: tuple[torch.Tensor]):
+        q, I = qI[:-1], qI[-1]
+        if len(q) == 1:
+            self.thread = PlotThread(
+                plot.plot_1d_sas,
+                q[0],
+                I,
+                mode='lines',
+                name=self.active_model.key,
+                title=self.active_model.key,
+                show=False,
+            )
+        else:
+            self.thread = PlotThread(
+                plot.plot_2d_sas,
+                I,
+                logI=True,
+                title=self.active_model.key,
+                show=False,
+            )
+        self.thread.thread_end.connect(self.display_html)
+        self.thread.start()
         
         
 class SubWindowBuildMathModel(QWidget):

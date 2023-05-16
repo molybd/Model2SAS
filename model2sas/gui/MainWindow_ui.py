@@ -125,7 +125,6 @@ class Ui_MainWindow(object):
         sizePolicy2.setHeightForWidth(self.tableView_model_params.sizePolicy().hasHeightForWidth())
         self.tableView_model_params.setSizePolicy(sizePolicy2)
         self.tableView_model_params.setAlternatingRowColors(True)
-        self.tableView_model_params.horizontalHeader().setCascadingSectionResizes(True)
 
         self.gridLayout_8.addWidget(self.tableView_model_params, 3, 0, 1, 4)
 
