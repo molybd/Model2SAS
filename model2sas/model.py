@@ -768,7 +768,15 @@ class MathPart(Part):
         Args:
             keyword args: param_name = param_value
         """
-        self.math_model.params.update(kwargs)                
+        self.math_model.params.update(kwargs)
+        
+    def get_params(self) -> dict:
+        """get a copy of current params dict
+
+        Returns:
+            dict: params dict
+        """        
+        return self.math_model.params.copy()
 
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         """Get boundary of part model. Return 2 points which
