@@ -273,14 +273,16 @@ class Part(Model):
         s1dz = torch.fft.rfftfreq(n_s, d=self.real_lattice_spacing, device=self.device)
 
         # using rfft to save time. so only upper half (qz>=0)
-        F_half = torch.fft.rfftn(self.sld, s=(n_s, n_s, n_s))
-        F_half = torch.fft.fftshift(F_half, dim=(0,1))
+        F_half = calcfunc.rfft3d(self.sld, n_s)
 
         # shift center to (0, 0, 0)
         # time-consuming part
         if need_centering:
+            @timer(level=2)
+            def centering(*args): # only for timer use
+                return self._translate_on_reciprocal_lattice(*args)
             xmin, ymin, zmin = xmin+self.real_lattice_spacing/2, ymin+self.real_lattice_spacing/2, zmin+self.real_lattice_spacing/2
-            F_half = self._translate_on_reciprocal_lattice(F_half, s1d, s1d, s1dz, xmin, ymin, zmin)
+            F_half = centering(F_half, s1d, s1d, s1dz, xmin, ymin, zmin)
             self.centered = True
         else:
             self.centered = False

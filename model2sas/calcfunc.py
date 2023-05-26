@@ -240,6 +240,22 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
     return intersect_count
 
 @timer(level=2)
+def rfft3d(real_3d_lattice: Tensor, reciprocal_edge_size: int) -> Tensor:
+    """Compute the 3 dimensional discrete Fourier Transform for real input.
+
+    Args:
+        real_3d_lattice (Tensor): 3d values lattice to be transformed
+        reciprocal_edge_size (int): edge size of output reciprocal grid
+
+    Returns:
+        Tensor: fft result, only half on z because of central symmetry.
+    """    
+    n_s = reciprocal_edge_size
+    F_half = torch.fft.rfftn(real_3d_lattice, s=(n_s, n_s, n_s))
+    F_half = torch.fft.fftshift(F_half, dim=(0,1))
+    return F_half
+
+@timer(level=2)
 def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Tensor]:
     """Generate sampling points for orientation average
     using fibonacci grid
