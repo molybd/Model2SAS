@@ -120,13 +120,16 @@ class MainWindow(QMainWindow):
         #     r'D:\Research\my_programs\Model2SAS\resources\exp_models\sphere.py',
         # ]
         # print(filename_list)
+        loaded_part_keys = []
         for filename in filename_list:
-            self.project.load_part_from_file(filename)
+            part_key = self.project.load_part_from_file(filename)
+            loaded_part_keys.append(part_key)
         
         #* only prelimilary
         first_assembly_key = list(self.project.assemblies.keys())[0]
-        for part_key in self.project.parts:
+        for part_key in loaded_part_keys:
             self.project.add_part_to_assembly(part_key, first_assembly_key)
+        #*
         
         self.build_qtmodel_for_model_treeview()
         
@@ -155,7 +158,8 @@ class MainWindow(QMainWindow):
                 QStandardItem('{} @{}'.format(model.model.model_type, model.model.device))
             )
             return qitem_child
-            
+        
+        print(self.project.assemblies)
         # top level
         for key, model in self.project.parts.items():
             if len(model.parent) == 0:
@@ -286,7 +290,8 @@ class MainWindow(QMainWindow):
             
     def sampling_thread_end(self):
         # print('sampling done')
-        self.plot_model()
+        # self.plot_model()
+        pass
         
     def rebuild_parts_in_assembly(self, assembly_model: ModelContainer):
         #* rebuild assembly every time used

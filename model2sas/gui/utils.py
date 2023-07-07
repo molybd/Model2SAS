@@ -46,7 +46,7 @@ class Project:
         key = '{}_{}'.format(name, self.name_index[name])
         self.assemblies[key] = ModelContainer(key, Assembly())
         
-    def load_part_from_file(self, filename: str):
+    def load_part_from_file(self, filename: str) -> str:
         name = os.path.splitext(os.path.basename(filename))[0]
         if name in self.name_index.keys():
             self.name_index[name] += 1
@@ -61,6 +61,7 @@ class Project:
         else:
             raise TypeError()
         self.parts[key] = ModelContainer(key, part)
+        return key
         
     def add_part_to_assembly(self, part_key: str, assembly_key: str):
         self.assemblies[assembly_key].children.append(part_key)
