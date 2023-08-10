@@ -195,11 +195,11 @@ class MainWindow(QMainWindow):
             # selected part
             self.active_model = self.project.parts[selected_key]
             self.ui.tableView_model_params.setDisabled(False)
-            self.ui.pushButton_sampling.setDisabled(False)
-            self.ui.pushButton_sampling.setText('Sampling')
+            self.ui.pushButton_sample.setDisabled(False)
+            self.ui.pushButton_sample.setText('Sample')
             self.ui.pushButton_plot_model.setDisabled(False)
-            self.ui.pushButton_scattering.setDisabled(False)
-            self.ui.pushButton_scattering.setText('Virtual Scattering')
+            self.ui.pushButton_scatter.setDisabled(False)
+            self.ui.pushButton_scatter.setText('Virtual Scatter')
             self.ui.pushButton_1d_measure.setDisabled(False)
             self.build_qtmodel_for_model_params_tableview()
         else:
@@ -207,11 +207,11 @@ class MainWindow(QMainWindow):
             self.active_model = self.project.assemblies[selected_key]
             self.qmodel_for_model_params_tableview.clear()
             self.ui.tableView_model_params.setDisabled(True)
-            self.ui.pushButton_sampling.setDisabled(False)
-            self.ui.pushButton_sampling.setText('Sampling All Sub-Parts')
+            self.ui.pushButton_sample.setDisabled(False)
+            self.ui.pushButton_sample.setText('Sample All Sub-Parts')
             self.ui.pushButton_plot_model.setDisabled(False)
-            self.ui.pushButton_scattering.setDisabled(False)
-            self.ui.pushButton_scattering.setText('Virtual Scattering All Sub-Parts')
+            self.ui.pushButton_scatter.setDisabled(False)
+            self.ui.pushButton_scatter.setText('Virtual Scatter by All Sub-Parts')
             self.ui.pushButton_1d_measure.setDisabled(False)
         self.display_model_settings()
         
@@ -258,18 +258,18 @@ class MainWindow(QMainWindow):
             self.qmodel_for_params = QStandardItemModel()
             self.qmodel_for_params.setHorizontalHeaderLabels(['Param', 'Value'])
         
-    def sampling(self):
+    def sample(self):
         self.read_params_from_tableview_qmodel()
         real_lattice_1d_size = int(self.ui.lineEdit_real_lattice_1d_size.text())
         self.active_model.real_lattice_1d_size = real_lattice_1d_size
         
         if self.active_model.type == 'part':
             self.thread = GeneralThread(
-                self.active_model.model.sampling,
+                self.active_model.model.sample,
                 real_lattice_1d_size=real_lattice_1d_size
             )
         else:
-            def assembly_sampling(
+            def assembly_sample(
                 assembly: ModelContainer,
                 parts: dict[str, ModelContainer],
                 real_lattice_1d_size: int
@@ -278,18 +278,18 @@ class MainWindow(QMainWindow):
                     # print(part_key)
                     part = parts[part_key]
                     part.real_lattice_1d_size = real_lattice_1d_size
-                    part.model.sampling(real_lattice_1d_size=real_lattice_1d_size)
+                    part.model.sample(real_lattice_1d_size=real_lattice_1d_size)
             self.thread = GeneralThread(
-                assembly_sampling,
+                assembly_sample,
                 self.active_model,
                 self.project.parts,
                 real_lattice_1d_size
             )
-        self.thread.thread_end.connect(self.sampling_thread_end)
+        self.thread.thread_end.connect(self.sample_thread_end)
         self.thread.start()
             
-    def sampling_thread_end(self):
-        # print('sampling done')
+    def sample_thread_end(self):
+        # print('sample done')
         # self.plot_model()
         pass
         
@@ -326,7 +326,7 @@ class MainWindow(QMainWindow):
         subwindow_html_view.show()
         
         
-    def virtual_scattering(self):
+    def virtual_scatter(self):
         if self.active_model.type == 'part':
             # self.active_model.model.scatter()
             self.thread = GeneralThread(self.active_model.model.scatter)
@@ -342,11 +342,11 @@ class MainWindow(QMainWindow):
                     part = parts[part_key]
                     part.model.scatter()
             self.thread = GeneralThread(assembly_scatter, self.active_model, self.project.parts)
-        self.thread.thread_end.connect(self.virtual_scattering_thread_end)
+        self.thread.thread_end.connect(self.virtual_scatter_thread_end)
         self.thread.start()
                 
-    def virtual_scattering_thread_end(self):
-        print('virtual scattering done')
+    def virtual_scatter_thread_end(self):
+        print('virtual scatter done')
         
     def measure_1d(self):
         q1d_min = float(self.ui.lineEdit_q1d_min.text())

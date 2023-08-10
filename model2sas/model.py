@@ -624,7 +624,7 @@ class Part(Model):
     #   functions for convinient and intuitionistic usage
     #========================================================
     @timer(level=0)
-    def sampling(self, real_lattice_1d_size: int | None = None, spacing: float | None = None) -> None:
+    def sample(self, real_lattice_1d_size: int | None = None, spacing: float | None = None) -> None:
         """To build the part model in real space.
         generate lattice model of a part model.
 

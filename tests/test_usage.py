@@ -6,7 +6,7 @@ from model2sas import *
 def test_normal_flow():
     part1 = MathPart(filename=r'resources/exp_models/cylinder_z.py', device='cpu')
     part1.set_params(R=10, H=20, sld_value=1)
-    part1.sampling()
+    part1.sample()
     part1.rotate((1,0,0), torch.pi/5.4)
     part1.translate(120, 34, -103)
     part1.scatter()
@@ -14,7 +14,7 @@ def test_normal_flow():
     part2 = StlPart(filename=r'resources/exp_models/torus.stl', device='cpu', sld_value=2)
     part2.rotate((1,1,0), torch.pi/3.1)
     part2.translate(131, 37, -97)
-    part2.sampling()
+    part2.sample()
     part2.scatter()
 
     plot_model(part1, part2)
@@ -46,7 +46,7 @@ def test_normal_flow():
 def test_transform():
     part1 = MathPart(filename=r'resources/exp_models/cylinder_z.py', device='cpu')
     part1.set_params(R=10, H=20, sld_value=1)
-    part1.sampling()
+    part1.sample()
     part1.rotate((1,0,0), torch.pi/5.4)
     part1.translate(120, 34, -103)
     part1.scatter()
@@ -54,7 +54,7 @@ def test_transform():
     part2 = StlPart(filename=r'resources/exp_models/torus.stl', device='cpu', sld_value=2)
     part2.rotate((1,1,0), torch.pi/3.1)
     part2.translate(131, 37, -97)
-    part2.sampling()
+    part2.sample()
     part2.scatter()
 
     plot_model(part1, part2, type='voxel')
@@ -74,7 +74,7 @@ def test_mathmodel_generate():
     )
     part1 = MathPart(math_model_class=mathcls)
     part1.set_params(r=30, t=20, sld_value_scale=3)
-    part1.sampling()
+    part1.sample()
     plot_model(part1)
     plot_model(part1, type='volume')
 
@@ -90,7 +90,7 @@ def test_mathmodel_generate():
         )
     part2 = MathPart(filename=filename)
     part2.set_params(r=30, t=20, sld_value_scale=3)
-    part2.sampling()
+    part2.sample()
     plot_model(part2, type='volume')
 
 
@@ -109,10 +109,10 @@ def test_detector_simulation():
 
     part1 = MathPart(filename=r'resources/exp_models/cylinder_z.py', device='cpu')
     part1.set_params(R=10, H=30, sld_value=1)
-    part1.sampling()
+    part1.sample()
     part1.scatter()
     part2 = StlPart(filename=r'resources/exp_models/torus.stl', device='cpu', sld_value=2)
-    part2.sampling()
+    part2.sample()
     part2.scatter()
     assembly = Assembly(part1, part2)
 

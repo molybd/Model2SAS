@@ -236,12 +236,12 @@
           </widget>
          </item>
          <item row="4" column="3">
-          <widget class="QPushButton" name="pushButton_sampling">
+          <widget class="QPushButton" name="pushButton_sample">
            <property name="enabled">
             <bool>false</bool>
            </property>
            <property name="text">
-            <string>Sampling</string>
+            <string>Sample</string>
            </property>
           </widget>
          </item>
@@ -537,12 +537,12 @@
           </widget>
          </item>
          <item row="1" column="0" colspan="2">
-          <widget class="QPushButton" name="pushButton_scattering">
+          <widget class="QPushButton" name="pushButton_scatter">
            <property name="enabled">
             <bool>false</bool>
            </property>
            <property name="text">
-            <string>Virtual Scattering</string>
+            <string>Virtual Scatter</string>
            </property>
           </widget>
          </item>
@@ -653,9 +653,9 @@
   <tabstop>lineEdit_real_lattice_1d_size</tabstop>
   <tabstop>pushButton_plot_model</tabstop>
   <tabstop>tableView_model_params</tabstop>
-  <tabstop>pushButton_sampling</tabstop>
+  <tabstop>pushButton_sample</tabstop>
   <tabstop>lineEdit_reciprocal_lattice_1d_size</tabstop>
-  <tabstop>pushButton_scattering</tabstop>
+  <tabstop>pushButton_scatter</tabstop>
   <tabstop>tabWidget_measure</tabstop>
   <tabstop>lineEdit_q1d_min</tabstop>
   <tabstop>lineEdit_q1d_max</tabstop>
@@ -682,8 +682,8 @@
    <slot>build_math_model()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>185</x>
-     <y>181</y>
+     <x>195</x>
+     <y>159</y>
     </hint>
     <hint type="destinationlabel">
      <x>195</x>
@@ -699,7 +699,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>136</x>
-     <y>151</y>
+     <y>129</y>
     </hint>
     <hint type="destinationlabel">
      <x>124</x>
@@ -724,10 +724,10 @@
    </hints>
   </connection>
   <connection>
-   <sender>pushButton_sampling</sender>
+   <sender>pushButton_sample</sender>
    <signal>clicked()</signal>
    <receiver>MainWindow</receiver>
-   <slot>sampling()</slot>
+   <slot>sample()</slot>
    <hints>
     <hint type="sourcelabel">
      <x>492</x>
@@ -756,10 +756,10 @@
    </hints>
   </connection>
   <connection>
-   <sender>pushButton_scattering</sender>
+   <sender>pushButton_scatter</sender>
    <signal>clicked()</signal>
    <receiver>MainWindow</receiver>
-   <slot>virtual_scattering()</slot>
+   <slot>virtual_scatter()</slot>
    <hints>
     <hint type="sourcelabel">
      <x>448</x>
@@ -794,9 +794,9 @@
   <slot>new_assembly()</slot>
   <slot>add_to_assembly()</slot>
   <slot>selected_model_settings()</slot>
-  <slot>sampling()</slot>
   <slot>plot_model()</slot>
-  <slot>virtual_scattering()</slot>
   <slot>measure_1d()</slot>
+  <slot>sample()</slot>
+  <slot>virtual_scatter()</slot>
  </slots>
 </ui>

@@ -175,11 +175,11 @@ class Ui_MainWindow(object):
 
         self.gridLayout_8.addWidget(self.label_real_lattice_1d_size, 4, 0, 1, 2)
 
-        self.pushButton_sampling = QPushButton(self.tabPage_model)
-        self.pushButton_sampling.setObjectName(u"pushButton_sampling")
-        self.pushButton_sampling.setEnabled(False)
+        self.pushButton_sample = QPushButton(self.tabPage_model)
+        self.pushButton_sample.setObjectName(u"pushButton_sample")
+        self.pushButton_sample.setEnabled(False)
 
-        self.gridLayout_8.addWidget(self.pushButton_sampling, 4, 3, 1, 1)
+        self.gridLayout_8.addWidget(self.pushButton_sample, 4, 3, 1, 1)
 
         self.checkBox_volume = QCheckBox(self.tabPage_model)
         self.checkBox_volume.setObjectName(u"checkBox_volume")
@@ -400,11 +400,11 @@ class Ui_MainWindow(object):
 
         self.gridLayout_3.addWidget(self.tabWidget_measure, 2, 0, 1, 2)
 
-        self.pushButton_scattering = QPushButton(self.tabPage_scattering)
-        self.pushButton_scattering.setObjectName(u"pushButton_scattering")
-        self.pushButton_scattering.setEnabled(False)
+        self.pushButton_scatter = QPushButton(self.tabPage_scattering)
+        self.pushButton_scatter.setObjectName(u"pushButton_scatter")
+        self.pushButton_scatter.setEnabled(False)
 
-        self.gridLayout_3.addWidget(self.pushButton_scattering, 1, 0, 1, 2)
+        self.gridLayout_3.addWidget(self.pushButton_scatter, 1, 0, 1, 2)
 
         self.tabWidget_settings.addTab(self.tabPage_scattering, "")
 
@@ -476,10 +476,10 @@ class Ui_MainWindow(object):
         QWidget.setTabOrder(self.tableView_transform, self.lineEdit_real_lattice_1d_size)
         QWidget.setTabOrder(self.lineEdit_real_lattice_1d_size, self.pushButton_plot_model)
         QWidget.setTabOrder(self.pushButton_plot_model, self.tableView_model_params)
-        QWidget.setTabOrder(self.tableView_model_params, self.pushButton_sampling)
-        QWidget.setTabOrder(self.pushButton_sampling, self.lineEdit_reciprocal_lattice_1d_size)
-        QWidget.setTabOrder(self.lineEdit_reciprocal_lattice_1d_size, self.pushButton_scattering)
-        QWidget.setTabOrder(self.pushButton_scattering, self.tabWidget_measure)
+        QWidget.setTabOrder(self.tableView_model_params, self.pushButton_sample)
+        QWidget.setTabOrder(self.pushButton_sample, self.lineEdit_reciprocal_lattice_1d_size)
+        QWidget.setTabOrder(self.lineEdit_reciprocal_lattice_1d_size, self.pushButton_scatter)
+        QWidget.setTabOrder(self.pushButton_scatter, self.tabWidget_measure)
         QWidget.setTabOrder(self.tabWidget_measure, self.lineEdit_q1d_min)
         QWidget.setTabOrder(self.lineEdit_q1d_min, self.lineEdit_q1d_max)
         QWidget.setTabOrder(self.lineEdit_q1d_max, self.lineEdit_q1d_num)
@@ -500,9 +500,9 @@ class Ui_MainWindow(object):
         self.pushButton_build_math_model.clicked.connect(MainWindow.build_math_model)
         self.pushButton_part_from_files.clicked.connect(MainWindow.load_model_files)
         self.treeView_models.clicked.connect(MainWindow.selected_model_settings)
-        self.pushButton_sampling.clicked.connect(MainWindow.sampling)
+        self.pushButton_sample.clicked.connect(MainWindow.sample)
         self.pushButton_plot_model.clicked.connect(MainWindow.plot_model)
-        self.pushButton_scattering.clicked.connect(MainWindow.virtual_scattering)
+        self.pushButton_scatter.clicked.connect(MainWindow.virtual_scatter)
         self.pushButton_1d_measure.clicked.connect(MainWindow.measure_1d)
 
         self.tabWidget_settings.setCurrentIndex(0)
@@ -533,7 +533,7 @@ class Ui_MainWindow(object):
         self.pushButton_apply_transform.setText(QCoreApplication.translate("MainWindow", u"Apply", None))
         self.lineEdit_real_lattice_1d_size.setText("")
         self.label_real_lattice_1d_size.setText(QCoreApplication.translate("MainWindow", u"Points in longest edge", None))
-        self.pushButton_sampling.setText(QCoreApplication.translate("MainWindow", u"Sampling", None))
+        self.pushButton_sample.setText(QCoreApplication.translate("MainWindow", u"Sample", None))
         self.checkBox_volume.setText(QCoreApplication.translate("MainWindow", u"Volume", None))
         self.pushButton_plot_model.setText(QCoreApplication.translate("MainWindow", u"Plot", None))
         self.checkBox_voxel.setText(QCoreApplication.translate("MainWindow", u"Voxel", None))
@@ -559,7 +559,7 @@ class Ui_MainWindow(object):
         self.pushButton_2d_measure.setText(QCoreApplication.translate("MainWindow", u"Measure", None))
         self.tabWidget_measure.setTabText(self.tabWidget_measure.indexOf(self.tabPage_direct_measure), QCoreApplication.translate("MainWindow", u"Direct Measure", None))
         self.tabWidget_measure.setTabText(self.tabWidget_measure.indexOf(self.tabPage_virtual_detector), QCoreApplication.translate("MainWindow", u"Virtual Detector", None))
-        self.pushButton_scattering.setText(QCoreApplication.translate("MainWindow", u"Virtual Scattering", None))
+        self.pushButton_scatter.setText(QCoreApplication.translate("MainWindow", u"Virtual Scatter", None))
         self.tabWidget_settings.setTabText(self.tabWidget_settings.indexOf(self.tabPage_scattering), QCoreApplication.translate("MainWindow", u"Scattering Settings", None))
         self.groupBox_assembly.setTitle(QCoreApplication.translate("MainWindow", u"Assembly Model", None))
         self.pushButton_new_assembly.setText(QCoreApplication.translate("MainWindow", u"New Assembly", None))

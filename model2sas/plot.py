@@ -227,7 +227,7 @@ def plot_model(
     fig = go.Figure()
     for modeli in model:
         if isinstance(modeli, Assembly):
-            modeli.sampling()
+            modeli.sample()
             x, y, z, sld = modeli.get_real_lattice_sld(output_device='cpu')
             spacing = modeli.real_lattice_spacing
             name = 'assembly'
