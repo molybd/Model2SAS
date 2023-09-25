@@ -5,6 +5,7 @@ with various sld equal to the x coordinate of certain point
 # ! Do not change the class name, attributes name or method name !
 """
 
+from typing import Any, Literal
 import torch
 from torch import Tensor
 
@@ -24,12 +25,12 @@ class MathModelClass:
         self.params: dict
         self.coord: Literal['car', 'sph', 'cyl']
         """
-        self.params = {
+        self.params: dict[str, Any] = {
             'R_core': 5,
             'thickness': 5,
             'sld_value': 1,
         }
-        self.coord = 'sph'  # 'car' or 'sph' or 'cyl'
+        self.coord: Literal['car', 'sph', 'cyl'] = 'sph'
 
     def get_bound(self) -> tuple[tuple|list, tuple|list]:
         """re-generate boundary for every method call
