@@ -14,9 +14,9 @@ def timer(level: int = 0):
     def timer_decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            start_time = time.time()
+            start_time = time.perf_counter()
             result = func(*args, **kwargs)
-            time_cost = time.time() - start_time
+            time_cost = time.perf_counter() - start_time
             if level ==0:
                 prefix = '✅ '
             else:
@@ -332,4 +332,30 @@ class Detector:
         mask = torch.ones(self.resolution, dtype=torch.float32)
         mask[(self.x**2+self.z**2) <= (d/2)**2] = 0.
         return mask
-        
+
+
+def save_pdb_file(filename: str, x: Tensor, y: Tensor, z:Tensor, sld: Tensor, atom_name: str = 'CA', temperature_factor: float = 0.0, element_symbol: str = 'C') -> None:
+    """Convert a lattice model to a pdb file
+    for calculation by other software like CRYSOL.
+    Only preserve sld!=0 points with uniform sld value.
+
+    Args:
+        x (Tensor): x coordinates
+        y (Tensor): x coordinates
+        z (Tensor): x coordinates
+        sld (Tensor): sld values at each coordinates
+        filename (str): output pdb file name
+    """    
+    sld = sld.flatten()
+    x = x.flatten()[sld!=0.]
+    y = y.flatten()[sld!=0.]
+    z = z.flatten()[sld!=0.]
+    sld = sld[sld!=0]
+    
+    lines = ['REMARK 265 EXPERIMENT TYPE: THEORETICAL MODELLING\n']
+    for i, (xi, yi, zi) in enumerate(zip(x, y, z)):
+        lines.append(
+            f'{"ATOM":<6}{i+1:>5d} {atom_name:<4} {"ASP":>3} {"A":>1}{1:>4d}    {xi:>8.3f}{yi:>8.3f}{zi:>8.3f}{1.0:>6.2f}{temperature_factor:>6.2f}          {element_symbol:>2}  \n'
+        )
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.writelines(lines)
