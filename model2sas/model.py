@@ -636,13 +636,13 @@ class Part(Model):
         self.gen_real_lattice_sld()
 
     @timer(level=0)
-    def scatter(self, reciprocal_lattice_1d_size: int | None = None) -> None:
+    def scatter(self, reciprocal_lattice_1d_size: int | None = None, need_centering: bool = True) -> None:
         """Simulate the scattering process to generate full reciprocal lattice.
 
         Args:
             reciprocal_lattice_1d_size (int | None, optional): _description_. Defaults to None.
         """
-        self.gen_reciprocal_lattice(reciprocal_lattice_1d_size=reciprocal_lattice_1d_size)
+        self.gen_reciprocal_lattice(reciprocal_lattice_1d_size=reciprocal_lattice_1d_size, need_centering=need_centering)
 
     @timer(level=0)
     def measure(self, *qi: Tensor, orientation_average_offset: int = 100, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
@@ -744,7 +744,7 @@ class MathPart(Part):
     """class for part from math description.
     Rewrite get_bound and gen_real_lattice_sld methods.
     """
-    def __init__(self, math_model_class: type | None = None, filename: str | None = None, partname: str | None = None, is_isolated: bool = True, device: str = 'cpu') -> None:        
+    def __init__(self, filename: str | None = None, math_model_class: type | None = None, partname: str | None = None, is_isolated: bool = True, device: str = 'cpu') -> None:        
         """Load math object from a specific math model class
         or py file. Provide either math_model_class or filename.
 
