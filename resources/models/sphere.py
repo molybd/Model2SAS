@@ -5,6 +5,7 @@ with various sld equal to the x coordinate of certain point
 # ! Do not change the class name, attributes name or method name !
 """
 
+from typing import Any, Literal
 import torch
 from torch import Tensor
 
@@ -24,12 +25,11 @@ class MathModelClass:
         self.params: dict
         self.coord: Literal['car', 'sph', 'cyl']
         """
-        self.params = {
-            'R_core': 5,
-            'thickness': 5,
+        self.params: dict[str, Any] = {
+            'R': 50,
             'sld_value': 1,
         }
-        self.coord = 'sph'  # 'car' or 'sph' or 'cyl'
+        self.coord: Literal['car', 'sph', 'cyl'] = 'sph'
 
     def get_bound(self) -> tuple[tuple|list, tuple|list]:
         """re-generate boundary for every method call
@@ -39,7 +39,7 @@ class MathModelClass:
         Returns:
             tuple[tuple|list, tuple|list]: min and max points
         """
-        bound_max = (self.params['R_core']+self.params['thickness']) * torch.ones(3)
+        bound_max = (self.params['R']) * torch.ones(3)
         bound_min = -bound_max
         return bound_min.tolist(), bound_max.tolist()
 
@@ -60,11 +60,10 @@ class MathModelClass:
         """
         device = u.device
         r, theta, phi = u, v, w
-        R = self.params['R_core']
-        t = self.params['thickness']
+        R = self.params['R']
         sld_value = self.params['sld_value']
         
         in_model_index = torch.zeros_like(r).to(device)
-        in_model_index[(r>=R) & (r<=(R+t))] = 1.
+        in_model_index[r<=R] = 1.
         sld = sld_value * in_model_index
         return sld

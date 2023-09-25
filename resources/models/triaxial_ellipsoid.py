@@ -25,11 +25,12 @@ class MathModelClass:
         self.coord: Literal['car', 'sph', 'cyl']
         """
         self.params = {
-            'R_core': 5,
-            'thickness': 5,
+            'a': 10,
+            'b': 30,
+            'c': 50,
             'sld_value': 1,
         }
-        self.coord = 'sph'  # 'car' or 'sph' or 'cyl'
+        self.coord = 'car'  # 'car' or 'sph' or 'cyl'
 
     def get_bound(self) -> tuple[tuple|list, tuple|list]:
         """re-generate boundary for every method call
@@ -39,7 +40,7 @@ class MathModelClass:
         Returns:
             tuple[tuple|list, tuple|list]: min and max points
         """
-        bound_max = (self.params['R_core']+self.params['thickness']) * torch.ones(3)
+        bound_max = torch.tensor([self.params['a'], self.params['b'], self.params['c']])
         bound_min = -bound_max
         return bound_min.tolist(), bound_max.tolist()
 
@@ -59,12 +60,13 @@ class MathModelClass:
             Tensor: sld values of each coordinates
         """
         device = u.device
-        r, theta, phi = u, v, w
-        R = self.params['R_core']
-        t = self.params['thickness']
+        x, y, z = u, v, w
+        a = self.params['a']
+        b = self.params['b']
+        c = self.params['c']
         sld_value = self.params['sld_value']
         
-        in_model_index = torch.zeros_like(r).to(device)
-        in_model_index[(r>=R) & (r<=(R+t))] = 1.
+        in_model_index = torch.zeros_like(x).to(device)
+        in_model_index[(x**2/a**2 + y**2/b**2 + z**2/c**2)<=1] = 1.
         sld = sld_value * in_model_index
         return sld
