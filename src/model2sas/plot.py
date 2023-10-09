@@ -59,9 +59,9 @@ def write_html(filename: str, htmlstr: str, encoding: str = 'utf-8') -> str:
     
 
 class Voxel(go.Mesh3d):
-    def __init__(self, xc=None, yc=None, zc=None, spacing=None, arg=None, alphahull=None, autocolorscale=None, cauto=None, cmax=None, cmid=None, cmin=None, color=None, coloraxis=None, colorbar=None, colorscale=None, contour=None, customdata=None, customdatasrc=None, delaunayaxis=None, facecolor=None, facecolorsrc=None, flatshading=None, hoverinfo=None, hoverinfosrc=None, hoverlabel=None, hovertemplate=None, hovertemplatesrc=None, hovertext=None, hovertextsrc=None, ids=None, idssrc=None, intensity=None, intensitymode=None, intensitysrc=None, isrc=None, jsrc=None, ksrc=None, legendgroup=None, legendgrouptitle=None, legendrank=None, legendwidth=None, lighting=None, lightposition=None, meta=None, metasrc=None, name=None, opacity=None, reversescale=None, scene=None, showlegend=None, showscale=None, stream=None, text=None, textsrc=None, uid=None, uirevision=None, vertexcolor=None, vertexcolorsrc=None, visible=None, xcalendar=None, xhoverformat=None, xsrc=None, ycalendar=None, yhoverformat=None, ysrc=None, zcalendar=None, zhoverformat=None, zsrc=None, **kwargs):
+    def __init__(self, xc=None, yc=None, zc=None, spacing=None, **kwargs):
         x, y, z, i, j, k = self.gen_vertices_triangles(xc, yc, zc, spacing)
-        super().__init__(arg, alphahull, autocolorscale, cauto, cmax, cmid, cmin, color, coloraxis, colorbar, colorscale, contour, customdata, customdatasrc, delaunayaxis, facecolor, facecolorsrc, flatshading, hoverinfo, hoverinfosrc, hoverlabel, hovertemplate, hovertemplatesrc, hovertext, hovertextsrc, i, ids, idssrc, intensity, intensitymode, intensitysrc, isrc, j, jsrc, k, ksrc, legendgroup, legendgrouptitle, legendrank, legendwidth, lighting, lightposition, meta, metasrc, name, opacity, reversescale, scene, showlegend, showscale, stream, text, textsrc, uid, uirevision, vertexcolor, vertexcolorsrc, visible, x, xcalendar, xhoverformat, xsrc, y, ycalendar, yhoverformat, ysrc, z, zcalendar, zhoverformat, zsrc, **kwargs)
+        super().__init__(x=x, y=y, z=z, i=i, j=j, k=k, **kwargs)
 
     def gen_vertices_triangles(self, xc, yc, zc, spacing) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
         """Generate vertices and triangles for mesh plot.
