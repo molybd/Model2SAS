@@ -15,18 +15,19 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComboBox,
-    QDockWidget, QGridLayout, QGroupBox, QHBoxLayout,
-    QHeaderView, QLabel, QLineEdit, QMainWindow,
-    QMdiArea, QMenuBar, QPushButton, QSizePolicy,
-    QSpacerItem, QStatusBar, QTabWidget, QTableView,
-    QTextBrowser, QTreeView, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QButtonGroup, QCheckBox,
+    QComboBox, QDockWidget, QGridLayout, QGroupBox,
+    QHBoxLayout, QHeaderView, QLabel, QLineEdit,
+    QListView, QMainWindow, QMdiArea, QMenuBar,
+    QPushButton, QRadioButton, QSizePolicy, QSpacerItem,
+    QStatusBar, QTabWidget, QTableView, QTextBrowser,
+    QTreeView, QVBoxLayout, QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(1002, 648)
+        MainWindow.resize(1023, 661)
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.gridLayout_7 = QGridLayout(self.centralwidget)
@@ -40,7 +41,7 @@ class Ui_MainWindow(object):
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 1002, 22))
+        self.menubar.setGeometry(QRect(0, 0, 1023, 22))
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QStatusBar(MainWindow)
         self.statusbar.setObjectName(u"statusbar")
@@ -51,54 +52,40 @@ class Ui_MainWindow(object):
         self.dockWidgetContents_3.setObjectName(u"dockWidgetContents_3")
         self.gridLayout_9 = QGridLayout(self.dockWidgetContents_3)
         self.gridLayout_9.setObjectName(u"gridLayout_9")
+        self.groupBox_assembly = QGroupBox(self.dockWidgetContents_3)
+        self.groupBox_assembly.setObjectName(u"groupBox_assembly")
+        self.gridLayout_6 = QGridLayout(self.groupBox_assembly)
+        self.gridLayout_6.setObjectName(u"gridLayout_6")
+        self.treeView_assemblies = QTreeView(self.groupBox_assembly)
+        self.treeView_assemblies.setObjectName(u"treeView_assemblies")
+        sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.treeView_assemblies.sizePolicy().hasHeightForWidth())
+        self.treeView_assemblies.setSizePolicy(sizePolicy)
+        self.treeView_assemblies.setMinimumSize(QSize(100, 0))
+        self.treeView_assemblies.setEditTriggers(QAbstractItemView.NoEditTriggers)
+
+        self.gridLayout_6.addWidget(self.treeView_assemblies, 3, 0, 1, 3)
+
+        self.pushButton_new_assembly = QPushButton(self.groupBox_assembly)
+        self.pushButton_new_assembly.setObjectName(u"pushButton_new_assembly")
+        self.pushButton_new_assembly.setEnabled(True)
+
+        self.gridLayout_6.addWidget(self.pushButton_new_assembly, 0, 0, 1, 3)
+
+
+        self.gridLayout_9.addWidget(self.groupBox_assembly, 3, 0, 1, 3)
+
         self.label_length_unit = QLabel(self.dockWidgetContents_3)
         self.label_length_unit.setObjectName(u"label_length_unit")
 
         self.gridLayout_9.addWidget(self.label_length_unit, 0, 0, 1, 1)
 
-        self.comboBox_length_unit = QComboBox(self.dockWidgetContents_3)
-        self.comboBox_length_unit.addItem("")
-        self.comboBox_length_unit.setObjectName(u"comboBox_length_unit")
-        self.comboBox_length_unit.setEnabled(False)
+        self.pushButton_delete_selected_model = QPushButton(self.dockWidgetContents_3)
+        self.pushButton_delete_selected_model.setObjectName(u"pushButton_delete_selected_model")
 
-        self.gridLayout_9.addWidget(self.comboBox_length_unit, 0, 1, 1, 1)
-
-        self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-
-        self.gridLayout_9.addItem(self.horizontalSpacer, 0, 2, 1, 1)
-
-        self.label_active_model = QLabel(self.dockWidgetContents_3)
-        self.label_active_model.setObjectName(u"label_active_model")
-        sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.label_active_model.sizePolicy().hasHeightForWidth())
-        self.label_active_model.setSizePolicy(sizePolicy)
-
-        self.gridLayout_9.addWidget(self.label_active_model, 0, 3, 1, 1)
-
-        self.groupBox_part = QGroupBox(self.dockWidgetContents_3)
-        self.groupBox_part.setObjectName(u"groupBox_part")
-        self.gridLayout_5 = QGridLayout(self.groupBox_part)
-        self.gridLayout_5.setObjectName(u"gridLayout_5")
-        self.pushButton_part_from_files = QPushButton(self.groupBox_part)
-        self.pushButton_part_from_files.setObjectName(u"pushButton_part_from_files")
-
-        self.gridLayout_5.addWidget(self.pushButton_part_from_files, 1, 0, 1, 2)
-
-        self.pushButton_build_math_model = QPushButton(self.groupBox_part)
-        self.pushButton_build_math_model.setObjectName(u"pushButton_build_math_model")
-        self.pushButton_build_math_model.setEnabled(False)
-
-        self.gridLayout_5.addWidget(self.pushButton_build_math_model, 1, 2, 1, 1)
-
-        self.treeView_parts = QTreeView(self.groupBox_part)
-        self.treeView_parts.setObjectName(u"treeView_parts")
-
-        self.gridLayout_5.addWidget(self.treeView_parts, 2, 0, 1, 3)
-
-
-        self.gridLayout_9.addWidget(self.groupBox_part, 1, 0, 1, 3)
+        self.gridLayout_9.addWidget(self.pushButton_delete_selected_model, 4, 2, 1, 1)
 
         self.tabWidget_settings = QTabWidget(self.dockWidgetContents_3)
         self.tabWidget_settings.setObjectName(u"tabWidget_settings")
@@ -109,107 +96,127 @@ class Ui_MainWindow(object):
         self.tabWidget_settings.setSizePolicy(sizePolicy1)
         self.tabPage_model = QWidget()
         self.tabPage_model.setObjectName(u"tabPage_model")
-        self.gridLayout_8 = QGridLayout(self.tabPage_model)
-        self.gridLayout_8.setObjectName(u"gridLayout_8")
-        self.label_model_params = QLabel(self.tabPage_model)
-        self.label_model_params.setObjectName(u"label_model_params")
-
-        self.gridLayout_8.addWidget(self.label_model_params, 2, 0, 1, 2)
-
-        self.label_part_device = QLabel(self.tabPage_model)
-        self.label_part_device.setObjectName(u"label_part_device")
-
-        self.gridLayout_8.addWidget(self.label_part_device, 0, 0, 1, 1)
-
-        self.tableView_model_params = QTableView(self.tabPage_model)
+        self.gridLayout = QGridLayout(self.tabPage_model)
+        self.gridLayout.setObjectName(u"gridLayout")
+        self.groupBox_model_params = QGroupBox(self.tabPage_model)
+        self.groupBox_model_params.setObjectName(u"groupBox_model_params")
+        self.verticalLayout_5 = QVBoxLayout(self.groupBox_model_params)
+        self.verticalLayout_5.setObjectName(u"verticalLayout_5")
+        self.tableView_model_params = QTableView(self.groupBox_model_params)
         self.tableView_model_params.setObjectName(u"tableView_model_params")
         self.tableView_model_params.setEnabled(False)
-        sizePolicy2 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        sizePolicy2.setHorizontalStretch(0)
-        sizePolicy2.setVerticalStretch(0)
-        sizePolicy2.setHeightForWidth(self.tableView_model_params.sizePolicy().hasHeightForWidth())
-        self.tableView_model_params.setSizePolicy(sizePolicy2)
+        sizePolicy.setHeightForWidth(self.tableView_model_params.sizePolicy().hasHeightForWidth())
+        self.tableView_model_params.setSizePolicy(sizePolicy)
         self.tableView_model_params.setAlternatingRowColors(True)
 
-        self.gridLayout_8.addWidget(self.tableView_model_params, 3, 0, 1, 4)
-
-        self.groupBox_transform = QGroupBox(self.tabPage_model)
-        self.groupBox_transform.setObjectName(u"groupBox_transform")
-        self.groupBox_transform.setEnabled(False)
-        self.gridLayout_4 = QGridLayout(self.groupBox_transform)
-        self.gridLayout_4.setObjectName(u"gridLayout_4")
-        self.pushButton_delete_transform = QPushButton(self.groupBox_transform)
-        self.pushButton_delete_transform.setObjectName(u"pushButton_delete_transform")
-
-        self.gridLayout_4.addWidget(self.pushButton_delete_transform, 0, 2, 1, 1)
-
-        self.comboBox_transform_type = QComboBox(self.groupBox_transform)
-        self.comboBox_transform_type.addItem("")
-        self.comboBox_transform_type.addItem("")
-        self.comboBox_transform_type.setObjectName(u"comboBox_transform_type")
-
-        self.gridLayout_4.addWidget(self.comboBox_transform_type, 0, 0, 1, 1)
-
-        self.pushButton_add_transform = QPushButton(self.groupBox_transform)
-        self.pushButton_add_transform.setObjectName(u"pushButton_add_transform")
-
-        self.gridLayout_4.addWidget(self.pushButton_add_transform, 0, 1, 1, 1)
-
-        self.pushButton_apply_transform = QPushButton(self.groupBox_transform)
-        self.pushButton_apply_transform.setObjectName(u"pushButton_apply_transform")
-
-        self.gridLayout_4.addWidget(self.pushButton_apply_transform, 5, 2, 1, 1)
-
-        self.tableView_transform = QTableView(self.groupBox_transform)
-        self.tableView_transform.setObjectName(u"tableView_transform")
-        sizePolicy2.setHeightForWidth(self.tableView_transform.sizePolicy().hasHeightForWidth())
-        self.tableView_transform.setSizePolicy(sizePolicy2)
-
-        self.gridLayout_4.addWidget(self.tableView_transform, 4, 0, 1, 3)
+        self.verticalLayout_5.addWidget(self.tableView_model_params)
 
 
-        self.gridLayout_8.addWidget(self.groupBox_transform, 5, 0, 1, 4)
-
-        self.lineEdit_real_lattice_1d_size = QLineEdit(self.tabPage_model)
-        self.lineEdit_real_lattice_1d_size.setObjectName(u"lineEdit_real_lattice_1d_size")
-
-        self.gridLayout_8.addWidget(self.lineEdit_real_lattice_1d_size, 4, 2, 1, 1)
+        self.gridLayout.addWidget(self.groupBox_model_params, 0, 0, 1, 4)
 
         self.label_real_lattice_1d_size = QLabel(self.tabPage_model)
         self.label_real_lattice_1d_size.setObjectName(u"label_real_lattice_1d_size")
 
-        self.gridLayout_8.addWidget(self.label_real_lattice_1d_size, 4, 0, 1, 2)
+        self.gridLayout.addWidget(self.label_real_lattice_1d_size, 1, 0, 1, 2)
+
+        self.lineEdit_real_lattice_1d_size = QLineEdit(self.tabPage_model)
+        self.lineEdit_real_lattice_1d_size.setObjectName(u"lineEdit_real_lattice_1d_size")
+
+        self.gridLayout.addWidget(self.lineEdit_real_lattice_1d_size, 1, 2, 1, 1)
 
         self.pushButton_sample = QPushButton(self.tabPage_model)
         self.pushButton_sample.setObjectName(u"pushButton_sample")
         self.pushButton_sample.setEnabled(False)
 
-        self.gridLayout_8.addWidget(self.pushButton_sample, 4, 3, 1, 1)
+        self.gridLayout.addWidget(self.pushButton_sample, 1, 3, 1, 1)
 
-        self.checkBox_volume = QCheckBox(self.tabPage_model)
-        self.checkBox_volume.setObjectName(u"checkBox_volume")
-        self.checkBox_volume.setEnabled(False)
+        self.groupBox_transform = QGroupBox(self.tabPage_model)
+        self.groupBox_transform.setObjectName(u"groupBox_transform")
+        self.groupBox_transform.setEnabled(True)
+        self.gridLayout_4 = QGridLayout(self.groupBox_transform)
+        self.gridLayout_4.setObjectName(u"gridLayout_4")
+        self.pushButton_delete_selected_transform = QPushButton(self.groupBox_transform)
+        self.pushButton_delete_selected_transform.setObjectName(u"pushButton_delete_selected_transform")
+        self.pushButton_delete_selected_transform.setEnabled(False)
 
-        self.gridLayout_8.addWidget(self.checkBox_volume, 6, 1, 1, 1)
+        self.gridLayout_4.addWidget(self.pushButton_delete_selected_transform, 7, 3, 1, 1)
+
+        self.label_transform_vector = QLabel(self.groupBox_transform)
+        self.label_transform_vector.setObjectName(u"label_transform_vector")
+        self.label_transform_vector.setEnabled(True)
+
+        self.gridLayout_4.addWidget(self.label_transform_vector, 1, 0, 1, 1)
+
+        self.listView_transforms = QListView(self.groupBox_transform)
+        self.listView_transforms.setObjectName(u"listView_transforms")
+        self.listView_transforms.setEnabled(True)
+        sizePolicy.setHeightForWidth(self.listView_transforms.sizePolicy().hasHeightForWidth())
+        self.listView_transforms.setSizePolicy(sizePolicy)
+
+        self.gridLayout_4.addWidget(self.listView_transforms, 6, 0, 1, 4)
+
+        self.label_transform_angle = QLabel(self.groupBox_transform)
+        self.label_transform_angle.setObjectName(u"label_transform_angle")
+        self.label_transform_angle.setEnabled(True)
+
+        self.gridLayout_4.addWidget(self.label_transform_angle, 2, 0, 1, 1)
+
+        self.lineEdit_transform_angle = QLineEdit(self.groupBox_transform)
+        self.lineEdit_transform_angle.setObjectName(u"lineEdit_transform_angle")
+        self.lineEdit_transform_angle.setEnabled(True)
+
+        self.gridLayout_4.addWidget(self.lineEdit_transform_angle, 2, 1, 1, 1)
+
+        self.pushButton_add_transform = QPushButton(self.groupBox_transform)
+        self.pushButton_add_transform.setObjectName(u"pushButton_add_transform")
+        self.pushButton_add_transform.setEnabled(False)
+
+        self.gridLayout_4.addWidget(self.pushButton_add_transform, 2, 3, 1, 1)
+
+        self.comboBox_transform_type = QComboBox(self.groupBox_transform)
+        self.comboBox_transform_type.addItem("")
+        self.comboBox_transform_type.addItem("")
+        self.comboBox_transform_type.setObjectName(u"comboBox_transform_type")
+        self.comboBox_transform_type.setEnabled(True)
+
+        self.gridLayout_4.addWidget(self.comboBox_transform_type, 0, 0, 1, 4)
+
+        self.lineEdit_transform_vector = QLineEdit(self.groupBox_transform)
+        self.lineEdit_transform_vector.setObjectName(u"lineEdit_transform_vector")
+        self.lineEdit_transform_vector.setEnabled(True)
+
+        self.gridLayout_4.addWidget(self.lineEdit_transform_vector, 1, 1, 1, 3)
+
+        self.label_degree = QLabel(self.groupBox_transform)
+        self.label_degree.setObjectName(u"label_degree")
+
+        self.gridLayout_4.addWidget(self.label_degree, 2, 2, 1, 1)
+
+
+        self.gridLayout.addWidget(self.groupBox_transform, 2, 0, 1, 4)
 
         self.pushButton_plot_model = QPushButton(self.tabPage_model)
         self.pushButton_plot_model.setObjectName(u"pushButton_plot_model")
         self.pushButton_plot_model.setEnabled(False)
 
-        self.gridLayout_8.addWidget(self.pushButton_plot_model, 6, 2, 1, 2)
+        self.gridLayout.addWidget(self.pushButton_plot_model, 3, 2, 1, 1)
 
-        self.checkBox_voxel = QCheckBox(self.tabPage_model)
-        self.checkBox_voxel.setObjectName(u"checkBox_voxel")
-        self.checkBox_voxel.setEnabled(False)
+        self.radioButton_voxel_plot = QRadioButton(self.tabPage_model)
+        self.buttonGroup = QButtonGroup(MainWindow)
+        self.buttonGroup.setObjectName(u"buttonGroup")
+        self.buttonGroup.addButton(self.radioButton_voxel_plot)
+        self.radioButton_voxel_plot.setObjectName(u"radioButton_voxel_plot")
+        self.radioButton_voxel_plot.setEnabled(True)
+        self.radioButton_voxel_plot.setChecked(True)
 
-        self.gridLayout_8.addWidget(self.checkBox_voxel, 6, 0, 1, 1)
+        self.gridLayout.addWidget(self.radioButton_voxel_plot, 3, 0, 1, 1)
 
-        self.comboBox_model_device = QComboBox(self.tabPage_model)
-        self.comboBox_model_device.addItem("")
-        self.comboBox_model_device.setObjectName(u"comboBox_model_device")
-        self.comboBox_model_device.setEnabled(False)
+        self.radioButton_volume_plot = QRadioButton(self.tabPage_model)
+        self.buttonGroup.addButton(self.radioButton_volume_plot)
+        self.radioButton_volume_plot.setObjectName(u"radioButton_volume_plot")
+        self.radioButton_volume_plot.setEnabled(True)
 
-        self.gridLayout_8.addWidget(self.comboBox_model_device, 0, 1, 1, 1)
+        self.gridLayout.addWidget(self.radioButton_volume_plot, 3, 1, 1, 1)
 
         self.tabWidget_settings.addTab(self.tabPage_model, "")
         self.tabPage_scattering = QWidget()
@@ -413,48 +420,45 @@ class Ui_MainWindow(object):
 
         self.tabWidget_settings.addTab(self.tabPage_scattering, "")
 
-        self.gridLayout_9.addWidget(self.tabWidget_settings, 1, 3, 3, 1)
+        self.gridLayout_9.addWidget(self.tabWidget_settings, 1, 3, 4, 1)
 
-        self.groupBox_assembly = QGroupBox(self.dockWidgetContents_3)
-        self.groupBox_assembly.setObjectName(u"groupBox_assembly")
-        self.gridLayout_6 = QGridLayout(self.groupBox_assembly)
-        self.gridLayout_6.setObjectName(u"gridLayout_6")
-        self.comboBox_assmbly_list = QComboBox(self.groupBox_assembly)
-        self.comboBox_assmbly_list.setObjectName(u"comboBox_assmbly_list")
-        self.comboBox_assmbly_list.setEnabled(False)
+        self.label_active_model = QLabel(self.dockWidgetContents_3)
+        self.label_active_model.setObjectName(u"label_active_model")
+        sizePolicy2 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        sizePolicy2.setHorizontalStretch(0)
+        sizePolicy2.setVerticalStretch(0)
+        sizePolicy2.setHeightForWidth(self.label_active_model.sizePolicy().hasHeightForWidth())
+        self.label_active_model.setSizePolicy(sizePolicy2)
 
-        self.gridLayout_6.addWidget(self.comboBox_assmbly_list, 3, 2, 1, 1)
+        self.gridLayout_9.addWidget(self.label_active_model, 0, 3, 1, 1)
 
-        self.comboBox_assembly_device = QComboBox(self.groupBox_assembly)
-        self.comboBox_assembly_device.addItem("")
-        self.comboBox_assembly_device.setObjectName(u"comboBox_assembly_device")
-        self.comboBox_assembly_device.setEnabled(False)
+        self.groupBox_part = QGroupBox(self.dockWidgetContents_3)
+        self.groupBox_part.setObjectName(u"groupBox_part")
+        self.gridLayout_5 = QGridLayout(self.groupBox_part)
+        self.gridLayout_5.setObjectName(u"gridLayout_5")
+        self.treeView_parts = QTreeView(self.groupBox_part)
+        self.treeView_parts.setObjectName(u"treeView_parts")
 
-        self.gridLayout_6.addWidget(self.comboBox_assembly_device, 0, 2, 1, 1)
+        self.gridLayout_5.addWidget(self.treeView_parts, 2, 0, 1, 3)
 
-        self.pushButton_add_to_assembly = QPushButton(self.groupBox_assembly)
+        self.pushButton_part_from_files = QPushButton(self.groupBox_part)
+        self.pushButton_part_from_files.setObjectName(u"pushButton_part_from_files")
+
+        self.gridLayout_5.addWidget(self.pushButton_part_from_files, 1, 0, 1, 2)
+
+
+        self.gridLayout_9.addWidget(self.groupBox_part, 1, 0, 1, 3)
+
+        self.pushButton_add_to_assembly = QPushButton(self.dockWidgetContents_3)
         self.pushButton_add_to_assembly.setObjectName(u"pushButton_add_to_assembly")
         self.pushButton_add_to_assembly.setEnabled(False)
 
-        self.gridLayout_6.addWidget(self.pushButton_add_to_assembly, 3, 0, 1, 2)
+        self.gridLayout_9.addWidget(self.pushButton_add_to_assembly, 2, 0, 1, 2)
 
-        self.treeView_assemblies = QTreeView(self.groupBox_assembly)
-        self.treeView_assemblies.setObjectName(u"treeView_assemblies")
-        sizePolicy2.setHeightForWidth(self.treeView_assemblies.sizePolicy().hasHeightForWidth())
-        self.treeView_assemblies.setSizePolicy(sizePolicy2)
-        self.treeView_assemblies.setMinimumSize(QSize(100, 0))
-        self.treeView_assemblies.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.comboBox_assemblies = QComboBox(self.dockWidgetContents_3)
+        self.comboBox_assemblies.setObjectName(u"comboBox_assemblies")
 
-        self.gridLayout_6.addWidget(self.treeView_assemblies, 4, 0, 1, 3)
-
-        self.pushButton_new_assembly = QPushButton(self.groupBox_assembly)
-        self.pushButton_new_assembly.setObjectName(u"pushButton_new_assembly")
-        self.pushButton_new_assembly.setEnabled(False)
-
-        self.gridLayout_6.addWidget(self.pushButton_new_assembly, 0, 0, 1, 2)
-
-
-        self.gridLayout_9.addWidget(self.groupBox_assembly, 2, 0, 1, 3)
+        self.gridLayout_9.addWidget(self.comboBox_assemblies, 2, 2, 1, 1)
 
         self.dockWidget_main.setWidget(self.dockWidgetContents_3)
         MainWindow.addDockWidget(Qt.LeftDockWidgetArea, self.dockWidget_main)
@@ -476,8 +480,8 @@ class Ui_MainWindow(object):
         self.dockWidget_log.setWidget(self.dockWidgetContents_4)
         MainWindow.addDockWidget(Qt.LeftDockWidgetArea, self.dockWidget_log)
         QWidget.setTabOrder(self.pushButton_part_from_files, self.comboBox_transform_type)
-        QWidget.setTabOrder(self.comboBox_transform_type, self.tableView_transform)
-        QWidget.setTabOrder(self.tableView_transform, self.lineEdit_real_lattice_1d_size)
+        QWidget.setTabOrder(self.comboBox_transform_type, self.listView_transforms)
+        QWidget.setTabOrder(self.listView_transforms, self.lineEdit_real_lattice_1d_size)
         QWidget.setTabOrder(self.lineEdit_real_lattice_1d_size, self.pushButton_plot_model)
         QWidget.setTabOrder(self.pushButton_plot_model, self.tableView_model_params)
         QWidget.setTabOrder(self.tableView_model_params, self.pushButton_sample)
@@ -498,7 +502,6 @@ class Ui_MainWindow(object):
         QWidget.setTabOrder(self.lineEdit_q2d_normal_z, self.checkBox_2d_show_3d)
         QWidget.setTabOrder(self.checkBox_2d_show_3d, self.pushButton_2d_measure)
         QWidget.setTabOrder(self.pushButton_2d_measure, self.pushButton_new_assembly)
-        QWidget.setTabOrder(self.pushButton_new_assembly, self.pushButton_add_to_assembly)
 
         self.retranslateUi(MainWindow)
         self.pushButton_part_from_files.clicked.connect(MainWindow.import_parts)
@@ -507,6 +510,12 @@ class Ui_MainWindow(object):
         self.pushButton_sample.clicked.connect(MainWindow.sample)
         self.pushButton_scatter.clicked.connect(MainWindow.scatter)
         self.pushButton_1d_measure.clicked.connect(MainWindow.measure)
+        self.pushButton_new_assembly.clicked.connect(MainWindow.new_assembly)
+        self.pushButton_add_to_assembly.clicked.connect(MainWindow.add_to_assembly)
+        self.pushButton_delete_selected_model.clicked.connect(MainWindow.delete_selected_model)
+        self.pushButton_add_transform.clicked.connect(MainWindow.add_transform)
+        self.pushButton_delete_selected_transform.clicked.connect(MainWindow.delete_selected_transform)
+        self.pushButton_plot_model.clicked.connect(MainWindow.plot_model)
 
         self.tabWidget_settings.setCurrentIndex(0)
         self.tabWidget_measure.setCurrentIndex(0)
@@ -518,30 +527,28 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"Model2SAS", None))
         self.dockWidget_main.setWindowTitle(QCoreApplication.translate("MainWindow", u"Main", None))
-        self.label_length_unit.setText(QCoreApplication.translate("MainWindow", u"Length Unit", None))
-        self.comboBox_length_unit.setItemText(0, QCoreApplication.translate("MainWindow", u"\u00c5", None))
-
-        self.label_active_model.setText(QCoreApplication.translate("MainWindow", u"No Active Model", None))
-        self.groupBox_part.setTitle(QCoreApplication.translate("MainWindow", u"Part Model", None))
-        self.pushButton_part_from_files.setText(QCoreApplication.translate("MainWindow", u"Import From File(s)", None))
-        self.pushButton_build_math_model.setText(QCoreApplication.translate("MainWindow", u"Build Math Model", None))
-        self.label_model_params.setText(QCoreApplication.translate("MainWindow", u"Model Parameters", None))
-        self.label_part_device.setText(QCoreApplication.translate("MainWindow", u"Device", None))
+        self.groupBox_assembly.setTitle(QCoreApplication.translate("MainWindow", u"Assembly Model", None))
+        self.pushButton_new_assembly.setText(QCoreApplication.translate("MainWindow", u"New Assembly", None))
+        self.label_length_unit.setText(QCoreApplication.translate("MainWindow", u"Length Unit: \u00c5", None))
+        self.pushButton_delete_selected_model.setText(QCoreApplication.translate("MainWindow", u"Delete Selected Model", None))
+        self.groupBox_model_params.setTitle(QCoreApplication.translate("MainWindow", u"Model Parameters", None))
+        self.label_real_lattice_1d_size.setText(QCoreApplication.translate("MainWindow", u"Points in longest edge", None))
+        self.lineEdit_real_lattice_1d_size.setText("")
+        self.pushButton_sample.setText(QCoreApplication.translate("MainWindow", u"Sample", None))
         self.groupBox_transform.setTitle(QCoreApplication.translate("MainWindow", u"Transform", None))
-        self.pushButton_delete_transform.setText(QCoreApplication.translate("MainWindow", u"Delete", None))
+        self.pushButton_delete_selected_transform.setText(QCoreApplication.translate("MainWindow", u"Delete", None))
+        self.label_transform_vector.setText(QCoreApplication.translate("MainWindow", u"Vector/Axis", None))
+        self.label_transform_angle.setText(QCoreApplication.translate("MainWindow", u"Angle", None))
+        self.lineEdit_transform_angle.setText(QCoreApplication.translate("MainWindow", u"90", None))
+        self.pushButton_add_transform.setText(QCoreApplication.translate("MainWindow", u"Add", None))
         self.comboBox_transform_type.setItemText(0, QCoreApplication.translate("MainWindow", u"Translate", None))
         self.comboBox_transform_type.setItemText(1, QCoreApplication.translate("MainWindow", u"Rotate", None))
 
-        self.pushButton_add_transform.setText(QCoreApplication.translate("MainWindow", u"Add", None))
-        self.pushButton_apply_transform.setText(QCoreApplication.translate("MainWindow", u"Apply", None))
-        self.lineEdit_real_lattice_1d_size.setText("")
-        self.label_real_lattice_1d_size.setText(QCoreApplication.translate("MainWindow", u"Points in longest edge", None))
-        self.pushButton_sample.setText(QCoreApplication.translate("MainWindow", u"Sample", None))
-        self.checkBox_volume.setText(QCoreApplication.translate("MainWindow", u"Volume", None))
+        self.lineEdit_transform_vector.setText(QCoreApplication.translate("MainWindow", u"0,0,1", None))
+        self.label_degree.setText(QCoreApplication.translate("MainWindow", u"deg", None))
         self.pushButton_plot_model.setText(QCoreApplication.translate("MainWindow", u"Plot", None))
-        self.checkBox_voxel.setText(QCoreApplication.translate("MainWindow", u"Voxel", None))
-        self.comboBox_model_device.setItemText(0, QCoreApplication.translate("MainWindow", u"cpu", None))
-
+        self.radioButton_voxel_plot.setText(QCoreApplication.translate("MainWindow", u"Voxel", None))
+        self.radioButton_volume_plot.setText(QCoreApplication.translate("MainWindow", u"Volume", None))
         self.tabWidget_settings.setTabText(self.tabWidget_settings.indexOf(self.tabPage_model), QCoreApplication.translate("MainWindow", u"Model Settings", None))
         self.label_reciprocal_lattice_1d_size.setText(QCoreApplication.translate("MainWindow", u"Edge points num in reciprocal grid", None))
         self.lineEdit_reciprocal_lattice_1d_size.setText(QCoreApplication.translate("MainWindow", u"default", None))
@@ -564,11 +571,10 @@ class Ui_MainWindow(object):
         self.tabWidget_measure.setTabText(self.tabWidget_measure.indexOf(self.tabPage_virtual_detector), QCoreApplication.translate("MainWindow", u"Virtual Detector", None))
         self.pushButton_scatter.setText(QCoreApplication.translate("MainWindow", u"Virtual Scatter", None))
         self.tabWidget_settings.setTabText(self.tabWidget_settings.indexOf(self.tabPage_scattering), QCoreApplication.translate("MainWindow", u"Scattering Settings", None))
-        self.groupBox_assembly.setTitle(QCoreApplication.translate("MainWindow", u"Assembly Model", None))
-        self.comboBox_assembly_device.setItemText(0, QCoreApplication.translate("MainWindow", u"cpu", None))
-
-        self.pushButton_add_to_assembly.setText(QCoreApplication.translate("MainWindow", u"Add to Assembly", None))
-        self.pushButton_new_assembly.setText(QCoreApplication.translate("MainWindow", u"New Assembly", None))
+        self.label_active_model.setText(QCoreApplication.translate("MainWindow", u"No Active Model", None))
+        self.groupBox_part.setTitle(QCoreApplication.translate("MainWindow", u"Part Model", None))
+        self.pushButton_part_from_files.setText(QCoreApplication.translate("MainWindow", u"Import From File(s)", None))
+        self.pushButton_add_to_assembly.setText(QCoreApplication.translate("MainWindow", u"Add to assembly", None))
         self.dockWidget_log.setWindowTitle(QCoreApplication.translate("MainWindow", u"Log", None))
     # retranslateUi
 

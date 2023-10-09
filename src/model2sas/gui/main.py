@@ -13,17 +13,15 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, Q
 from .MainWindow_ui import Ui_MainWindow
 from .SubWindow_buildmath_ui import Ui_subWindow_build_math_model
 from .SubWindow_htmlview_ui import Ui_subWindow_html_view
-# from .utils import ModelContainer, Project
-from .project import Project, StlPartModel, MathPartModel, AssemblyModel, PartModel
+from .wrapper import Project, StlPartModel, MathPartModel, AssemblyModel, PartModel
 
 
 from ..model import Part, StlPart, MathPart, Assembly
 from .. import plot
 
 '''
-TODO:
-1. 支持多个assembly
-2. 可删除part，可添加或删除assembly
+TODO
+
 '''
 
 
@@ -88,9 +86,11 @@ class MainWindow(QMainWindow):
         self.qitemmodel_parts = QStandardItemModel()
         self.qitemmodel_assmblies = QStandardItemModel()
         self.qitemmodel_params = QStandardItemModel()
+        self.qitemmodel_transforms = QStandardItemModel()
         self.ui.treeView_parts.setModel(self.qitemmodel_parts)
         self.ui.treeView_assemblies.setModel(self.qitemmodel_assmblies)
         self.ui.tableView_model_params.setModel(self.qitemmodel_params)
+        self.ui.listView_transforms.setModel(self.qitemmodel_transforms)
         self.qitemmodel_params.itemChanged.connect(self.read_params_from_qitemmodel)
         
         # other variables
@@ -106,7 +106,8 @@ class MainWindow(QMainWindow):
         
         # initial actions
         self.project = Project()
-        self.project.new_assembly() #* only prelimilary
+        # self.project.new_assembly() #* only prelimilary
+        
         
     def write_log(self, text: str):
         if text != '\n': # print() func will print a \n afterwards
@@ -142,13 +143,40 @@ class MainWindow(QMainWindow):
             self.project.import_part(filename)
             
         #* only prelimilary
-        for part in self.project.parts.values():
-            self.project.add_part_to_assembly(
-                part, list(self.project.assemblies.values())[0]
-            )
+        # for part in self.project.parts.values():
+        #     self.project.add_part_to_assembly(
+        #         part, list(self.project.assemblies.values())[0]
+        #     )
         #*
         
         self.refresh_qitemmodel_models()
+        
+    def add_to_assembly(self) -> None:
+        assembly_key = self.ui.comboBox_assemblies.currentText()
+        self.project.add_part_to_assembly(self.active_model.key, assembly_key)
+        self.refresh_qitemmodel_models()
+        
+    def new_assembly(self) -> None:
+        self.project.new_assembly()
+        self.refresh_qitemmodel_models()
+        self.refresh_combobox_assemblies()
+        
+    def refresh_combobox_assemblies(self) -> None:
+        self.ui.comboBox_assemblies.clear()
+        self.ui.comboBox_assemblies.addItems(self.project.assemblies.keys())
+        
+    def delete_selected_model(self) -> None:
+        if self.active_model in self.project.parts.values():
+            # part model selected
+            del self.project.parts[self.active_model.key]
+            for assembly in self.project.assemblies.values():
+                if self.active_model in assembly.parts:
+                    assembly.parts.remove(self.active_model)
+        else:
+            # assembly model selected
+            del self.project.assemblies[self.active_model.key]
+        self.refresh_qitemmodel_models()
+        self.refresh_combobox_assemblies()
         
     def refresh_qitemmodel_models(self) -> None:
         self.qitemmodel_parts.clear()
@@ -198,25 +226,33 @@ class MainWindow(QMainWindow):
             
     
     def _unique_actions_for_part_model_selected(self) -> None:
+        self.ui.pushButton_add_to_assembly.setDisabled(False)
         self.ui.tableView_model_params.setDisabled(False)
         self.ui.pushButton_sample.setDisabled(False)
         self.ui.pushButton_sample.setText('Sample')
+        self.ui.pushButton_add_transform.setDisabled(False)
+        self.ui.pushButton_delete_selected_transform.setDisabled(False)
         self.ui.pushButton_plot_model.setDisabled(False)
         self.ui.pushButton_scatter.setDisabled(False)
         self.ui.pushButton_scatter.setText('Virtual Scatter')
         self.ui.pushButton_1d_measure.setDisabled(False)
         self.refresh_qitemmodel_params()
+        self.refresh_qitemmodel_transforms()
         
         
     def _unique_actions_for_assembly_model_selected(self) -> None:
+        self.ui.pushButton_add_to_assembly.setDisabled(True)
         self.ui.tableView_model_params.setDisabled(True)
         self.ui.pushButton_sample.setDisabled(False)
         self.ui.pushButton_sample.setText('Sample All Sub-Parts')
+        self.ui.pushButton_add_transform.setDisabled(True)
+        self.ui.pushButton_delete_selected_transform.setDisabled(True)
         self.ui.pushButton_plot_model.setDisabled(False)
         self.ui.pushButton_scatter.setDisabled(False)
         self.ui.pushButton_scatter.setText('Virtual Scatter by All Sub-Parts')
         self.ui.pushButton_1d_measure.setDisabled(False)
         self.qitemmodel_params.clear()
+        self.qitemmodel_transforms.clear()
     
     def _actions_for_model_selected(self) -> None:
         self.ui.label_active_model.setText(
@@ -259,6 +295,28 @@ class MainWindow(QMainWindow):
                 self.active_model.set_params(**{param_name: param_value})
             print(self.active_model.get_params())
             
+    def refresh_qitemmodel_transforms(self) -> None:
+        self.qitemmodel_transforms.clear()
+        for transform in self.active_model.model.geo_transform:
+            self.qitemmodel_transforms.appendRow(
+                QStandardItem(f"{transform['type']} with param: {transform['param']}")
+            )
+            
+    def add_transform(self) -> None:
+        transform_type = self.ui.comboBox_transform_type.currentText().lower()
+        vec = [float(i) for i in self.ui.lineEdit_transform_vector.text().split(',')]
+        if transform_type == 'translate':
+            self.active_model.model.translate(*vec[:3])
+        elif transform_type == 'rotate':
+            angle = math.radians(float(self.ui.lineEdit_transform_angle.text()))
+            self.active_model.model.rotate(tuple(vec[:3]), angle)
+        self.refresh_qitemmodel_transforms()
+        
+    def delete_selected_transform(self) -> None:
+        selected_index = self.ui.listView_transforms.selectedIndexes()[0].row()
+        del self.active_model.model.geo_transform[selected_index]
+        self.refresh_qitemmodel_transforms()        
+            
     def sample(self) -> None:
         self.thread = GeneralThread(
             self.active_model.sample
@@ -268,6 +326,25 @@ class MainWindow(QMainWindow):
                 
     def sample_thread_end(self) -> None:
         print('Sampling Done')
+        
+    def plot_model(self) -> None:
+        if self.ui.radioButton_voxel_plot.isChecked():
+            plot_type = 'voxel'
+        elif self.ui.radioButton_volume_plot.isChecked():
+            plot_type = 'volume'
+        if self.active_model.type == 'assembly':
+            model = self.active_model.model.parts
+        else:
+            model = [self.active_model.model]
+        self.thread = PlotThread(
+            plot.plot_model,
+            *model,
+            type = plot_type,
+            title=f'Model Plot: {self.active_model.key}',
+            show=False,
+        )
+        self.thread.thread_end.connect(self.display_html)
+        self.thread.start()
         
     def scatter(self) -> None:
         self.thread = GeneralThread(
@@ -303,6 +380,9 @@ class MainWindow(QMainWindow):
         
         
     def display_html(self, html_filename: str) -> None:
+        # * Known issues
+        # * (Solved) must use forward slashes in file path, or will be blank or error
+        # * (Solved) begin size can't be too small or plot will be blank
         subwindow_html_view = SubWindowHtmlView()
         subwindow_html_view.setWindowTitle('Plot')
         subwindow_html_view.ui.webEngineView.setUrl(html_filename.replace('\\', '/'))
@@ -319,3 +399,12 @@ class SubWindowHtmlView(QWidget):
         super().__init__()
         self.ui = Ui_subWindow_html_view()
         self.ui.setupUi(self)
+        
+        
+def run():
+    app = QApplication(sys.argv)
+    main_window = MainWindow()
+    sys.exit(app.exec())
+
+if __name__ == '__main__':
+    run()
