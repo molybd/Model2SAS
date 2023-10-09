@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'MainWindow.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.5.0
+## Created by: Qt User Interface Compiler version 6.5.3
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -81,16 +81,21 @@ class Ui_MainWindow(object):
         self.groupBox_part.setObjectName(u"groupBox_part")
         self.gridLayout_5 = QGridLayout(self.groupBox_part)
         self.gridLayout_5.setObjectName(u"gridLayout_5")
-        self.pushButton_build_math_model = QPushButton(self.groupBox_part)
-        self.pushButton_build_math_model.setObjectName(u"pushButton_build_math_model")
-        self.pushButton_build_math_model.setEnabled(False)
-
-        self.gridLayout_5.addWidget(self.pushButton_build_math_model, 2, 0, 1, 3)
-
         self.pushButton_part_from_files = QPushButton(self.groupBox_part)
         self.pushButton_part_from_files.setObjectName(u"pushButton_part_from_files")
 
         self.gridLayout_5.addWidget(self.pushButton_part_from_files, 1, 0, 1, 2)
+
+        self.pushButton_build_math_model = QPushButton(self.groupBox_part)
+        self.pushButton_build_math_model.setObjectName(u"pushButton_build_math_model")
+        self.pushButton_build_math_model.setEnabled(False)
+
+        self.gridLayout_5.addWidget(self.pushButton_build_math_model, 1, 2, 1, 1)
+
+        self.treeView_parts = QTreeView(self.groupBox_part)
+        self.treeView_parts.setObjectName(u"treeView_parts")
+
+        self.gridLayout_5.addWidget(self.treeView_parts, 2, 0, 1, 3)
 
 
         self.gridLayout_9.addWidget(self.groupBox_part, 1, 0, 1, 3)
@@ -420,12 +425,6 @@ class Ui_MainWindow(object):
 
         self.gridLayout_6.addWidget(self.comboBox_assmbly_list, 3, 2, 1, 1)
 
-        self.pushButton_new_assembly = QPushButton(self.groupBox_assembly)
-        self.pushButton_new_assembly.setObjectName(u"pushButton_new_assembly")
-        self.pushButton_new_assembly.setEnabled(False)
-
-        self.gridLayout_6.addWidget(self.pushButton_new_assembly, 0, 0, 1, 2)
-
         self.comboBox_assembly_device = QComboBox(self.groupBox_assembly)
         self.comboBox_assembly_device.addItem("")
         self.comboBox_assembly_device.setObjectName(u"comboBox_assembly_device")
@@ -439,17 +438,23 @@ class Ui_MainWindow(object):
 
         self.gridLayout_6.addWidget(self.pushButton_add_to_assembly, 3, 0, 1, 2)
 
+        self.treeView_assemblies = QTreeView(self.groupBox_assembly)
+        self.treeView_assemblies.setObjectName(u"treeView_assemblies")
+        sizePolicy2.setHeightForWidth(self.treeView_assemblies.sizePolicy().hasHeightForWidth())
+        self.treeView_assemblies.setSizePolicy(sizePolicy2)
+        self.treeView_assemblies.setMinimumSize(QSize(100, 0))
+        self.treeView_assemblies.setEditTriggers(QAbstractItemView.NoEditTriggers)
+
+        self.gridLayout_6.addWidget(self.treeView_assemblies, 4, 0, 1, 3)
+
+        self.pushButton_new_assembly = QPushButton(self.groupBox_assembly)
+        self.pushButton_new_assembly.setObjectName(u"pushButton_new_assembly")
+        self.pushButton_new_assembly.setEnabled(False)
+
+        self.gridLayout_6.addWidget(self.pushButton_new_assembly, 0, 0, 1, 2)
+
 
         self.gridLayout_9.addWidget(self.groupBox_assembly, 2, 0, 1, 3)
-
-        self.treeView_models = QTreeView(self.dockWidgetContents_3)
-        self.treeView_models.setObjectName(u"treeView_models")
-        sizePolicy2.setHeightForWidth(self.treeView_models.sizePolicy().hasHeightForWidth())
-        self.treeView_models.setSizePolicy(sizePolicy2)
-        self.treeView_models.setMinimumSize(QSize(100, 0))
-        self.treeView_models.setEditTriggers(QAbstractItemView.NoEditTriggers)
-
-        self.gridLayout_9.addWidget(self.treeView_models, 3, 0, 1, 3)
 
         self.dockWidget_main.setWidget(self.dockWidgetContents_3)
         MainWindow.addDockWidget(Qt.LeftDockWidgetArea, self.dockWidget_main)
@@ -470,8 +475,7 @@ class Ui_MainWindow(object):
 
         self.dockWidget_log.setWidget(self.dockWidgetContents_4)
         MainWindow.addDockWidget(Qt.LeftDockWidgetArea, self.dockWidget_log)
-        QWidget.setTabOrder(self.pushButton_part_from_files, self.pushButton_build_math_model)
-        QWidget.setTabOrder(self.pushButton_build_math_model, self.comboBox_transform_type)
+        QWidget.setTabOrder(self.pushButton_part_from_files, self.comboBox_transform_type)
         QWidget.setTabOrder(self.comboBox_transform_type, self.tableView_transform)
         QWidget.setTabOrder(self.tableView_transform, self.lineEdit_real_lattice_1d_size)
         QWidget.setTabOrder(self.lineEdit_real_lattice_1d_size, self.pushButton_plot_model)
@@ -497,13 +501,12 @@ class Ui_MainWindow(object):
         QWidget.setTabOrder(self.pushButton_new_assembly, self.pushButton_add_to_assembly)
 
         self.retranslateUi(MainWindow)
-        self.pushButton_build_math_model.clicked.connect(MainWindow.build_math_model)
-        self.pushButton_part_from_files.clicked.connect(MainWindow.load_model_files)
-        self.treeView_models.clicked.connect(MainWindow.selected_model_settings)
+        self.pushButton_part_from_files.clicked.connect(MainWindow.import_parts)
+        self.treeView_parts.clicked.connect(MainWindow.part_model_selected)
+        self.treeView_assemblies.clicked.connect(MainWindow.assembly_model_selected)
         self.pushButton_sample.clicked.connect(MainWindow.sample)
-        self.pushButton_plot_model.clicked.connect(MainWindow.plot_model)
-        self.pushButton_scatter.clicked.connect(MainWindow.virtual_scatter)
-        self.pushButton_1d_measure.clicked.connect(MainWindow.measure_1d)
+        self.pushButton_scatter.clicked.connect(MainWindow.scatter)
+        self.pushButton_1d_measure.clicked.connect(MainWindow.measure)
 
         self.tabWidget_settings.setCurrentIndex(0)
         self.tabWidget_measure.setCurrentIndex(0)
@@ -520,8 +523,8 @@ class Ui_MainWindow(object):
 
         self.label_active_model.setText(QCoreApplication.translate("MainWindow", u"No Active Model", None))
         self.groupBox_part.setTitle(QCoreApplication.translate("MainWindow", u"Part Model", None))
+        self.pushButton_part_from_files.setText(QCoreApplication.translate("MainWindow", u"Import From File(s)", None))
         self.pushButton_build_math_model.setText(QCoreApplication.translate("MainWindow", u"Build Math Model", None))
-        self.pushButton_part_from_files.setText(QCoreApplication.translate("MainWindow", u"Load From File(s)", None))
         self.label_model_params.setText(QCoreApplication.translate("MainWindow", u"Model Parameters", None))
         self.label_part_device.setText(QCoreApplication.translate("MainWindow", u"Device", None))
         self.groupBox_transform.setTitle(QCoreApplication.translate("MainWindow", u"Transform", None))
@@ -562,10 +565,10 @@ class Ui_MainWindow(object):
         self.pushButton_scatter.setText(QCoreApplication.translate("MainWindow", u"Virtual Scatter", None))
         self.tabWidget_settings.setTabText(self.tabWidget_settings.indexOf(self.tabPage_scattering), QCoreApplication.translate("MainWindow", u"Scattering Settings", None))
         self.groupBox_assembly.setTitle(QCoreApplication.translate("MainWindow", u"Assembly Model", None))
-        self.pushButton_new_assembly.setText(QCoreApplication.translate("MainWindow", u"New Assembly", None))
         self.comboBox_assembly_device.setItemText(0, QCoreApplication.translate("MainWindow", u"cpu", None))
 
         self.pushButton_add_to_assembly.setText(QCoreApplication.translate("MainWindow", u"Add to Assembly", None))
+        self.pushButton_new_assembly.setText(QCoreApplication.translate("MainWindow", u"New Assembly", None))
         self.dockWidget_log.setWindowTitle(QCoreApplication.translate("MainWindow", u"Log", None))
     # retranslateUi
 

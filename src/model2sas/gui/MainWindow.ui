@@ -98,7 +98,14 @@
         <string>Part Model</string>
        </property>
        <layout class="QGridLayout" name="gridLayout_5">
-        <item row="2" column="0" colspan="3">
+        <item row="1" column="0" colspan="2">
+         <widget class="QPushButton" name="pushButton_part_from_files">
+          <property name="text">
+           <string>Import From File(s)</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="2">
          <widget class="QPushButton" name="pushButton_build_math_model">
           <property name="enabled">
            <bool>false</bool>
@@ -108,12 +115,8 @@
           </property>
          </widget>
         </item>
-        <item row="1" column="0" colspan="2">
-         <widget class="QPushButton" name="pushButton_part_from_files">
-          <property name="text">
-           <string>Load From File(s)</string>
-          </property>
-         </widget>
+        <item row="2" column="0" colspan="3">
+         <widget class="QTreeView" name="treeView_parts"/>
         </item>
        </layout>
       </widget>
@@ -563,16 +566,6 @@
           </property>
          </widget>
         </item>
-        <item row="0" column="0" colspan="2">
-         <widget class="QPushButton" name="pushButton_new_assembly">
-          <property name="enabled">
-           <bool>false</bool>
-          </property>
-          <property name="text">
-           <string>New Assembly</string>
-          </property>
-         </widget>
-        </item>
         <item row="0" column="2">
          <widget class="QComboBox" name="comboBox_assembly_device">
           <property name="enabled">
@@ -595,26 +588,36 @@
           </property>
          </widget>
         </item>
+        <item row="4" column="0" colspan="3">
+         <widget class="QTreeView" name="treeView_assemblies">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>100</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="editTriggers">
+           <set>QAbstractItemView::NoEditTriggers</set>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="0" colspan="2">
+         <widget class="QPushButton" name="pushButton_new_assembly">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="text">
+           <string>New Assembly</string>
+          </property>
+         </widget>
+        </item>
        </layout>
-      </widget>
-     </item>
-     <item row="3" column="0" colspan="3">
-      <widget class="QTreeView" name="treeView_models">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>100</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="editTriggers">
-        <set>QAbstractItemView::NoEditTriggers</set>
-       </property>
       </widget>
      </item>
     </layout>
@@ -647,7 +650,6 @@
  </widget>
  <tabstops>
   <tabstop>pushButton_part_from_files</tabstop>
-  <tabstop>pushButton_build_math_model</tabstop>
   <tabstop>comboBox_transform_type</tabstop>
   <tabstop>tableView_transform</tabstop>
   <tabstop>lineEdit_real_lattice_1d_size</tabstop>
@@ -676,50 +678,50 @@
  <resources/>
  <connections>
   <connection>
-   <sender>pushButton_build_math_model</sender>
-   <signal>clicked()</signal>
-   <receiver>MainWindow</receiver>
-   <slot>build_math_model()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>195</x>
-     <y>159</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>195</x>
-     <y>0</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
    <sender>pushButton_part_from_files</sender>
    <signal>clicked()</signal>
    <receiver>MainWindow</receiver>
-   <slot>load_model_files()</slot>
+   <slot>import_parts()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>136</x>
-     <y>129</y>
+     <x>34</x>
+     <y>115</y>
     </hint>
     <hint type="destinationlabel">
-     <x>124</x>
-     <y>0</y>
+     <x>-14</x>
+     <y>116</y>
     </hint>
    </hints>
   </connection>
   <connection>
-   <sender>treeView_models</sender>
+   <sender>treeView_parts</sender>
    <signal>clicked(QModelIndex)</signal>
    <receiver>MainWindow</receiver>
-   <slot>selected_model_settings()</slot>
+   <slot>part_model_selected()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>95</x>
-     <y>360</y>
+     <x>68</x>
+     <y>187</y>
     </hint>
     <hint type="destinationlabel">
-     <x>0</x>
-     <y>372</y>
+     <x>-2</x>
+     <y>186</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>treeView_assemblies</sender>
+   <signal>clicked(QModelIndex)</signal>
+   <receiver>MainWindow</receiver>
+   <slot>assembly_model_selected()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>136</x>
+     <y>420</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>-1</x>
+     <y>414</y>
     </hint>
    </hints>
   </connection>
@@ -730,28 +732,12 @@
    <slot>sample()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>492</x>
-     <y>261</y>
+     <x>531</x>
+     <y>266</y>
     </hint>
     <hint type="destinationlabel">
-     <x>521</x>
-     <y>281</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>pushButton_plot_model</sender>
-   <signal>clicked()</signal>
-   <receiver>MainWindow</receiver>
-   <slot>plot_model()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>492</x>
-     <y>489</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>516</x>
-     <y>523</y>
+     <x>584</x>
+     <y>246</y>
     </hint>
    </hints>
   </connection>
@@ -759,15 +745,15 @@
    <sender>pushButton_scatter</sender>
    <signal>clicked()</signal>
    <receiver>MainWindow</receiver>
-   <slot>virtual_scatter()</slot>
+   <slot>scatter()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>448</x>
-     <y>154</y>
+     <x>538</x>
+     <y>148</y>
     </hint>
     <hint type="destinationlabel">
-     <x>521</x>
-     <y>151</y>
+     <x>584</x>
+     <y>145</y>
     </hint>
    </hints>
   </connection>
@@ -775,28 +761,25 @@
    <sender>pushButton_1d_measure</sender>
    <signal>clicked()</signal>
    <receiver>MainWindow</receiver>
-   <slot>measure_1d()</slot>
+   <slot>measure()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>437</x>
-     <y>295</y>
+     <x>465</x>
+     <y>298</y>
     </hint>
     <hint type="destinationlabel">
-     <x>520</x>
-     <y>309</y>
+     <x>584</x>
+     <y>290</y>
     </hint>
    </hints>
   </connection>
  </connections>
  <slots>
-  <slot>build_math_model()</slot>
-  <slot>load_model_files()</slot>
-  <slot>new_assembly()</slot>
-  <slot>add_to_assembly()</slot>
-  <slot>selected_model_settings()</slot>
-  <slot>plot_model()</slot>
-  <slot>measure_1d()</slot>
+  <slot>import_parts()</slot>
+  <slot>part_model_selected()</slot>
+  <slot>assembly_model_selected()</slot>
   <slot>sample()</slot>
-  <slot>virtual_scatter()</slot>
+  <slot>scatter()</slot>
+  <slot>measure()</slot>
  </slots>
 </ui>
