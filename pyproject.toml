@@ -17,6 +17,9 @@ requires-python = ">=3.10,<3.12"
 readme = "README.md"
 license = {text = "GPL-3.0-only"}
 
+[project.gui-scripts]
+model2sas-gui = "model2sas.gui.main:run"
+
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
@@ -26,4 +29,5 @@ dev = [
     "pytest>=7.4.2",
     "ipython>=8.16.1",
     "ipykernel>=6.25.2",
+    "black>=23.9.1",
 ]
