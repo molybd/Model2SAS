@@ -125,3 +125,5 @@ def test_detector_simulation():
         (det1.x, det1.y, det1.z, I1), (det2.x, det2.y, det2.z, I2)
     )
 
+if __name__ == '__main__':
+    test_normal_flow()

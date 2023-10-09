@@ -56,6 +56,7 @@ def write_html(filename: str, htmlstr: str, encoding: str = 'utf-8') -> str:
     with open(filename, 'w', encoding=encoding) as f:
         f.write(htmlstr)
         return os.path.abspath(filename)
+    
 
 class Voxel(go.Mesh3d):
     def __init__(self, xc=None, yc=None, zc=None, spacing=None, arg=None, alphahull=None, autocolorscale=None, cauto=None, cmax=None, cmid=None, cmin=None, color=None, coloraxis=None, colorbar=None, colorscale=None, contour=None, customdata=None, customdatasrc=None, delaunayaxis=None, facecolor=None, facecolorsrc=None, flatshading=None, hoverinfo=None, hoverinfosrc=None, hoverlabel=None, hovertemplate=None, hovertemplatesrc=None, hovertext=None, hovertextsrc=None, ids=None, idssrc=None, intensity=None, intensitymode=None, intensitysrc=None, isrc=None, jsrc=None, ksrc=None, legendgroup=None, legendgrouptitle=None, legendrank=None, legendwidth=None, lighting=None, lightposition=None, meta=None, metasrc=None, name=None, opacity=None, reversescale=None, scene=None, showlegend=None, showscale=None, stream=None, text=None, textsrc=None, uid=None, uirevision=None, vertexcolor=None, vertexcolorsrc=None, visible=None, xcalendar=None, xhoverformat=None, xsrc=None, ycalendar=None, yhoverformat=None, ysrc=None, zcalendar=None, zhoverformat=None, zsrc=None, **kwargs):

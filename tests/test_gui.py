@@ -13,3 +13,6 @@ def test_gui():
         sys.exit(app.exec())
     assert e.type == SystemExit
     assert e.value.code == 0
+
+if __name__ == '__main__':
+    test_gui()

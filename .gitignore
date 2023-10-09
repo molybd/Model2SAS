@@ -162,3 +162,6 @@ temp/
 
 # local files for myself
 local/
+
+# pdm related
+.pdm-python
