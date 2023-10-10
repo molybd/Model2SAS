@@ -14,7 +14,7 @@ from torch import Tensor
 
 from . import calcfunc
 from .calcfunc import euler_rodrigues_rotate, convert_coord, abi2modarg, modarg2abi
-from .utils import timer, MathModelClassBase
+from .utils import log, MathModelClassBase
 
 
 class Model:
@@ -223,7 +223,7 @@ class Part(Model):
         self.sld_original = sld.clone()
 
 
-    @timer(level=1)
+    @log
     def gen_reciprocal_lattice(self, reciprocal_lattice_1d_size: int | None = None, need_centering: bool = True) -> Tensor:
         """Generate reciprocal lattice from real lattice.
         The actual real lattice begins with bound_min, but
@@ -278,8 +278,8 @@ class Part(Model):
         # shift center to (0, 0, 0)
         # time-consuming part
         if need_centering:
-            @timer(level=2)
-            def centering(*args): # only for timer use
+            @log
+            def centering(*args): # only for log use
                 return self._translate_on_reciprocal_lattice(*args)
             xmin, ymin, zmin = xmin+self.real_lattice_spacing/2, ymin+self.real_lattice_spacing/2, zmin+self.real_lattice_spacing/2
             F_half = centering(F_half, s1d, s1d, s1dz, xmin, ymin, zmin)
@@ -341,7 +341,7 @@ class Part(Model):
         self.sx, self.sy, self.sz_half = sx, sy, sz_half
         return F_new
 
-    @timer(level=0)
+    @log
     def translate(self, vx: float, vy: float, vz: float) -> None:
         """Translate model by vector.
         Change real space lattice directly;
@@ -379,7 +379,7 @@ class Part(Model):
             func_for_reciprocal = func_for_reciprocal, # 闭包函数
         ))
 
-    @timer(level=0)
+    @log
     def rotate(self, axis: tuple[float, float, float], angle: float) -> None:
         """Rotate model around an axis passing origin by angle.
         Change real space lattice directly;
@@ -430,7 +430,7 @@ class Part(Model):
         self.x, self.y, self.z = self.x_original.clone(), self.y_original.clone(), self.z_original.clone()
         self.geo_transform = []
 
-    @timer(level=1)
+    @log
     def get_F_value(self, reciprocal_coord: Tensor, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
         """Get F value (scattering amplitude) of certain coordinates
         in reciprocal space.
@@ -623,7 +623,7 @@ class Part(Model):
     #========================================================
     #   functions for convinient and intuitionistic usage
     #========================================================
-    @timer(level=0)
+    @log
     def sample(self, real_lattice_1d_size: int | None = None, spacing: float | None = None) -> None:
         """To build the part model in real space.
         generate lattice model of a part model.
@@ -635,7 +635,7 @@ class Part(Model):
         self.gen_real_lattice_meshgrid(real_lattice_1d_size=real_lattice_1d_size, spacing=spacing)
         self.gen_real_lattice_sld()
 
-    @timer(level=0)
+    @log
     def scatter(self, reciprocal_lattice_1d_size: int | None = None, need_centering: bool = True) -> None:
         """Simulate the scattering process to generate full reciprocal lattice.
 
@@ -644,7 +644,7 @@ class Part(Model):
         """
         self.gen_reciprocal_lattice(reciprocal_lattice_1d_size=reciprocal_lattice_1d_size, need_centering=need_centering)
 
-    @timer(level=0)
+    @log
     def measure(self, *qi: Tensor, orientation_average_offset: int = 100, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
         """Simulate measurement process. The full scatter pattern is generated
         in self.scatter() process, this method gives measured result of certain
@@ -712,7 +712,7 @@ class StlPart(Part):
         self.bound_min, self.bound_max = bound_min, bound_max
         return bound_min, bound_max
 
-    @timer(level=1)
+    @log
     def gen_real_lattice_sld(self) -> Tensor:
         """Generate SLD lattice of this stl part model.
         All same sld value inside stl part.
@@ -792,7 +792,7 @@ class MathPart(Part):
         self.bound_min, self.bound_max = bound_min, bound_max
         return bound_min, bound_max
 
-    @timer(level=1)
+    @log
     def gen_real_lattice_sld(self) -> Tensor:
         """Generate sld in real lattice, which is sld value on each
         lattice meshgrid point. From math description.
@@ -835,7 +835,7 @@ class Assembly(Part):
         for p in part:
             self.parts.append(p)
 
-    @timer(level=1)
+    @log
     def get_F_value(self, reciprocal_coord: Tensor, interpolation_method: Literal['trilinear', 'nearest'] = 'trilinear') -> Tensor:
         """Get F value (scattering amplitude) of certain coordinates
         in reciprocal space.

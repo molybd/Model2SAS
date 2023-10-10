@@ -4,34 +4,36 @@
 from typing import Literal
 
 import time
+import sys
 import functools
 
 import torch
 from torch import Tensor
+from loguru import logger
 
+LOG: bool = False
+LOG_FORMAT_STR: str = '<cyan>{time:YYYY-MM-DD HH:mm:ss.SSS}</cyan> | <level>{level: <8}</level> | <level>{message}</level>'
 
-def timer(level: int = 0):
-    def timer_decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            start_time = time.perf_counter()
-            result = func(*args, **kwargs)
-            time_cost = time.perf_counter() - start_time
-            if level ==0:
-                prefix = '✅ '
-            else:
-                prefix = '⏳' + ' ⬇'*level + ' '
-            # print('{} [{:>9}s] {}'.format(prefix, round(time_cost, 5), func.__name__))
-            print('[{} {:>2}.{:<5.0f} s] {}{}'.format(
-                '⏱',
-                int(time_cost),
-                round((time_cost-int(time_cost))*1e5, 5),
-                prefix,
-                func.__name__
-                ))
-            return result
-        return wrapper
-    return timer_decorator
+logger.remove(0)
+logger.add(sys.stderr, format=LOG_FORMAT_STR)
+
+func_tier: int = 0
+
+def log(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        global func_tier
+        if LOG:
+            logger.info(f'[{" ":>11}] {"|  "*func_tier}○ {func.__name__}')
+            func_tier += 1
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        time_cost = time.perf_counter() - start_time
+        if LOG:
+            func_tier -= 1
+            logger.success(f'[{time_cost:>9.6f} s] {"|  "*func_tier}● {func.__name__}')
+        return result
+    return wrapper
 
 
 class MathModelClassBase:

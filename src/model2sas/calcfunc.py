@@ -8,7 +8,7 @@ from typing import Literal
 import torch
 from torch import Tensor
 
-from .utils import timer
+from .utils import log
 
 # try:
 #     import taichi as ti
@@ -121,7 +121,7 @@ def modarg2abi(mod: Tensor, arg: Tensor) -> Tensor:
 
 # * rewritten with taichi for better speed
 # * same api remains
-# @timer(level=2)
+@log
 def _torch_moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor) -> Tensor:
     """Calculate all the points intersect with 1 triangle
     using Möller-Trumbore intersection algorithm
@@ -173,7 +173,7 @@ def _torch_moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangl
 #         count = 1
 #     return count
 
-# @timer(level=2)
+# @log
 # def _taichi_moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor) -> Tensor:
 #     """Calculate all the points intersect with 1 triangle
 #     using Möller-Trumbore intersection algorithm
@@ -213,7 +213,7 @@ def _torch_moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangl
 #     intersect_count = count_vec.to_torch(device=device)
 #     return intersect_count
 
-@timer(level=2)
+@log
 def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Tensor, backend: Literal['torch', 'taichi'] = 'torch') -> Tensor:
     """Calculate all the points intersect with 1 triangle
     using Möller-Trumbore intersection algorithm
@@ -239,7 +239,7 @@ def moller_trumbore_intersect_count(origins: Tensor, ray: Tensor, triangles: Ten
         raise ValueError('Unsupported backend: {}'.format(backend))
     return intersect_count
 
-@timer(level=2)
+@log
 def rfft3d(real_3d_lattice: Tensor, reciprocal_edge_size: int) -> Tensor:
     """Compute the 3 dimensional discrete Fourier Transform for real input.
 
@@ -255,7 +255,7 @@ def rfft3d(real_3d_lattice: Tensor, reciprocal_edge_size: int) -> Tensor:
     F_half = torch.fft.fftshift(F_half, dim=(0,1))
     return F_half
 
-@timer(level=2)
+@log
 def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Tensor]:
     """Generate sampling points for orientation average
     using fibonacci grid
@@ -287,7 +287,7 @@ def sampling_points(s: Tensor, n_on_sphere: Tensor) -> tuple[Tensor, Tensor, Ten
     z = R*z
     return x.to(device), y.to(device), z.to(device)
 
-@timer(level=2)
+@log
 def nearest_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tensor, c:Tensor, d:float | Tensor) -> Tensor:
     """Conduct nearest interpolate on equally spaced meshgrid.
     当网格值c是复数时等效于对实部和虚部分别进行插值
@@ -310,7 +310,7 @@ def nearest_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tensor
     c_interp = c[ix, iy, iz]
     return c_interp
 
-@timer(level=2)
+@log
 def trilinear_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tensor, c:Tensor, d:float | Tensor) -> Tensor:
     """Conduct trilinear interpolate on equally spaced meshgrid.
     当网格值c是复数时等效于对实部和虚部分别进行插值
@@ -345,7 +345,7 @@ def trilinear_interp(x:Tensor, y:Tensor, z:Tensor, px:Tensor, py:Tensor, pz:Tens
     c_interp += c[ix+1, iy+1, iz+1]*xd*yd*zd
     return c_interp
 
-@timer(level=2)
+@log
 def euler_rodrigues_rotate(coord: Tensor, axis_local: tuple[float, float, float], angle_local: float) -> Tensor:
     """Central rotation of coordinates by Euler-Rodrigues formula.
     Refer to https://en.wikipedia.org/wiki/Euler%E2%80%93Rodrigues_formula

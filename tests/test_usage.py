@@ -1,7 +1,10 @@
 import torch
 
+import model2sas
 from model2sas import *
 
+model2sas.utils.LOG = True
+# model2sas.utils.logger.add('./local/log.txt', format=model2sas.utils.LOG_FORMAT_STR)
 
 def test_quick():
     part1 = MathPart(filename=r'resources/models/cylinder.py', device='cpu')
@@ -51,7 +54,7 @@ def test_normal_flow():
     qcoord2 = det2.get_reciprocal_coord(wavelength)
     I2d1 = assembly.get_sas(*qcoord1)
     I2d2 = assembly.get_sas(*qcoord2)
-    plot_2d_sas(I2d1, savename='temp/test_2dhtml.html', show=True, title='2d plot')
+    plot_2d_sas(I2d1, savename='local/test_2dplot.png', show=True, title='2d plot')
     plot_surface((*qcoord1, I2d1), (*qcoord2, I2d2))
 
 
@@ -138,4 +141,5 @@ def test_detector_simulation():
     )
 
 if __name__ == '__main__':
-    test_quick()
+    # test_quick()
+    test_normal_flow()
