@@ -3,6 +3,18 @@ import torch
 from model2sas import *
 
 
+def test_quick():
+    part1 = MathPart(filename=r'resources/models/cylinder.py', device='cpu')
+    part1.set_params(R=10, H=20, sld_value=1)
+    part1.sample()
+    part1.rotate((1,0,0), torch.pi/5.4)
+    part1.translate(120, 34, -103)
+    part1.scatter()
+    # plot_model(part1)
+    q = torch.linspace(0.01, 2, steps=200)
+    I = part1.measure(q)
+    # plot_1d_sas(q, I, name='cylinder', mode='lines', title='test')
+
 def test_normal_flow():
     part1 = MathPart(filename=r'resources/exp_models/cylinder_z.py', device='cpu')
     part1.set_params(R=10, H=20, sld_value=1)
@@ -126,4 +138,4 @@ def test_detector_simulation():
     )
 
 if __name__ == '__main__':
-    test_normal_flow()
+    test_quick()
