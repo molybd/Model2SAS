@@ -12,6 +12,7 @@ dependencies = [
     "nbformat>=5.9.2",
     "kaleido==0.2.1",
     "PySide6>=6.5.3",
+    "loguru>=0.7.2",
 ]
 requires-python = ">=3.10,<3.12"
 readme = "README.md"
