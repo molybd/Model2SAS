@@ -1,6 +1,6 @@
 [project]
 name = "model2sas"
-version = "0.8.0"
+version = "2.0.0"
 description = "Small angle scattering simulation from 3D models"
 authors = [
     {name = "molybd", email = "limu.robert@outlook.com"},
