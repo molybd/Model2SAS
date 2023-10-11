@@ -173,28 +173,8 @@
             <string>Transform</string>
            </property>
            <layout class="QGridLayout" name="gridLayout_4">
-            <item row="7" column="3">
-             <widget class="QPushButton" name="pushButton_delete_selected_transform">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="text">
-               <string>Delete</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="QLabel" name="label_transform_vector">
-              <property name="enabled">
-               <bool>true</bool>
-              </property>
-              <property name="text">
-               <string>Vector/Axis</string>
-              </property>
-             </widget>
-            </item>
-            <item row="6" column="0" colspan="4">
-             <widget class="QListView" name="listView_transforms">
+            <item row="3" column="0" colspan="4">
+             <widget class="QTableView" name="tableView_transforms">
               <property name="enabled">
                <bool>true</bool>
               </property>
@@ -206,27 +186,17 @@
               </property>
              </widget>
             </item>
-            <item row="2" column="0">
-             <widget class="QLabel" name="label_transform_angle">
+            <item row="0" column="1">
+             <widget class="QPushButton" name="pushButton_delete_selected_transform">
               <property name="enabled">
-               <bool>true</bool>
+               <bool>false</bool>
               </property>
               <property name="text">
-               <string>Angle</string>
+               <string>Delete</string>
               </property>
              </widget>
             </item>
-            <item row="2" column="1">
-             <widget class="QLineEdit" name="lineEdit_transform_angle">
-              <property name="enabled">
-               <bool>true</bool>
-              </property>
-              <property name="text">
-               <string>90</string>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="3">
+            <item row="0" column="0">
              <widget class="QPushButton" name="pushButton_add_transform">
               <property name="enabled">
                <bool>false</bool>
@@ -236,37 +206,13 @@
               </property>
              </widget>
             </item>
-            <item row="0" column="0" colspan="4">
-             <widget class="QComboBox" name="comboBox_transform_type">
+            <item row="0" column="2" colspan="2">
+             <widget class="QPushButton" name="pushButton_apply_transform">
               <property name="enabled">
-               <bool>true</bool>
-              </property>
-              <item>
-               <property name="text">
-                <string>Translate</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>Rotate</string>
-               </property>
-              </item>
-             </widget>
-            </item>
-            <item row="1" column="1" colspan="3">
-             <widget class="QLineEdit" name="lineEdit_transform_vector">
-              <property name="enabled">
-               <bool>true</bool>
+               <bool>false</bool>
               </property>
               <property name="text">
-               <string>0,0,1</string>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="2">
-             <widget class="QLabel" name="label_degree">
-              <property name="text">
-               <string>deg</string>
+               <string>Apply Transform</string>
               </property>
              </widget>
             </item>
@@ -650,8 +596,7 @@
  </widget>
  <tabstops>
   <tabstop>pushButton_part_from_files</tabstop>
-  <tabstop>comboBox_transform_type</tabstop>
-  <tabstop>listView_transforms</tabstop>
+  <tabstop>tableView_transforms</tabstop>
   <tabstop>lineEdit_real_lattice_1d_size</tabstop>
   <tabstop>pushButton_plot_model</tabstop>
   <tabstop>tableView_model_params</tabstop>
@@ -827,8 +772,8 @@
    <slot>add_transform()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>547</x>
-     <y>345</y>
+     <x>358</x>
+     <y>381</y>
     </hint>
     <hint type="destinationlabel">
      <x>601</x>
@@ -843,8 +788,8 @@
    <slot>delete_selected_transform()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>552</x>
-     <y>447</y>
+     <x>453</x>
+     <y>381</y>
     </hint>
     <hint type="destinationlabel">
      <x>601</x>
@@ -868,6 +813,22 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>pushButton_apply_transform</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>apply_transform()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>542</x>
+     <y>372</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>606</x>
+     <y>385</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
   <slot>import_parts()</slot>
@@ -883,6 +844,7 @@
   <slot>add_transform()</slot>
   <slot>delete_selected_transform()</slot>
   <slot>plot_model()</slot>
+  <slot>apply_transform()</slot>
  </slots>
  <buttongroups>
   <buttongroup name="buttonGroup"/>

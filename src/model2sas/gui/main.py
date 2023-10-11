@@ -2,13 +2,13 @@ import sys
 import os
 import math
 import tempfile, time
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 import torch
 from PySide6 import QtCore
-from PySide6.QtCore import QThread, Signal, QObject, QModelIndex
+from PySide6.QtCore import QThread, Signal, Slot, QObject, QModelIndex, SIGNAL, SLOT
 from PySide6.QtGui import QStandardItemModel, QStandardItem
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow, QHeaderView
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow, QHeaderView, QStyledItemDelegate, QComboBox
 from art import text2art
 
 from .MainWindow_ui import Ui_MainWindow
@@ -67,6 +67,34 @@ class PlotThread(GeneralThread):
             html_filename = os.path.join(tempfile.gettempdir(), 'model2sas_temp_plot.html')
         self.func(*self.args, savename=html_filename, **self.kwargs)
         self.thread_end.emit(html_filename)
+        
+
+class TransformTypeComboDelegate(QStyledItemDelegate):
+    """refer to:
+    https://stackoverflow.com/questions/17615997/pyqt-how-to-set-qcombobox-in-a-table-view-using-qitemdelegate
+    """
+    def __init__(self, parent: QObject | None = ...) -> None:
+        super().__init__(parent)
+        
+    def createEditor(self, parent, option, index) -> QWidget:
+        combo  = QComboBox(parent)
+        combo.addItems(['Translate', 'Rotate'])
+        self.connect(combo, SIGNAL('currentIndexChanged(int)'), self, SLOT('currentIndexChanged()'))
+        return combo
+    
+    def setEditorData(self, editor: QComboBox, index: QModelIndex) -> None:
+        editor.blockSignals(True)
+        # index.data() is actually index string, like "0" and "1"
+        # not actually displayed values
+        editor.setCurrentIndex(int(index.data()))
+        editor.blockSignals(False)
+        
+    def setModelData(self, editor: QComboBox, model: QStandardItemModel, index: QModelIndex) -> None:
+        model.setData(index, editor.currentIndex())
+    
+    @Slot()
+    def currentIndexChanged(self):
+        self.commitData.emit(self.sender())
 
 
 class MainWindow(QMainWindow):
@@ -96,15 +124,20 @@ class MainWindow(QMainWindow):
         
         # set model-view
         self.qitemmodel_parts = QStandardItemModel()
-        self.qitemmodel_assmblies = QStandardItemModel()
-        self.qitemmodel_params = QStandardItemModel()
-        self.qitemmodel_transforms = QStandardItemModel()
         self.ui.treeView_parts.setModel(self.qitemmodel_parts)
-        self.ui.treeView_assemblies.setModel(self.qitemmodel_assmblies)
-        self.ui.tableView_model_params.setModel(self.qitemmodel_params)
-        self.ui.listView_transforms.setModel(self.qitemmodel_transforms)
-        self.qitemmodel_params.itemChanged.connect(self.read_params_from_qitemmodel)
         
+        self.qitemmodel_assmblies = QStandardItemModel()
+        self.ui.treeView_assemblies.setModel(self.qitemmodel_assmblies)
+        
+        self.qitemmodel_params = QStandardItemModel()
+        self.qitemmodel_params.itemChanged.connect(self.read_params_from_qitemmodel)
+        self.ui.tableView_model_params.setModel(self.qitemmodel_params)
+        
+        self.qitemmodel_transforms = QStandardItemModel()
+        # self.qitemmodel_transforms.itemChanged.connect(self.read_transforms_from_qitemmodel)
+        self.ui.tableView_transforms.setModel(self.qitemmodel_transforms)
+        self.ui.tableView_transforms.setItemDelegateForColumn(0, TransformTypeComboDelegate(self))
+                
         # other variables
         self.active_model: StlPartModel | MathPartModel | AssemblyModel | PartModel
         self.thread: QThread
@@ -118,7 +151,6 @@ class MainWindow(QMainWindow):
         
         # initial actions
         self.project = Project()
-        # self.project.new_assembly() #* only prelimilary
         
         # welcome message
         welcome_message = text2art('Model2SAS')
@@ -272,6 +304,7 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_sample.setText('Sample')
         self.ui.pushButton_add_transform.setDisabled(False)
         self.ui.pushButton_delete_selected_transform.setDisabled(False)
+        self.ui.pushButton_apply_transform.setDisabled(False)
         self.ui.pushButton_plot_model.setDisabled(False)
         self.ui.pushButton_scatter.setDisabled(False)
         self.ui.pushButton_scatter.setText('Virtual Scatter')
@@ -287,6 +320,7 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_sample.setText('Sample All Sub-Parts')
         self.ui.pushButton_add_transform.setDisabled(True)
         self.ui.pushButton_delete_selected_transform.setDisabled(True)
+        self.ui.pushButton_apply_transform.setDisabled(True)
         self.ui.pushButton_plot_model.setDisabled(False)
         self.ui.pushButton_scatter.setDisabled(False)
         self.ui.pushButton_scatter.setText('Virtual Scatter by All Sub-Parts')
@@ -337,25 +371,51 @@ class MainWindow(QMainWindow):
             
     def refresh_qitemmodel_transforms(self) -> None:
         self.qitemmodel_transforms.clear()
-        for transform in self.active_model.model.geo_transform:
-            self.qitemmodel_transforms.appendRow(
-                QStandardItem(f"{transform['type']} with param: {transform['param']}")
+        self.qitemmodel_transforms.setHorizontalHeaderLabels(['Type', 'Vector/Axis', 'Angle(deg)'])
+        for i, transform in enumerate(self.active_model.model.geo_transform):
+            if transform['type'] == 'rotate':
+                combo_index = '1'
+                vec, angle = transform['param']
+                angle = math.degrees(angle)
+            else:
+                combo_index = '0'
+                vec, angle = transform['param'], 'N.A.'
+            self.qitemmodel_transforms.setItem(
+                i, 0, QStandardItem(combo_index)
+            )
+            self.qitemmodel_transforms.setItem(
+                i, 1, QStandardItem(','.join(map(str, vec)))
+            )
+            self.qitemmodel_transforms.setItem(
+                i, 2, QStandardItem(str(angle))
+            )
+            self.ui.tableView_transforms.openPersistentEditor(
+                self.qitemmodel_transforms.index(i, 0)
             )
             
     def add_transform(self) -> None:
-        transform_type = self.ui.comboBox_transform_type.currentText().lower()
-        vec = [float(i) for i in self.ui.lineEdit_transform_vector.text().split(',')]
-        if transform_type == 'translate':
-            self.active_model.model.translate(*vec[:3])
-        elif transform_type == 'rotate':
-            angle = math.radians(float(self.ui.lineEdit_transform_angle.text()))
-            self.active_model.model.rotate(tuple(vec[:3]), angle)
-        self.refresh_qitemmodel_transforms()
+        row_count = self.qitemmodel_transforms.rowCount()
+        self.qitemmodel_transforms.setItem(row_count, 0, QStandardItem('0'))
+        self.ui.tableView_transforms.openPersistentEditor(
+            self.qitemmodel_transforms.index(row_count, 0)
+        )
         
     def delete_selected_transform(self) -> None:
-        selected_index = self.ui.listView_transforms.selectedIndexes()[0].row()
-        del self.active_model.model.geo_transform[selected_index]
-        self.refresh_qitemmodel_transforms()        
+        selected_index = self.ui.tableView_transforms.selectedIndexes()[0].row()
+        self.qitemmodel_transforms.removeRow(selected_index)   
+        
+    def apply_transform(self) -> None:
+        self.active_model.model.geo_transform.clear() # clear former records first
+        for i in range(self.qitemmodel_transforms.rowCount()):
+            combo_index = int(self.qitemmodel_transforms.index(i, 0).data())
+            vec = tuple(map(float, self.qitemmodel_transforms.index(i, 1).data().split(',')))
+            if combo_index == 1: # rotate
+                angle = float(self.qitemmodel_transforms.index(i, 2).data())
+                angle = math.radians(angle)
+                self.active_model.model.rotate(vec, angle)
+            else: # translate
+                self.active_model.model.translate(*vec)
+        self.refresh_qitemmodel_transforms()
             
     def sample(self) -> None:
         self.thread = GeneralThread(
