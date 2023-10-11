@@ -9,6 +9,7 @@ from PySide6 import QtCore
 from PySide6.QtCore import QThread, Signal, QObject, QModelIndex
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow, QHeaderView
+from art import text2art
 
 from .MainWindow_ui import Ui_MainWindow
 from .SubWindow_buildmath_ui import Ui_subWindow_build_math_model
@@ -19,9 +20,11 @@ from .wrapper import Project, StlPartModel, MathPartModel, AssemblyModel, PartMo
 from ..model import Part, StlPart, MathPart, Assembly
 from .. import plot
 
+from ..utils import logger, set_log_state, LOG_FORMAT_STR
+
 '''
 TODO
-
+1. BUG 一次导入多个模型会显示不全（没有复现）
 '''
 
 
@@ -76,11 +79,20 @@ class MainWindow(QMainWindow):
         self.show()
         
         # redirect print output and error
-        self.system_stdout, self.system_stderr = sys.stdout, sys.stderr
-        sys.stdout = RedirectedPrintStream()
-        sys.stdout.write_text.connect(self.write_log)
-        sys.stderr = RedirectedPrintStream()
-        sys.stderr.write_text.connect(self.write_log)
+        # self.system_stdout, self.system_stderr = sys.stdout, sys.stderr
+        # sys.stdout = RedirectedPrintStream()
+        # sys.stdout.write_text.connect(self.write_log)
+        # sys.stderr = RedirectedPrintStream()
+        # sys.stderr.write_text.connect(self.write_log)
+        
+        # logger.remove(0)
+        logger.add(self.write_log, format=LOG_FORMAT_STR)
+        set_log_state(True)
+        
+        # self.gui_log('success', 'test')
+        # self.gui_log('info', 'test')
+        # self.gui_log('warning', 'test')
+        # self.gui_log('error', 'test')
         
         # set model-view
         self.qitemmodel_parts = QStandardItemModel()
@@ -108,11 +120,40 @@ class MainWindow(QMainWindow):
         self.project = Project()
         # self.project.new_assembly() #* only prelimilary
         
+        # welcome message
+        welcome_message = text2art('Model2SAS')
+        welcome_message += text2art('Small angle scattering simulation from 3d models', font='fancy1', decoration='barcode1') + '\n\n'
+        welcome_message += '🏠️ Homepage: https://github.com/molybd/Model2SAS\n'
+        welcome_message += '📄 Please site: Li, Mu and Yin, Panchao, Model2SAS: software for small-angle scattering data calculation from custom shapes., J. Appl. Cryst., 2022, 55, 663-668. https://doi.org/10.1107/S1600576722003600\n'
+        self.ui.textBrowser_log.append(welcome_message)
+        print(welcome_message)
+        
+        
         
     def write_log(self, text: str):
-        if text != '\n': # print() func will print a \n afterwards
-            self.ui.textBrowser_log.append(text)
-        self.system_stdout.write(text)
+        self.ui.textBrowser_log.append(text.strip()) # use .strip(), or will have blank line
+        
+        # scroll textBrowser_log to bottom
+        cursor = self.ui.textBrowser_log.textCursor()  # 设置游标
+        pos = len(self.ui.textBrowser_log.toPlainText())  # 获取文本尾部的位置
+        cursor.setPosition(pos)  # 游标位置设置为尾部
+        self.ui.textBrowser_log.setTextCursor(cursor)  # 滚动到游标位置
+        
+        
+    def gui_log(self, type: Literal['success', 'info', 'warning', 'error'], text: str):
+        if type == 'info':
+            func = logger.info
+            symbol = 'ℹ️'
+        elif type == 'warning':
+            func = logger.warning
+            symbol = '⚠️'
+        elif type == 'error':
+            func = logger.error
+            symbol = '❌️'
+        else:
+            func = logger.success
+            symbol = '✅️'
+        func(f'[{" ":>11}] {symbol} {text}')
     
     ###### * Link setting values to lineEdit contents * ######
     def change_variable_real_lattice_1d_size(self, value: str):
@@ -124,7 +165,6 @@ class MainWindow(QMainWindow):
     def change_variable_q1d_num(self, value: str):
         self.active_model.q1d_num = int(float(value))
     def change_variable_q1d_log_spaced(self, state: int):
-        print(state)
         self.active_model.q1d_log_spaced = bool(state)
     
     ##########################################################*
@@ -138,9 +178,9 @@ class MainWindow(QMainWindow):
         #     r'D:\Work@IASF\@my_programs\Model2SAS\resources\exp_models\sphere.py',
         # ]
         #*
-        print(filename_list)
         for filename in filename_list:
             self.project.import_part(filename)
+            self.gui_log('info', f'imported {filename}')
             
         #* only prelimilary
         # for part in self.project.parts.values():
@@ -206,14 +246,13 @@ class MainWindow(QMainWindow):
         
     def part_model_selected(self) -> None:
         selected_key = str(self.ui.treeView_parts.selectedIndexes()[0].data())
-        # print(selected_key)
         self.active_model = self.project.parts[selected_key]
+        self.gui_log('info', f'select 【{selected_key}】{self.active_model.name}')
         self._unique_actions_for_part_model_selected()
         self._actions_for_model_selected()
     
     def assembly_model_selected(self) -> None:
         selected_key = str(self.ui.treeView_assemblies.selectedIndexes()[0].data())
-        print(selected_key)
         if selected_key in self.project.parts.keys():
             # part model selected
             self.active_model = self.project.parts[selected_key]
@@ -222,6 +261,7 @@ class MainWindow(QMainWindow):
             # assembly model selected
             self.active_model = self.project.assemblies[selected_key]
             self._unique_actions_for_assembly_model_selected()
+        self.gui_log('info', f'select 【{selected_key}】{self.active_model.name}')
         self._actions_for_model_selected()
             
     
@@ -282,18 +322,18 @@ class MainWindow(QMainWindow):
                 qitem_param_name,
                 QStandardItem(str(param_value))
             ])
-            
+    
     def read_params_from_qitemmodel(self):
         if isinstance(self.active_model, StlPartModel):
             self.active_model.sld_value = \
                 float(self.qitemmodel_params.index(0, 1).data())
-            print(self.active_model.sld_value)
+            self.gui_log('success', 'change parameter')
         elif isinstance(self.active_model, MathPartModel):
             for i in range(self.qitemmodel_params.rowCount()):
                 param_name = self.qitemmodel_params.index(i, 0).data()
                 param_value = float(self.qitemmodel_params.index(i, 1).data())
                 self.active_model.set_params(**{param_name: param_value})
-            print(self.active_model.get_params())
+            self.gui_log('success', 'change parameter')
             
     def refresh_qitemmodel_transforms(self) -> None:
         self.qitemmodel_transforms.clear()
@@ -325,7 +365,7 @@ class MainWindow(QMainWindow):
         self.thread.start()
                 
     def sample_thread_end(self) -> None:
-        print('Sampling Done')
+        self.gui_log('success', 'Sample done')
         
     def plot_model(self) -> None:
         if self.ui.radioButton_voxel_plot.isChecked():
@@ -345,6 +385,7 @@ class MainWindow(QMainWindow):
         )
         self.thread.thread_end.connect(self.display_html)
         self.thread.start()
+        self.gui_log('info', 'Plotting...')
         
     def scatter(self) -> None:
         self.thread = GeneralThread(
@@ -354,7 +395,7 @@ class MainWindow(QMainWindow):
         self.thread.start()
                 
     def scatter_thread_end(self) -> None:
-        print('Scattering Done')
+        self.gui_log('success', 'Scatter done')
         
     def measure(self) -> None:
         self.thread = MeasureThread(
@@ -364,7 +405,7 @@ class MainWindow(QMainWindow):
         self.thread.start()
         
     def measure_thread_end(self, result: tuple) -> None:
-        print('Measuring Done')
+        self.gui_log('success', 'Measure done')
         q, I = result
         self.thread = PlotThread(
             plot.plot_1d_sas,
@@ -388,6 +429,7 @@ class MainWindow(QMainWindow):
         subwindow_html_view.ui.webEngineView.setUrl(html_filename.replace('\\', '/'))
         self.ui.mdiArea.addSubWindow(subwindow_html_view)
         subwindow_html_view.show()
+        self.gui_log('success', 'Plot done')
     
 
 
@@ -399,7 +441,6 @@ class SubWindowHtmlView(QWidget):
         super().__init__()
         self.ui = Ui_subWindow_html_view()
         self.ui.setupUi(self)
-        
         
 def run():
     app = QApplication(sys.argv)

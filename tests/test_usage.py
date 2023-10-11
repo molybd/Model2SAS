@@ -3,8 +3,8 @@ import torch
 import model2sas
 from model2sas import *
 
-model2sas.utils.LOG = True
-# model2sas.utils.logger.add('./local/log.txt', format=model2sas.utils.LOG_FORMAT_STR)
+model2sas.utils.set_log_state(True)
+model2sas.utils.add_logger(sink='./local/log.txt', format=model2sas.utils.LOG_FORMAT_STR)
 
 def test_quick():
     part1 = MathPart(filename=r'resources/models/cylinder.py', device='cpu')
@@ -13,10 +13,10 @@ def test_quick():
     part1.rotate((1,0,0), torch.pi/5.4)
     part1.translate(120, 34, -103)
     part1.scatter()
-    # plot_model(part1)
+    plot_model(part1)
     q = torch.linspace(0.01, 2, steps=200)
     I = part1.measure(q)
-    # plot_1d_sas(q, I, name='cylinder', mode='lines', title='test')
+    plot_1d_sas(q, I, name='cylinder', mode='lines', title='test')
 
 def test_normal_flow():
     part1 = MathPart(filename=r'resources/exp_models/cylinder_z.py', device='cpu')
@@ -141,5 +141,5 @@ def test_detector_simulation():
     )
 
 if __name__ == '__main__':
-    # test_quick()
-    test_normal_flow()
+    test_quick()
+    # test_normal_flow()

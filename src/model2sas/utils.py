@@ -14,10 +14,17 @@ from loguru import logger
 LOG: bool = False
 LOG_FORMAT_STR: str = '<cyan>{time:YYYY-MM-DD HH:mm:ss.SSS}</cyan> | <level>{level: <8}</level> | <level>{message}</level>'
 
+func_tier: int = 0
+
+def set_log_state(state: bool) -> None:
+    global LOG
+    LOG = state
+    
+def add_logger(sink=sys.stderr, format=LOG_FORMAT_STR, **kwargs):
+    logger.add(sink, format=format, **kwargs)
+    
 logger.remove(0)
 logger.add(sys.stderr, format=LOG_FORMAT_STR)
-
-func_tier: int = 0
 
 def log(func):
     @functools.wraps(func)
