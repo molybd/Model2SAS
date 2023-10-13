@@ -20,7 +20,7 @@ from .wrapper import Project, StlPartModel, MathPartModel, AssemblyModel, PartMo
 from ..model import Part, StlPart, MathPart, Assembly
 from .. import plot
 
-from ..utils import logger, set_log_state, LOG_FORMAT_STR
+from ..utils import logger, set_log_state, LOG_FORMAT_STR, WELCOME_MESSAGE
 
 '''
 TODO
@@ -150,16 +150,10 @@ class MainWindow(QMainWindow):
         self.ui.checkBox_q1d_log_spaced.clicked.connect(self.change_variable_q1d_log_spaced)        
         
         # initial actions
-        self.project = Project()
+        self.project = Project()        
         
-        # welcome message
-        welcome_message = text2art('Model2SAS')
-        welcome_message += text2art('Small angle scattering simulation from 3d models', font='fancy1', decoration='barcode1') + '\n\n'
-        welcome_message += '🏠️ Github: https://github.com/molybd/Model2SAS\n'
-        welcome_message += '📄 Please cite: Li, Mu and Yin, Panchao, Model2SAS: software for small-angle scattering data calculation from custom shapes., J. Appl. Cryst., 2022, 55, 663-668. https://doi.org/10.1107/S1600576722003600\n'
-        self.ui.textBrowser_log.append(welcome_message)
-        print(welcome_message)
-        
+        self.ui.textBrowser_log.append(WELCOME_MESSAGE)
+        print(WELCOME_MESSAGE)
         
         
     def write_log(self, text: str):

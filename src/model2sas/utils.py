@@ -10,6 +10,15 @@ import functools
 import torch
 from torch import Tensor
 from loguru import logger
+from art import text2art
+
+
+WELCOME_MESSAGE = f'''{text2art('Model2SAS')}
+===== Small-angle scattering simulation from 3d models =====
+
+🏠️ Github: https://github.com/molybd/Model2SAS
+📄 Please cite: Li, Mu and Yin, Panchao, Model2SAS: software for small-angle scattering data calculation from custom shapes., J. Appl. Cryst., 2022, 55, 663-668. https://doi.org/10.1107/S1600576722003600
+'''
 
 LOG: bool = False
 LOG_FORMAT_STR: str = '<cyan>{time:YYYY-MM-DD HH:mm:ss.SSS}</cyan> | <level>{level: <8}</level> | <level>{message}</level>'
