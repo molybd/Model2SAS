@@ -139,7 +139,25 @@ def test_detector_simulation():
     plot_real_detector(
         (det1.x, det1.y, det1.z, I1), (det2.x, det2.y, det2.z, I2)
     )
+    
+def test_plot_I3d():
+    part1 = MathPart(filename=r'resources/models/torus.py', device='cpu')
+    # part1.set_params(R=10, H=20, sld_value=1)
+    part1.sample()
+    plot_model(part1, type='volume')
+    part1.scatter()
+    q1d = torch.linspace(-0.1, 0.1, steps=50)
+    # qx, qy, qz = torch.meshgrid(q1d, q1d, q1d, indexing='ij')
+    # I3d = part1.measure(qx, qy, qz)
+    # model2sas.plot.plot_3d_sas(qx, qy, qz, I3d, logI=False, show=True, savename='./local/test_3d_sas_plot.html')
+    det = Detector((981, 1043), 172e-6)
+    det.set_sdd(3)
+    qx, qy, qz = det.get_reciprocal_coord(1.54)
+    I2d = part1.measure(qx, qy, qz)
+    plot_2d_sas(I2d)
+
 
 if __name__ == '__main__':
-    test_quick()
+    # test_quick()
     # test_normal_flow()
+    test_plot_I3d()

@@ -198,6 +198,56 @@ def plot_2d_sas(
 
 
 @plot_utils
+def plot_3d_sas(
+    qx: Tensor,
+    qy: Tensor,
+    qz: Tensor,
+    I3d: Tensor,
+    logI: bool = True,
+    title: str | None = None,
+    colorscale: str | None = None,
+    show: bool = True,
+    savename: str | None = None,
+    plotly_template: str | dict = 'plotly',
+    ) -> go.Figure:
+    """_summary_
+
+    Args:
+        qx (Tensor): _description_
+        qy (Tensor): _description_
+        qz (Tensor): _description_
+        I3d (Tensor): _description_
+        logI (bool, optional): _description_. Defaults to True.
+        title (str | None, optional): _description_. Defaults to None.
+        colorscale (str | None, optional): _description_. Defaults to None.
+        show (bool, optional): _description_. Defaults to True.
+        savename (str | None, optional): _description_. Defaults to None.
+        plotly_template (str | dict, optional): _description_. Defaults to 'plotly'.
+
+    Returns:
+        go.Figure: _description_
+    """    
+    fig = go.Figure()
+    if logI:
+        data = torch.log10(I3d)
+        data = torch.nan_to_num(data, nan=0., neginf=0.) # incase 0 in data, cause log(0) output
+    else:
+        data = I3d
+    fig.add_trace(go.Volume(
+        x=qx.flatten(),
+        y=qy.flatten(),
+        z=qz.flatten(),
+        value=data.flatten(),
+        opacity=0.1,
+        surface_count=21,
+        coloraxis='coloraxis'
+    ))
+    fig.update_layout(scene_aspectmode='data') # make equal aspect
+    fig.update_layout(coloraxis={'colorscale': colorscale})
+    return fig
+
+
+@plot_utils
 def plot_model(
     *model: Part | Assembly,
     type: Literal['volume', 'voxel'] | None = None,

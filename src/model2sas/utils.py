@@ -13,7 +13,7 @@ from loguru import logger
 from art import text2art
 
 
-WELCOME_MESSAGE = f'''{text2art('Model2SAS')}
+WELCOME_MESSAGE = str(text2art("Model2SAS")).rstrip('\n') + '''
 ===== Small-angle scattering simulation from 3d models =====
 
 🏠️ Github: https://github.com/molybd/Model2SAS

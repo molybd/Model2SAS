@@ -8,6 +8,7 @@ import torch
 from torch import Tensor
 
 from ..model import Part, StlPart, MathPart, Assembly
+from ..utils import Detector
 
 
 class Model:
@@ -25,31 +26,59 @@ class Model:
             self.type = 'mathpart'
         else:
             self.type = 'generalpart'
-        self.q1d_min: float = 0.01
+        
+        self.model = model
+        
+        #! take care of the units!
+        self.real_lattice_1d_size: int = 50
+        self.q1d_min: float = 0.01  # reverse angstrom
         self.q1d_max: float = 1.0
         self.q1d_num: int = 200
         self.q1d_log_spaced: bool = False
-        self.real_lattice_1d_size: int = 50
+        self.det_res_h: int = 981
+        self.det_res_v: int = 1043
+        self.det_pixel_size: float = 172  # micrometer
+        self.det_wavelength: float = 1.54  # angstrom
+        self.det_sdd: float = 2  # meter
+        self.det_show_in_q_space: bool = False
+        self.log_Idet: bool = True
+        self.q3d_max: float = 0.5
+        self.log_I3d: bool = True
+        
         
     def _gen_key(self) -> str:
         return hashlib.sha1(
             str(time.time()).encode('utf-8')
             ).hexdigest()[:4]
-        
-    def gen_q1d(self) -> Tensor:
-        if self.q1d_log_spaced:
-            q1d = torch.logspace(
-                math.log10(self.q1d_min),
-                math.log10(self.q1d_max),
-                self.q1d_num
-            )
-        else:
-            q1d = torch.linspace(
-                self.q1d_min,
-                self.q1d_max,
-                self.q1d_num
-            )
-        return q1d
+    
+    def gen_q(self, type: Literal['1d', 'det', '3d']) -> Tensor | tuple[Tensor, Tensor, Tensor]:
+        match type:
+            case 'det':
+                det = Detector((self.det_res_h, self.det_res_v), self.det_pixel_size*1e-6)
+                det.set_sdd(self.det_sdd)
+                qx, qy, qz = det.get_reciprocal_coord(self.det_wavelength)
+                return qx, qy, qz
+            case '3d':
+                q1d = torch.linspace(-self.q3d_max, self.q3d_max, steps=50)
+                qx, qy, qz = torch.meshgrid(q1d, q1d, q1d, indexing='ij')
+                return qx, qy, qz
+            case _:
+                if self.q1d_log_spaced:
+                    q1d = torch.logspace(
+                        math.log10(self.q1d_min),
+                        math.log10(self.q1d_max),
+                        self.q1d_num
+                    )
+                else:
+                    q1d = torch.linspace(
+                        self.q1d_min,
+                        self.q1d_max,
+                        self.q1d_num
+                    )
+                return q1d
+            
+    def measure(self, *qi: Tensor, **kwargs) -> Tensor:
+        return self.model.measure(*qi, **kwargs)
         
 
 class PartModel(Model):
@@ -57,7 +86,6 @@ class PartModel(Model):
     """    
     def __init__(self, model: StlPart | MathPart | Part) -> None:
         super().__init__(model)
-        self.model = model
         self.name = model.partname or 'no_name'
         self.geo_transform = copy.deepcopy(self.model.geo_transform)
         
@@ -67,17 +95,12 @@ class PartModel(Model):
     def scatter(self) -> None:
         self.model.scatter()
         
-    def measure(self) -> tuple[Tensor, Tensor]:
-        q1d = self.gen_q1d()
-        return q1d, self.model.measure(q1d)
-        
         
 class StlPartModel(PartModel):
     """_summary_
     """    
     def __init__(self, model: StlPart) -> None:
         super().__init__(model)
-        self.model = model
         self.sld_value = model.sld_value
         
     def sample(self) -> None:
@@ -88,10 +111,6 @@ class StlPartModel(PartModel):
 class MathPartModel(PartModel):
     """_summary_
     """    
-    def __init__(self, model: MathPart) -> None:
-        super().__init__(model)
-        self.model = model
-        
     def get_params(self) -> dict:
         return self.model.get_params()
     
@@ -109,7 +128,6 @@ class AssemblyModel(Model):
     def __init__(self, model: Assembly) -> None:
         super().__init__(model)
         self.name = 'assembly'
-        self.model = model
         self.parts: list[StlPartModel| MathPartModel | PartModel] = []
         
     def _rebuild_parts_in_assembly(self) -> None:
@@ -130,10 +148,9 @@ class AssemblyModel(Model):
         for model in self.parts:
             model.scatter()
             
-    def measure(self) -> tuple[Tensor, Tensor]:       
-        q1d = self.gen_q1d()
+    def measure(self, *qi: Tensor, **kwargs) -> Tensor:       
         self._rebuild_parts_in_assembly()
-        return q1d, self.model.measure(q1d)
+        return self.model.measure(*qi, **kwargs)
 
 
 class Project:

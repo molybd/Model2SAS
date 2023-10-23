@@ -4,17 +4,17 @@ import math
 import tempfile, time
 from typing import Literal, Optional, Union
 
-import torch
+from torch import Tensor
 from PySide6 import QtCore
 from PySide6.QtCore import QThread, Signal, Slot, QObject, QModelIndex, SIGNAL, SLOT
 from PySide6.QtGui import QStandardItemModel, QStandardItem
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow, QHeaderView, QStyledItemDelegate, QComboBox
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow, QHeaderView, QStyledItemDelegate, QComboBox, QLineEdit, QCheckBox
 from art import text2art
 
 from .MainWindow_ui import Ui_MainWindow
 from .SubWindow_buildmath_ui import Ui_subWindow_build_math_model
 from .SubWindow_htmlview_ui import Ui_subWindow_html_view
-from .wrapper import Project, StlPartModel, MathPartModel, AssemblyModel, PartModel
+from .model_wrapper import Project, StlPartModel, MathPartModel, AssemblyModel, PartModel
 
 
 from ..model import Part, StlPart, MathPart, Assembly
@@ -53,7 +53,8 @@ class GeneralThread(QThread):
 class MeasureThread(GeneralThread):
     thread_end = Signal(tuple)
     def run(self):
-        result = self.func(*self.args, **self.kwargs)
+        I = self.func(*self.args, **self.kwargs)
+        result = tuple([*self.args, I])  # return q and I
         self.thread_end.emit(result)
         
 
@@ -106,21 +107,9 @@ class MainWindow(QMainWindow):
         self.ui.setupUi(self)
         self.show()
         
-        # redirect print output and error
-        # self.system_stdout, self.system_stderr = sys.stdout, sys.stderr
-        # sys.stdout = RedirectedPrintStream()
-        # sys.stdout.write_text.connect(self.write_log)
-        # sys.stderr = RedirectedPrintStream()
-        # sys.stderr.write_text.connect(self.write_log)
-        
         # logger.remove(0)
         logger.add(self.write_log, format=LOG_FORMAT_STR)
         set_log_state(True)
-        
-        # self.gui_log('success', 'test')
-        # self.gui_log('info', 'test')
-        # self.gui_log('warning', 'test')
-        # self.gui_log('error', 'test')
         
         # set model-view
         self.qitemmodel_parts = QStandardItemModel()
@@ -134,20 +123,12 @@ class MainWindow(QMainWindow):
         self.ui.tableView_model_params.setModel(self.qitemmodel_params)
         
         self.qitemmodel_transforms = QStandardItemModel()
-        # self.qitemmodel_transforms.itemChanged.connect(self.read_transforms_from_qitemmodel)
         self.ui.tableView_transforms.setModel(self.qitemmodel_transforms)
         self.ui.tableView_transforms.setItemDelegateForColumn(0, TransformTypeComboDelegate(self))
                 
         # other variables
         self.active_model: StlPartModel | MathPartModel | AssemblyModel | PartModel
-        self.thread: QThread
-        
-        # link setting values to lineEdit contents      
-        self.ui.lineEdit_real_lattice_1d_size.textChanged.connect(self.change_variable_real_lattice_1d_size)
-        self.ui.lineEdit_q1d_min.textChanged.connect(self.change_variable_q1d_min)
-        self.ui.lineEdit_q1d_max.textChanged.connect(self.change_variable_q1d_max)
-        self.ui.lineEdit_q1d_num.textChanged.connect(self.change_variable_q1d_num)
-        self.ui.checkBox_q1d_log_spaced.clicked.connect(self.change_variable_q1d_log_spaced)        
+        self.thread: QThread    
         
         # initial actions
         self.project = Project()        
@@ -180,41 +161,32 @@ class MainWindow(QMainWindow):
             func = logger.success
             symbol = '✅️'
         func(f'[{" ":>11}] {symbol} {text}')
-    
-    ###### * Link setting values to lineEdit contents * ######
-    def change_variable_real_lattice_1d_size(self, value: str):
-        self.active_model.real_lattice_1d_size = int(float(value))
-    def change_variable_q1d_min(self, value: str):
-        self.active_model.q1d_min = float(value)
-    def change_variable_q1d_max(self, value: str):
-        self.active_model.q1d_max = float(value)
-    def change_variable_q1d_num(self, value: str):
-        self.active_model.q1d_num = int(float(value))
-    def change_variable_q1d_log_spaced(self, state: int):
-        self.active_model.q1d_log_spaced = bool(state)
-    
-    ##########################################################*
+        
+    def link_gui_item_to_variable(self, gui_item: QLineEdit | QCheckBox, var_name: str, type_func) -> None:        
+        def change_value(value):
+            self.active_model.__setattr__(var_name, type_func(value))
+        
+        if isinstance(gui_item, QLineEdit):
+            gui_item.setText(str(self.active_model.__getattribute__(var_name)))
+            gui_item.textChanged.connect(change_value)
+        else:
+            gui_item.setChecked(bool(self.active_model.__getattribute__(var_name)))
+            gui_item.clicked.connect(change_value)
+            
+    def set_progressbar(self, state: Literal['begin', 'end']) -> None:
+        if state == 'begin':
+            self.ui.progressBar.setMinimum(0)
+            self.ui.progressBar.setMaximum(0)
+        else:
+            self.ui.progressBar.setMinimum(0)
+            self.ui.progressBar.setMaximum(100)
+            self.ui.progressBar.setValue(100)
         
     def import_parts(self) -> None:
         filename_list, _ = QFileDialog.getOpenFileNames(self, caption='Select Model File(s)', dir='./', filter="All Files (*);;stl Files (*.stl);;math model Files (*.py)")
-        #* for test only
-        # filename_list = [
-        #     r'D:\Work@IASF\@my_programs\Model2SAS\resources\exp_models\torus.stl',
-        #     r'D:\Work@IASF\@my_programs\Model2SAS\resources\exp_models\cylinder.py',
-        #     r'D:\Work@IASF\@my_programs\Model2SAS\resources\exp_models\sphere.py',
-        # ]
-        #*
         for filename in filename_list:
             self.project.import_part(filename)
             self.gui_log('info', f'imported {filename}')
-            
-        #* only prelimilary
-        # for part in self.project.parts.values():
-        #     self.project.add_part_to_assembly(
-        #         part, list(self.project.assemblies.values())[0]
-        #     )
-        #*
-        
         self.refresh_qitemmodel_models()
         
     def add_to_assembly(self) -> None:
@@ -294,15 +266,14 @@ class MainWindow(QMainWindow):
     def _unique_actions_for_part_model_selected(self) -> None:
         self.ui.pushButton_add_to_assembly.setDisabled(False)
         self.ui.tableView_model_params.setDisabled(False)
-        self.ui.pushButton_sample.setDisabled(False)
+        # self.ui.pushButton_sample.setDisabled(False)
         self.ui.pushButton_sample.setText('Sample')
         self.ui.pushButton_add_transform.setDisabled(False)
         self.ui.pushButton_delete_selected_transform.setDisabled(False)
         self.ui.pushButton_apply_transform.setDisabled(False)
-        self.ui.pushButton_plot_model.setDisabled(False)
-        self.ui.pushButton_scatter.setDisabled(False)
+        # self.ui.pushButton_plot_model.setDisabled(False)
+        # self.ui.pushButton_scatter.setDisabled(False)
         self.ui.pushButton_scatter.setText('Virtual Scatter')
-        self.ui.pushButton_1d_measure.setDisabled(False)
         self.refresh_qitemmodel_params()
         self.refresh_qitemmodel_transforms()
         
@@ -310,15 +281,14 @@ class MainWindow(QMainWindow):
     def _unique_actions_for_assembly_model_selected(self) -> None:
         self.ui.pushButton_add_to_assembly.setDisabled(True)
         self.ui.tableView_model_params.setDisabled(True)
-        self.ui.pushButton_sample.setDisabled(False)
+        # self.ui.pushButton_sample.setDisabled(False)
         self.ui.pushButton_sample.setText('Sample All Sub-Parts')
         self.ui.pushButton_add_transform.setDisabled(True)
         self.ui.pushButton_delete_selected_transform.setDisabled(True)
         self.ui.pushButton_apply_transform.setDisabled(True)
-        self.ui.pushButton_plot_model.setDisabled(False)
-        self.ui.pushButton_scatter.setDisabled(False)
+        # self.ui.pushButton_plot_model.setDisabled(False)
+        # self.ui.pushButton_scatter.setDisabled(False)
         self.ui.pushButton_scatter.setText('Virtual Scatter by All Sub-Parts')
-        self.ui.pushButton_1d_measure.setDisabled(False)
         self.qitemmodel_params.clear()
         self.qitemmodel_transforms.clear()
     
@@ -326,11 +296,20 @@ class MainWindow(QMainWindow):
         self.ui.label_active_model.setText(
             f'Active Model: 【{self.active_model.key}】 {self.active_model.name}'
         )
-        self.ui.lineEdit_real_lattice_1d_size.setText(str(self.active_model.real_lattice_1d_size))
-        self.ui.lineEdit_q1d_min.setText(str(self.active_model.q1d_min))
-        self.ui.lineEdit_q1d_max.setText(str(self.active_model.q1d_max))
-        self.ui.lineEdit_q1d_num.setText(str(self.active_model.q1d_num))
-        self.ui.checkBox_q1d_log_spaced.setChecked(self.active_model.q1d_log_spaced)
+        self.link_gui_item_to_variable(self.ui.lineEdit_real_lattice_1d_size, 'real_lattice_1d_size', int)
+        self.link_gui_item_to_variable(self.ui.lineEdit_q1d_min, 'q1d_min', float)
+        self.link_gui_item_to_variable(self.ui.lineEdit_q1d_max, 'q1d_max', float)
+        self.link_gui_item_to_variable(self.ui.lineEdit_q1d_num, 'q1d_num', int)
+        self.link_gui_item_to_variable(self.ui.checkBox_q1d_log_spaced, 'q1d_log_spaced', bool)
+        self.link_gui_item_to_variable(self.ui.lineEdit_det_res_h, 'det_res_h', int)
+        self.link_gui_item_to_variable(self.ui.lineEdit_det_res_v, 'det_res_v', int)
+        self.link_gui_item_to_variable(self.ui.lineEdit_det_pixel_size, 'det_pixel_size', float)
+        self.link_gui_item_to_variable(self.ui.lineEdit_wavelength, 'det_wavelength', float)
+        self.link_gui_item_to_variable(self.ui.lineEdit_det_sdd, 'det_sdd', float)
+        self.link_gui_item_to_variable(self.ui.checkBox_log_Idet, 'log_Idet', bool)
+        self.link_gui_item_to_variable(self.ui.lineEdit_q3d_qmax, 'q3d_max', float)
+        self.link_gui_item_to_variable(self.ui.checkBox_log_I3d, 'log_I3d', bool)
+
         
     def refresh_qitemmodel_params(self) -> None:
         self.qitemmodel_params.clear()
@@ -365,7 +344,7 @@ class MainWindow(QMainWindow):
             
     def refresh_qitemmodel_transforms(self) -> None:
         self.qitemmodel_transforms.clear()
-        self.qitemmodel_transforms.setHorizontalHeaderLabels(['Type', 'Vector/Axis', 'Angle(deg)'])
+        self.qitemmodel_transforms.setHorizontalHeaderLabels(['Type', 'Vector/Axis', 'Angle (deg)'])
         for i, transform in enumerate(self.active_model.model.geo_transform):
             if transform['type'] == 'rotate':
                 combo_index = '1'
@@ -417,9 +396,11 @@ class MainWindow(QMainWindow):
         )
         self.thread.thread_end.connect(self.sample_thread_end)
         self.thread.start()
+        self.set_progressbar('begin')
                 
     def sample_thread_end(self) -> None:
         self.gui_log('success', 'Sample done')
+        self.set_progressbar('end')
         
     def plot_model(self) -> None:
         if self.ui.radioButton_voxel_plot.isChecked():
@@ -440,6 +421,7 @@ class MainWindow(QMainWindow):
         self.thread.thread_end.connect(self.display_html)
         self.thread.start()
         self.gui_log('info', 'Plotting...')
+        self.set_progressbar('begin')
         
     def scatter(self) -> None:
         self.thread = GeneralThread(
@@ -447,19 +429,24 @@ class MainWindow(QMainWindow):
         )
         self.thread.thread_end.connect(self.scatter_thread_end)
         self.thread.start()
+        self.set_progressbar('begin')        
                 
     def scatter_thread_end(self) -> None:
         self.gui_log('success', 'Scatter done')
+        self.set_progressbar('end')
         
-    def measure(self) -> None:
+    def measure_1d(self) -> None:
+        q1d = self.active_model.gen_q('1d')
         self.thread = MeasureThread(
-            self.active_model.measure
+            self.active_model.measure,
+            q1d
         )
-        self.thread.thread_end.connect(self.measure_thread_end)
+        self.thread.thread_end.connect(self.measure_1d_thread_end)
         self.thread.start()
+        self.set_progressbar('begin')
         
-    def measure_thread_end(self, result: tuple) -> None:
-        self.gui_log('success', 'Measure done')
+    def measure_1d_thread_end(self, result: tuple[Tensor, Tensor]) -> None:
+        self.gui_log('success', '1d measure done')
         q, I = result
         self.thread = PlotThread(
             plot.plot_1d_sas,
@@ -472,7 +459,55 @@ class MainWindow(QMainWindow):
         )
         self.thread.thread_end.connect(self.display_html)
         self.thread.start()
+        self.set_progressbar('end')
         
+    def measure_det(self) -> None:
+        qx, qy, qz = self.active_model.gen_q('det')
+        self.thread = MeasureThread(
+            self.active_model.measure,
+            qx, qy, qz
+        )
+        self.thread.thread_end.connect(self.measure_det_thread_end)
+        self.thread.start()
+        self.set_progressbar('begin')
+    
+    def measure_det_thread_end(self, result: tuple[Tensor, Tensor, Tensor, Tensor]) -> None:
+        self.gui_log('success', 'Detector measure done')
+        qx, qy, qz, I2d = result
+        self.thread = PlotThread(
+            plot.plot_2d_sas,
+            I2d,
+            logI = self.active_model.log_Idet,
+            title = f'【{self.active_model.key}】 {self.active_model.name}',
+            show = False
+        )
+        self.thread.thread_end.connect(self.display_html)
+        self.thread.start()
+        self.set_progressbar('end')
+    
+    def measure_3d(self) -> None:
+        qx, qy, qz = self.active_model.gen_q('3d')
+        self.thread = MeasureThread(
+            self.active_model.measure,
+            qx, qy, qz
+        )
+        self.thread.thread_end.connect(self.measure_3d_thread_end)
+        self.thread.start()
+        self.set_progressbar('begin')
+    
+    def measure_3d_thread_end(self, result: tuple[Tensor, Tensor, Tensor, Tensor]) -> None:
+        self.gui_log('success', '3d measure done')
+        qx, qy, qz, I3d = result
+        self.thread = PlotThread(
+            plot.plot_3d_sas,
+            qx, qy, qz, I3d,
+            logI = self.active_model.log_I3d,
+            title = f'【{self.active_model.key}】 {self.active_model.name}',
+            show = False
+        )
+        self.thread.thread_end.connect(self.display_html)
+        self.thread.start()
+        self.set_progressbar('end')
         
     def display_html(self, html_filename: str) -> None:
         # * Known issues
@@ -484,6 +519,7 @@ class MainWindow(QMainWindow):
         self.ui.mdiArea.addSubWindow(subwindow_html_view)
         subwindow_html_view.show()
         self.gui_log('success', 'Plot done')
+        self.set_progressbar('end')
     
 
 
