@@ -1,6 +1,6 @@
 # Model2SAS
 
-**A brand-new version with new algorithm and GUI will coming soon!**
+**⚠️ A brand-new version with new algorithm and GUI will coming soon! All the tutorials below are for older versions. Please stay tuned for new tutorials**
 
 Program to generate small angle scattering curve from 3D models. Models can be STL file and/or math description by .py file. Both module and GUI are available for convenience.
 
