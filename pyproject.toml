@@ -1,0 +1,35 @@
+[project]
+name = "model2sas"
+version = "2.0.0"
+description = "Small angle scattering simulation from 3D models"
+authors = [
+    {name = "molybd", email = "limu.robert@outlook.com"},
+]
+dependencies = [
+    "torch>=2.1.0",
+    "numpy-stl>=3.0.1",
+    "plotly>=5.17.0",
+    "nbformat>=5.9.2",
+    "kaleido==0.2.1",
+    "PySide6>=6.5.3",
+    "loguru>=0.7.2",
+    "art>=6.1",
+]
+requires-python = ">=3.10,<3.12"
+readme = "README.md"
+license = {text = "GPL-3.0-only"}
+
+[project.gui-scripts]
+model2sas-gui = "model2sas.gui.main:run"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "pytest>=7.4.2",
+    "ipython>=8.16.1",
+    "ipykernel>=6.25.2",
+    "black>=23.9.1",
+]

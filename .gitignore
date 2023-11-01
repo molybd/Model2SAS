@@ -134,9 +134,10 @@ dmypy.json
 *.svg
 *.jpg
 *.tif
+*.html
 
-# test files
-test*
+# experimental codes
+exp_*
 
 # CrysolPath file
 CrysolPath.txt
@@ -146,12 +147,6 @@ discarded design/
 
 # vscode configurations
 .vscode/
-
-# models
-models/
-
-# unfinished documents
-doc_temp/
 
 # temp folder
 .TEMP_Model2SAS/
@@ -165,5 +160,8 @@ doc_temp/
 # temporary folder
 temp/
 
-# tips for myself
-design,tips&idea.md
+# local files for myself
+local/
+
+# pdm related
+.pdm-python
