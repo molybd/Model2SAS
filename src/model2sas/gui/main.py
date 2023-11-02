@@ -11,9 +11,8 @@ from PySide6.QtGui import QStandardItemModel, QStandardItem
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow, QHeaderView, QStyledItemDelegate, QComboBox, QLineEdit, QCheckBox
 from art import text2art
 
-from .MainWindow_ui import Ui_MainWindow
-from .SubWindow_buildmath_ui import Ui_subWindow_build_math_model
-from .SubWindow_htmlview_ui import Ui_subWindow_html_view
+from .mainwindow_ui import Ui_MainWindow
+from .subwindow_htmlview_ui import Ui_subWindow_html_view
 from .model_wrapper import Project, StlPartModel, MathPartModel, AssemblyModel, PartModel
 
 
