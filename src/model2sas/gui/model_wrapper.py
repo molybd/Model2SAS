@@ -9,9 +9,10 @@ from torch import Tensor
 
 from ..model import Part, StlPart, MathPart, Assembly
 from ..utils import Detector
+from .utils import time_hash_digest
 
 
-class Model:
+class ModelWrapper:
     """_summary_
     """    
     def __init__(self, model: StlPart | MathPart | Part | Assembly) -> None:
@@ -47,9 +48,7 @@ class Model:
         
         
     def _gen_key(self) -> str:
-        return hashlib.sha1(
-            str(time.time()).encode('utf-8')
-            ).hexdigest()[:4]
+        return time_hash_digest(4)
     
     def gen_q(self, type: Literal['1d', 'det', '3d']) -> Tensor | tuple[Tensor, Tensor, Tensor]:
         match type:
@@ -81,7 +80,7 @@ class Model:
         return self.model.measure(*qi, **kwargs)
         
 
-class PartModel(Model):
+class PartWrapper(ModelWrapper):
     """_summary_
     """    
     def __init__(self, model: StlPart | MathPart | Part) -> None:
@@ -96,7 +95,7 @@ class PartModel(Model):
         self.model.scatter()
         
         
-class StlPartModel(PartModel):
+class StlPartWrapper(PartWrapper):
     """_summary_
     """    
     def __init__(self, model: StlPart) -> None:
@@ -108,7 +107,7 @@ class StlPartModel(PartModel):
         self.model.sample(real_lattice_1d_size=self.real_lattice_1d_size)
         
 
-class MathPartModel(PartModel):
+class MathPartWrapper(PartWrapper):
     """_summary_
     """    
     def get_params(self) -> dict:
@@ -122,13 +121,13 @@ class MathPartModel(PartModel):
         
         
 
-class AssemblyModel(Model):
+class AssemblyWrapper(ModelWrapper):
     """_summary_
     """    
     def __init__(self, model: Assembly) -> None:
         super().__init__(model)
         self.name = 'assembly'
-        self.parts: list[StlPartModel| MathPartModel | PartModel] = []
+        self.parts: list[StlPartWrapper| MathPartWrapper | PartWrapper] = []
         
     def _rebuild_parts_in_assembly(self) -> None:
         self.model.parts.clear()
@@ -157,23 +156,23 @@ class Project:
     """_summary_
     """    
     def __init__(self) -> None:
-        self.parts: dict[str, StlPartModel | MathPartModel | PartModel] = {}
-        self.assemblies: dict[str, AssemblyModel] = {}
+        self.parts: dict[str, StlPartWrapper | MathPartWrapper | PartWrapper] = {}
+        self.assemblies: dict[str, AssemblyWrapper] = {}
         
     def import_part(self, filename: str) -> None:
         if os.path.splitext(filename)[-1].lower() == '.stl':
-            part = StlPartModel(StlPart(filename=filename))
+            part = StlPartWrapper(StlPart(filename=filename))
         elif os.path.splitext(filename)[-1].lower() == '.py':
-            part = MathPartModel(MathPart(filename=filename))
+            part = MathPartWrapper(MathPart(filename=filename))
         else:
             raise TypeError()
         self.parts[part.key] = part
         
     def new_assembly(self) -> None:
-        assmbly = AssemblyModel(Assembly())
+        assmbly = AssemblyWrapper(Assembly())
         self.assemblies[assmbly.key] = assmbly
         
-    def add_part_to_assembly(self, part: str | StlPartModel | MathPartModel | PartModel, assembly: str | AssemblyModel) -> None:
+    def add_part_to_assembly(self, part: str | StlPartWrapper | MathPartWrapper | PartWrapper, assembly: str | AssemblyWrapper) -> None:
         if isinstance(part, str):
             part = self.parts[part]
         if isinstance(assembly, str):
@@ -181,4 +180,4 @@ class Project:
         assembly.parts.append(part)
     
 
-    
+ModelWrapperType = StlPartWrapper | MathPartWrapper | AssemblyWrapper | PartWrapper
