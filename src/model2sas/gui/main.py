@@ -8,67 +8,22 @@ from torch import Tensor
 from PySide6 import QtCore
 from PySide6.QtCore import QThread, Signal, Slot, QObject, QModelIndex, SIGNAL, SLOT
 from PySide6.QtGui import QStandardItemModel, QStandardItem
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow, QHeaderView, QStyledItemDelegate, QComboBox, QLineEdit, QCheckBox
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow, QHeaderView, QStyledItemDelegate, QComboBox, QLineEdit, QCheckBox, QGridLayout, QPushButton, QSpacerItem, QSizePolicy
+from PySide6.QtWebEngineWidgets import QWebEngineView
 from art import text2art
+import plotly.graph_objects as go
 
-from .MainWindow_ui import Ui_MainWindow
-from .SubWindow_buildmath_ui import Ui_subWindow_build_math_model
-from .SubWindow_htmlview_ui import Ui_subWindow_html_view
-from .model_wrapper import Project, StlPartModel, MathPartModel, AssemblyModel, PartModel
+from .mainwindow_ui import Ui_MainWindow
+# from .subwindow_htmlview_ui import Ui_subWindow_html_view
+from .model_wrapper import Project, StlPartWrapper, MathPartWrapper, AssemblyWrapper, PartWrapper, ModelWrapperType
 
 
 from ..model import Part, StlPart, MathPart, Assembly
 from .. import plot
-
 from ..utils import logger, set_log_state, LOG_FORMAT_STR, WELCOME_MESSAGE
+from .utils import GeneralThread, MeasureThread, PlotThread
+from .subwindows import SubWindowHtmlView, SubWindowPlotView
 
-'''
-TODO
-1. BUG 一次导入多个模型会显示不全（没有复现）
-'''
-
-
-class RedirectedPrintStream(QObject):
-    write_text = Signal(str)
-    def write(self, text: str):
-        self.write_text.emit(text)
-        
-    def flush(self):
-        pass
-    
-
-class GeneralThread(QThread):
-    thread_end = Signal()
-    def __init__(self, func, *args, **kwargs) -> None:
-        super().__init__()
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
-        
-    def run(self):
-        self.func(*self.args, **self.kwargs)
-        self.thread_end.emit()
-        
-
-class MeasureThread(GeneralThread):
-    thread_end = Signal(tuple)
-    def run(self):
-        I = self.func(*self.args, **self.kwargs)
-        result = tuple([*self.args, I])  # return q and I
-        self.thread_end.emit(result)
-        
-
-class PlotThread(GeneralThread):
-    thread_end = Signal(str)
-    def run(self):
-        # print('ploting')
-        if 'savename' in self.kwargs.keys():
-            html_filename = self.kwargs.pop('savename')
-        else:
-            html_filename = os.path.join(tempfile.gettempdir(), 'model2sas_temp_plot.html')
-        self.func(*self.args, savename=html_filename, **self.kwargs)
-        self.thread_end.emit(html_filename)
-        
 
 class TransformTypeComboDelegate(QStyledItemDelegate):
     """refer to:
@@ -127,7 +82,7 @@ class MainWindow(QMainWindow):
         self.ui.tableView_transforms.setItemDelegateForColumn(0, TransformTypeComboDelegate(self))
                 
         # other variables
-        self.active_model: StlPartModel | MathPartModel | AssemblyModel | PartModel
+        self.active_model: ModelWrapperType
         self.thread: QThread    
         
         # initial actions
@@ -135,6 +90,11 @@ class MainWindow(QMainWindow):
         
         self.ui.textBrowser_log.append(WELCOME_MESSAGE)
         print(WELCOME_MESSAGE)
+        
+        subwindow = SubWindowHtmlView()
+        subwindow.display_htmlfile(os.path.join(os.path.dirname(__file__), 'README.html'))
+        self.ui.mdiArea.addSubWindow(subwindow)
+        subwindow.show()
         
         
     def write_log(self, text: str):
@@ -314,9 +274,9 @@ class MainWindow(QMainWindow):
     def refresh_qitemmodel_params(self) -> None:
         self.qitemmodel_params.clear()
         self.qitemmodel_params.setHorizontalHeaderLabels(['Param', 'Value'])
-        if isinstance(self.active_model, StlPartModel):
+        if isinstance(self.active_model, StlPartWrapper):
             params = dict(sld_value=self.active_model.sld_value)
-        elif isinstance(self.active_model, MathPartModel):
+        elif isinstance(self.active_model, MathPartWrapper):
             params = self.active_model.get_params()
         else:
             params = dict()
@@ -331,11 +291,11 @@ class MainWindow(QMainWindow):
             ])
     
     def read_params_from_qitemmodel(self):
-        if isinstance(self.active_model, StlPartModel):
+        if isinstance(self.active_model, StlPartWrapper):
             self.active_model.sld_value = \
                 float(self.qitemmodel_params.index(0, 1).data())
             self.gui_log('success', 'change parameter')
-        elif isinstance(self.active_model, MathPartModel):
+        elif isinstance(self.active_model, MathPartWrapper):
             for i in range(self.qitemmodel_params.rowCount()):
                 param_name = self.qitemmodel_params.index(i, 0).data()
                 param_value = float(self.qitemmodel_params.index(i, 1).data())
@@ -403,25 +363,17 @@ class MainWindow(QMainWindow):
         self.set_progressbar('end')
         
     def plot_model(self) -> None:
-        if self.ui.radioButton_voxel_plot.isChecked():
-            plot_type = 'voxel'
-        elif self.ui.radioButton_volume_plot.isChecked():
+        if self.ui.radioButton_volume_plot.isChecked():
             plot_type = 'volume'
-        if self.active_model.type == 'assembly':
-            model = self.active_model.model.parts
-        else:
-            model = [self.active_model.model]
-        self.thread = PlotThread(
-            plot.plot_model,
-            *model,
-            type = plot_type,
-            title=f'Model Plot: {self.active_model.key}',
-            show=False,
-        )
-        self.thread.thread_end.connect(self.display_html)
-        self.thread.start()
-        self.gui_log('info', 'Plotting...')
-        self.set_progressbar('begin')
+        else: # self.ui.radioButton_voxel_plot.isChecked()
+            plot_type = 'voxel'
+        subwindow = SubWindowPlotView(self)
+        subwindow.setWindowTitle(f'【{self.active_model.key}】Model Plot')
+        subwindow.plot_model(self.active_model, plot_type)
+        self.ui.mdiArea.addSubWindow(subwindow)
+        subwindow.show()
+        self.gui_log('success', 'Plot done')
+        self.set_progressbar('end')
         
     def scatter(self) -> None:
         self.thread = GeneralThread(
@@ -441,25 +393,9 @@ class MainWindow(QMainWindow):
             self.active_model.measure,
             q1d
         )
-        self.thread.thread_end.connect(self.measure_1d_thread_end)
+        self.thread.thread_end.connect(self.display_sas_plot_subwindow)
         self.thread.start()
         self.set_progressbar('begin')
-        
-    def measure_1d_thread_end(self, result: tuple[Tensor, Tensor]) -> None:
-        self.gui_log('success', '1d measure done')
-        q, I = result
-        self.thread = PlotThread(
-            plot.plot_1d_sas,
-            q,
-            I,
-            mode = 'lines',
-            name = f'【{self.active_model.key}】 {self.active_model.name}',
-            title = f'【{self.active_model.key}】 {self.active_model.name}',
-            show = False
-        )
-        self.thread.thread_end.connect(self.display_html)
-        self.thread.start()
-        self.set_progressbar('end')
         
     def measure_det(self) -> None:
         qx, qy, qz = self.active_model.gen_q('det')
@@ -467,23 +403,9 @@ class MainWindow(QMainWindow):
             self.active_model.measure,
             qx, qy, qz
         )
-        self.thread.thread_end.connect(self.measure_det_thread_end)
+        self.thread.thread_end.connect(self.display_sas_plot_subwindow)
         self.thread.start()
         self.set_progressbar('begin')
-    
-    def measure_det_thread_end(self, result: tuple[Tensor, Tensor, Tensor, Tensor]) -> None:
-        self.gui_log('success', 'Detector measure done')
-        qx, qy, qz, I2d = result
-        self.thread = PlotThread(
-            plot.plot_2d_sas,
-            I2d,
-            logI = self.active_model.log_Idet,
-            title = f'【{self.active_model.key}】 {self.active_model.name}',
-            show = False
-        )
-        self.thread.thread_end.connect(self.display_html)
-        self.thread.start()
-        self.set_progressbar('end')
     
     def measure_3d(self) -> None:
         qx, qy, qz = self.active_model.gen_q('3d')
@@ -491,33 +413,16 @@ class MainWindow(QMainWindow):
             self.active_model.measure,
             qx, qy, qz
         )
-        self.thread.thread_end.connect(self.measure_3d_thread_end)
+        self.thread.thread_end.connect(self.display_sas_plot_subwindow)
         self.thread.start()
         self.set_progressbar('begin')
-    
-    def measure_3d_thread_end(self, result: tuple[Tensor, Tensor, Tensor, Tensor]) -> None:
-        self.gui_log('success', '3d measure done')
-        qx, qy, qz, I3d = result
-        self.thread = PlotThread(
-            plot.plot_3d_sas,
-            qx, qy, qz, I3d,
-            logI = self.active_model.log_I3d,
-            title = f'【{self.active_model.key}】 {self.active_model.name}',
-            show = False
-        )
-        self.thread.thread_end.connect(self.display_html)
-        self.thread.start()
-        self.set_progressbar('end')
         
-    def display_html(self, html_filename: str) -> None:
-        # * Known issues
-        # * (Solved) must use forward slashes in file path, or will be blank or error
-        # * (Solved) begin size can't be too small or plot will be blank
-        subwindow_html_view = SubWindowHtmlView()
-        subwindow_html_view.setWindowTitle('Plot')
-        subwindow_html_view.ui.webEngineView.setUrl(html_filename.replace('\\', '/'))
-        self.ui.mdiArea.addSubWindow(subwindow_html_view)
-        subwindow_html_view.show()
+    def display_sas_plot_subwindow(self, data: tuple[Tensor, ...]) -> None:
+        self.gui_log('success', 'Measure done')
+        subwindow = SubWindowPlotView(self)
+        subwindow.plot_sas(*data)
+        self.ui.mdiArea.addSubWindow(subwindow)
+        subwindow.show()
         self.gui_log('success', 'Plot done')
         self.set_progressbar('end')
     
@@ -526,15 +431,14 @@ class MainWindow(QMainWindow):
 
 
 
-class SubWindowHtmlView(QWidget):
-    def __init__(self) -> None:
-        super().__init__()
-        self.ui = Ui_subWindow_html_view()
-        self.ui.setupUi(self)
+
+        
+        
         
 def run():
     app = QApplication(sys.argv)
     main_window = MainWindow()
+    # main_window = SubWindowScatterPlot()
     sys.exit(app.exec())
 
 if __name__ == '__main__':

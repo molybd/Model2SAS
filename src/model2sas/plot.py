@@ -183,11 +183,14 @@ def plot_2d_sas(
     if logI:
         data = torch.log10(I2d)
         data = torch.nan_to_num(data, nan=0., neginf=0.) # incase 0 in data, cause log(0) output
+        colorbar_title = 'log(I)'
     else:
         data = I2d
+        colorbar_title = None
     fig.add_trace(go.Heatmap(
         z=data.T,
-        colorscale=colorscale
+        colorscale=colorscale,
+        colorbar={'title': colorbar_title}
         ))
     fig.update_xaxes(
         scaleanchor='y',
@@ -231,8 +234,10 @@ def plot_3d_sas(
     if logI:
         data = torch.log10(I3d)
         data = torch.nan_to_num(data, nan=0., neginf=0.) # incase 0 in data, cause log(0) output
+        colorbar_title = 'log(I)'
     else:
         data = I3d
+        colorbar_title = None
     fig.add_trace(go.Volume(
         x=qx.flatten(),
         y=qy.flatten(),
@@ -240,7 +245,8 @@ def plot_3d_sas(
         value=data.flatten(),
         opacity=0.1,
         surface_count=21,
-        coloraxis='coloraxis'
+        coloraxis='coloraxis',
+        colorbar={'title': colorbar_title}
     ))
     fig.update_layout(scene_aspectmode='data') # make equal aspect
     fig.update_layout(coloraxis={'colorscale': colorscale})
@@ -364,7 +370,11 @@ def plot_surface(
         fig.add_trace(go.Surface(
             x=x, y=y, z=z, surfacecolor=surfacecolor, coloraxis='coloraxis'
         ))
-    fig.update_layout(coloraxis = {'colorscale': colorscale})
+    if logI:
+        colorbar_title = 'log(I)'
+    else:
+        colorbar_title = None
+    fig.update_layout(coloraxis = {'colorscale': colorscale}, colorbar={'title': colorbar_title})
     
     fig.update_layout(scene_aspectmode='data') # make equal aspect, or use fig.update_scenes(aspectmode='data')
     return fig
