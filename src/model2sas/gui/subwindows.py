@@ -4,6 +4,7 @@ from typing import Callable, Literal, Optional
 import shutil
 
 from PySide6.QtCore import QThread, Signal, Slot, QObject, QModelIndex, SIGNAL, SLOT, QSize
+from PySide6.QtGui import QStandardItemModel, QStandardItem
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QInputDialog, QMdiSubWindow, QHeaderView, QStyledItemDelegate, QComboBox, QLineEdit, QCheckBox, QGridLayout, QPushButton, QSpacerItem, QSizePolicy, QLabel
 from PySide6.QtWebEngineWidgets import QWebEngineView
 import plotly.graph_objects as go
@@ -13,7 +14,9 @@ import numpy as np
 
 from .utils import GeneralThread, PlotThread, time_hash_digest
 from ..plot import write_html, plot_1d_sas, plot_2d_sas, plot_3d_sas, plot_model
+from ..utils import gen_math_model_class, gen_math_model_class_sourcecode
 from .model_wrapper import ModelWrapperType
+from .subwindow_userdefined_model_ui import Ui_subwindow_user_defined_model
 
 
 class SubWindowHtmlView(QWidget):
@@ -191,3 +194,66 @@ class SubSubWindowSaveImage(QWidget):
                 filename, width=width, height=height, scale=scale
             )
         self.close()
+        
+
+class SubWindowUserDefinedModel(QWidget):
+    def __init__(self, mainwindow) -> None:
+        super().__init__()
+        self.mainwindow = mainwindow
+        self.ui = Ui_subwindow_user_defined_model()
+        self.ui.setupUi(self)
+        
+        self.qitemmodel_params = QStandardItemModel(self)
+        self.qitemmodel_params.setHorizontalHeaderLabels(['Param', 'Value'])
+        self.ui.tableView_params.setModel(self.qitemmodel_params)
+        
+        
+    def help(self) -> None:
+        pass
+    
+    def add_param(self) -> None:
+        self.qitemmodel_params.appendRow([
+            QStandardItem(),
+            QStandardItem()
+        ])
+    
+    def delete_param(self) -> None:
+        selected_row = self.ui.tableView_params.selectedIndexes()[0].row()
+        self.qitemmodel_params.removeRow(selected_row)
+        
+    def read_all(self):
+        name = self.ui.lineEdit_name.text()
+        coord = self.ui.comboBox_coord.currentText().lower()[:3]
+        bound_point = (
+            self.ui.lineEdit_bound_point_1.text(),
+            self.ui.lineEdit_bound_point_2.text(),
+            self.ui.lineEdit_bound_point_3.text(),
+        )
+        params = dict()
+        for i in range(self.qitemmodel_params.rowCount()):
+            param_name = self.qitemmodel_params.index(i, 0).data()
+            param_value = float(self.qitemmodel_params.index(i, 1).data())
+            params[param_name] = param_value
+        shape_description = self.ui.textEdit_shape_description.toPlainText()
+        sld_description = self.ui.textEdit_sld_description.toPlainText()
+        self.math_model_class = gen_math_model_class(
+            name=name,
+            params=params,
+            coord=coord,
+            bound_point=bound_point,
+            shape_description=shape_description,
+            sld_description=sld_description
+        )
+    
+    def generate(self) -> None:
+        self.read_all()
+        self.mainwindow.project.import_part(self.math_model_class)
+        self.mainwindow.refresh_qitemmodel_models()
+    
+    def save(self)  -> None:
+        self.read_all()
+        filename, _ = QFileDialog.getSaveFileName(self, caption='Save Math Model', dir='./', filter="PY (*.py)")
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(
+                gen_math_model_class_sourcecode(**self.math_model_class.info)
+            )

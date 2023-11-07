@@ -27,7 +27,7 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(1012, 690)
+        MainWindow.resize(1012, 691)
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.gridLayout_7 = QGridLayout(self.centralwidget)
@@ -71,15 +71,20 @@ class Ui_MainWindow(object):
         self.groupBox_part.setObjectName(u"groupBox_part")
         self.gridLayout_5 = QGridLayout(self.groupBox_part)
         self.gridLayout_5.setObjectName(u"gridLayout_5")
-        self.treeView_parts = QTreeView(self.groupBox_part)
-        self.treeView_parts.setObjectName(u"treeView_parts")
-
-        self.gridLayout_5.addWidget(self.treeView_parts, 2, 0, 1, 3)
-
         self.pushButton_part_from_files = QPushButton(self.groupBox_part)
         self.pushButton_part_from_files.setObjectName(u"pushButton_part_from_files")
 
         self.gridLayout_5.addWidget(self.pushButton_part_from_files, 1, 0, 1, 2)
+
+        self.treeView_parts = QTreeView(self.groupBox_part)
+        self.treeView_parts.setObjectName(u"treeView_parts")
+
+        self.gridLayout_5.addWidget(self.treeView_parts, 3, 0, 1, 3)
+
+        self.pushButton_user_defined_model = QPushButton(self.groupBox_part)
+        self.pushButton_user_defined_model.setObjectName(u"pushButton_user_defined_model")
+
+        self.gridLayout_5.addWidget(self.pushButton_user_defined_model, 2, 0, 1, 2)
 
 
         self.gridLayout_9.addWidget(self.groupBox_part, 1, 0, 1, 2)
@@ -472,7 +477,7 @@ class Ui_MainWindow(object):
         self.pushButton_new_assembly.setObjectName(u"pushButton_new_assembly")
         self.pushButton_new_assembly.setEnabled(True)
 
-        self.gridLayout_6.addWidget(self.pushButton_new_assembly, 0, 0, 1, 3)
+        self.gridLayout_6.addWidget(self.pushButton_new_assembly, 0, 0, 1, 2)
 
 
         self.gridLayout_9.addWidget(self.groupBox_assembly, 3, 0, 1, 2)
@@ -486,17 +491,13 @@ class Ui_MainWindow(object):
 
         self.gridLayout_9.addWidget(self.pushButton_delete_selected_model, 4, 1, 1, 1)
 
-        self.horizontalSpacer_7 = QSpacerItem(153, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-
-        self.gridLayout_9.addItem(self.horizontalSpacer_7, 4, 2, 1, 1)
-
         self.progressBar = QProgressBar(self.dockWidgetContents_3)
         self.progressBar.setObjectName(u"progressBar")
         self.progressBar.setValue(0)
         self.progressBar.setTextVisible(False)
         self.progressBar.setInvertedAppearance(False)
 
-        self.gridLayout_9.addWidget(self.progressBar, 4, 3, 1, 1)
+        self.gridLayout_9.addWidget(self.progressBar, 4, 2, 1, 2)
 
         self.dockWidget_main.setWidget(self.dockWidgetContents_3)
         MainWindow.addDockWidget(Qt.LeftDockWidgetArea, self.dockWidget_main)
@@ -549,6 +550,7 @@ class Ui_MainWindow(object):
         self.pushButton_measure_1d.clicked.connect(MainWindow.measure_1d)
         self.pushButton_measure_det.clicked.connect(MainWindow.measure_det)
         self.pushButton_measure_3d.clicked.connect(MainWindow.measure_3d)
+        self.pushButton_user_defined_model.clicked.connect(MainWindow.user_defined_model)
 
         self.tabWidget_settings.setCurrentIndex(0)
 
@@ -563,6 +565,7 @@ class Ui_MainWindow(object):
         self.label_active_model.setText(QCoreApplication.translate("MainWindow", u"No Active Model", None))
         self.groupBox_part.setTitle(QCoreApplication.translate("MainWindow", u"Part Model", None))
         self.pushButton_part_from_files.setText(QCoreApplication.translate("MainWindow", u"Import From File(s)", None))
+        self.pushButton_user_defined_model.setText(QCoreApplication.translate("MainWindow", u"User-defined Model", None))
         self.groupBox_model_params.setTitle(QCoreApplication.translate("MainWindow", u"Model Parameters", None))
         self.label_real_lattice_1d_size.setText(QCoreApplication.translate("MainWindow", u"Points in longest edge", None))
         self.lineEdit_real_lattice_1d_size.setText("")

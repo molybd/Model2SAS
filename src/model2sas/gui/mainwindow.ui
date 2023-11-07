@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1012</width>
-    <height>690</height>
+    <height>691</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -73,13 +73,20 @@
         <string>Part Model</string>
        </property>
        <layout class="QGridLayout" name="gridLayout_5">
-        <item row="2" column="0" colspan="3">
-         <widget class="QTreeView" name="treeView_parts"/>
-        </item>
         <item row="1" column="0" colspan="2">
          <widget class="QPushButton" name="pushButton_part_from_files">
           <property name="text">
            <string>Import From File(s)</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0" colspan="3">
+         <widget class="QTreeView" name="treeView_parts"/>
+        </item>
+        <item row="2" column="0" colspan="2">
+         <widget class="QPushButton" name="pushButton_user_defined_model">
+          <property name="text">
+           <string>User-defined Model</string>
           </property>
          </widget>
         </item>
@@ -656,7 +663,7 @@
           </property>
          </widget>
         </item>
-        <item row="0" column="0" colspan="3">
+        <item row="0" column="0" colspan="2">
          <widget class="QPushButton" name="pushButton_new_assembly">
           <property name="enabled">
            <bool>true</bool>
@@ -689,20 +696,7 @@
        </property>
       </widget>
      </item>
-     <item row="4" column="2">
-      <spacer name="horizontalSpacer_7">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>153</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item row="4" column="3">
+     <item row="4" column="2" colspan="2">
       <widget class="QProgressBar" name="progressBar">
        <property name="value">
         <number>0</number>
@@ -850,8 +844,8 @@
    <slot>new_assembly()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>34</x>
-     <y>333</y>
+     <x>44</x>
+     <y>377</y>
     </hint>
     <hint type="destinationlabel">
      <x>0</x>
@@ -867,7 +861,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>46</x>
-     <y>271</y>
+     <y>322</y>
     </hint>
     <hint type="destinationlabel">
      <x>0</x>
@@ -882,8 +876,8 @@
    <slot>delete_selected_model()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>202</x>
-     <y>502</y>
+     <x>256</x>
+     <y>545</y>
     </hint>
     <hint type="destinationlabel">
      <x>0</x>
@@ -1003,6 +997,22 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>pushButton_user_defined_model</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>user_defined_model()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>49</x>
+     <y>142</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>-2</x>
+     <y>151</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
   <slot>import_parts()</slot>
@@ -1021,6 +1031,8 @@
   <slot>measure_1d()</slot>
   <slot>measure_det()</slot>
   <slot>measure_3d()</slot>
+  <slot>gen_math_model()</slot>
+  <slot>user_defined_model()</slot>
  </slots>
  <buttongroups>
   <buttongroup name="buttonGroup"/>

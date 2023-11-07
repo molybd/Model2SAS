@@ -22,7 +22,7 @@ from ..model import Part, StlPart, MathPart, Assembly
 from .. import plot
 from ..utils import logger, set_log_state, LOG_FORMAT_STR, WELCOME_MESSAGE
 from .utils import GeneralThread, MeasureThread, PlotThread
-from .subwindows import SubWindowHtmlView, SubWindowPlotView
+from .subwindows import SubWindowHtmlView, SubWindowPlotView, SubWindowUserDefinedModel
 
 
 class TransformTypeComboDelegate(QStyledItemDelegate):
@@ -158,6 +158,10 @@ class MainWindow(QMainWindow):
         self.project.new_assembly()
         self.refresh_qitemmodel_models()
         self.refresh_combobox_assemblies()
+        
+    def user_defined_model(self):
+        self.subwindow_userdefined_model = SubWindowUserDefinedModel(self)
+        self.subwindow_userdefined_model.show()
         
     def refresh_combobox_assemblies(self) -> None:
         self.ui.comboBox_assemblies.clear()
