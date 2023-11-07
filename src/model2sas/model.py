@@ -756,6 +756,10 @@ class MathPart(Part):
         self.model_type = 'math'
         if math_model_class is not None:
             self.math_model: MathModelClassBase = math_model_class()
+            try:
+                self.partname = self.math_model.name
+            except:
+                pass
         elif filename is not None:
             abspath = os.path.abspath(filename)
             dirname = os.path.dirname(abspath)

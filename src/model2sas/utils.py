@@ -148,6 +148,7 @@ def gen_math_model_class(
         return sld
 
     attr = dict(
+        name = name,
         __init__ = init,
         get_bound = get_bound,
         sld = sld,
