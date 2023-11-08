@@ -104,7 +104,7 @@ def gen_math_model_class(
         coord: Literal['car', 'sph', 'cyl'] = 'car',
         bound_point: tuple[str, str, str] = ('1', '1', '1'),
         shape_description: str = ':',
-        sld_description: str = 'False',
+        sld_description: str = '1.0',
     ):
     """Generate a math modol class dynamically by description strings.
 
@@ -148,6 +148,7 @@ def gen_math_model_class(
         return sld
 
     attr = dict(
+        name = name,
         __init__ = init,
         get_bound = get_bound,
         sld = sld,

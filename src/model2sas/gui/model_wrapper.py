@@ -159,13 +159,18 @@ class Project:
         self.parts: dict[str, StlPartWrapper | MathPartWrapper | PartWrapper] = {}
         self.assemblies: dict[str, AssemblyWrapper] = {}
         
-    def import_part(self, filename: str) -> None:
-        if os.path.splitext(filename)[-1].lower() == '.stl':
-            part = StlPartWrapper(StlPart(filename=filename))
-        elif os.path.splitext(filename)[-1].lower() == '.py':
-            part = MathPartWrapper(MathPart(filename=filename))
+    def import_part(self, filename_or_mathmodel: str | type) -> None:
+        if isinstance(filename_or_mathmodel, str):
+            filename = filename_or_mathmodel
+            if os.path.splitext(filename)[-1].lower() == '.stl':
+                part = StlPartWrapper(StlPart(filename=filename))
+            elif os.path.splitext(filename)[-1].lower() == '.py':
+                part = MathPartWrapper(MathPart(filename=filename))
+            else:
+                raise TypeError()
         else:
-            raise TypeError()
+            math_model_class = filename_or_mathmodel
+            part = MathPartWrapper(MathPart(math_model_class=math_model_class))
         self.parts[part.key] = part
         
     def new_assembly(self) -> None:

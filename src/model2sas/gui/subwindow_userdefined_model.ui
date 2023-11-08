@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>subwindow_user_defined_model</class>
+ <widget class="QWidget" name="subwindow_user_defined_model">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>347</width>
+    <height>461</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>User-defined Model</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <widget class="QLabel" name="label_6">
+     <property name="text">
+      <string>Name</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="1" colspan="3">
+    <widget class="QLineEdit" name="lineEdit_name">
+     <property name="text">
+      <string/>
+     </property>
+     <property name="placeholderText">
+      <string>use only a-z,A-Z,0-9,underscore</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="4">
+    <widget class="QPushButton" name="pushButton_help">
+     <property name="text">
+      <string>Help</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0" colspan="2">
+    <widget class="QLabel" name="label">
+     <property name="text">
+      <string>Coordinates</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="2">
+    <widget class="QComboBox" name="comboBox_coord">
+     <item>
+      <property name="text">
+       <string>Cartesian</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Spherical</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Cylindrical</string>
+      </property>
+     </item>
+    </widget>
+   </item>
+   <item row="2" column="0" colspan="2">
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>Parameters</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="2">
+    <widget class="QPushButton" name="pushButton_add_param">
+     <property name="text">
+      <string>Add</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="3">
+    <widget class="QPushButton" name="pushButton_delete_param">
+     <property name="text">
+      <string>Delete</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="4" colspan="2">
+    <spacer name="horizontalSpacer_2">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>78</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item row="3" column="0" colspan="6">
+    <widget class="QTableView" name="tableView_params">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>100</height>
+      </size>
+     </property>
+     <property name="font">
+      <font>
+       <family>Consolas</family>
+      </font>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="0" colspan="2">
+    <widget class="QLabel" name="label_3">
+     <property name="text">
+      <string>Bound Point</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="2" colspan="3">
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <widget class="QLineEdit" name="lineEdit_bound_point_1"/>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEdit_bound_point_2"/>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEdit_bound_point_3"/>
+     </item>
+    </layout>
+   </item>
+   <item row="4" column="5">
+    <spacer name="horizontalSpacer">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>2</width>
+       <height>17</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item row="5" column="0" colspan="3">
+    <widget class="QLabel" name="label_4">
+     <property name="text">
+      <string>Shape Description</string>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="0" colspan="3">
+    <widget class="QLabel" name="label_5">
+     <property name="text">
+      <string>SLD Description</string>
+     </property>
+    </widget>
+   </item>
+   <item row="9" column="4" colspan="2">
+    <widget class="QPushButton" name="pushButton_generate">
+     <property name="text">
+      <string>Generate</string>
+     </property>
+    </widget>
+   </item>
+   <item row="9" column="3">
+    <widget class="QPushButton" name="pushButton">
+     <property name="text">
+      <string>Save</string>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="0" colspan="6">
+    <widget class="QTextEdit" name="textEdit_shape_description">
+     <property name="font">
+      <font>
+       <family>Consolas</family>
+      </font>
+     </property>
+    </widget>
+   </item>
+   <item row="8" column="0" colspan="6">
+    <widget class="QTextEdit" name="textEdit_sld_description">
+     <property name="font">
+      <font>
+       <family>Consolas</family>
+      </font>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <tabstops>
+  <tabstop>lineEdit_name</tabstop>
+  <tabstop>pushButton_help</tabstop>
+  <tabstop>comboBox_coord</tabstop>
+  <tabstop>pushButton_add_param</tabstop>
+  <tabstop>pushButton_delete_param</tabstop>
+  <tabstop>tableView_params</tabstop>
+  <tabstop>lineEdit_bound_point_1</tabstop>
+  <tabstop>lineEdit_bound_point_2</tabstop>
+  <tabstop>lineEdit_bound_point_3</tabstop>
+  <tabstop>textEdit_shape_description</tabstop>
+  <tabstop>textEdit_sld_description</tabstop>
+  <tabstop>pushButton_generate</tabstop>
+ </tabstops>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>pushButton_help</sender>
+   <signal>clicked()</signal>
+   <receiver>subwindow_user_defined_model</receiver>
+   <slot>help()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>323</x>
+     <y>23</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>337</x>
+     <y>27</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_add_param</sender>
+   <signal>clicked()</signal>
+   <receiver>subwindow_user_defined_model</receiver>
+   <slot>add_param()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>160</x>
+     <y>79</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>187</x>
+     <y>59</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_delete_param</sender>
+   <signal>clicked()</signal>
+   <receiver>subwindow_user_defined_model</receiver>
+   <slot>delete_param()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>239</x>
+     <y>81</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>285</x>
+     <y>89</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_generate</sender>
+   <signal>clicked()</signal>
+   <receiver>subwindow_user_defined_model</receiver>
+   <slot>generate()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>290</x>
+     <y>413</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>235</x>
+     <y>411</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton</sender>
+   <signal>clicked()</signal>
+   <receiver>subwindow_user_defined_model</receiver>
+   <slot>save()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>185</x>
+     <y>410</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>136</x>
+     <y>406</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>help()</slot>
+  <slot>add_param()</slot>
+  <slot>delete_param()</slot>
+  <slot>generate()</slot>
+  <slot>save()</slot>
+ </slots>
+</ui>
