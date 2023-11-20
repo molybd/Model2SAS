@@ -370,11 +370,7 @@ def plot_surface(
         fig.add_trace(go.Surface(
             x=x, y=y, z=z, surfacecolor=surfacecolor, coloraxis='coloraxis'
         ))
-    if logI:
-        colorbar_title = 'log(I)'
-    else:
-        colorbar_title = None
-    fig.update_layout(coloraxis = {'colorscale': colorscale}, colorbar={'title': colorbar_title})
+    fig.update_layout(coloraxis = {'colorscale': colorscale})
     
     fig.update_layout(scene_aspectmode='data') # make equal aspect, or use fig.update_scenes(aspectmode='data')
     return fig
