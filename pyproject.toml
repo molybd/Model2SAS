@@ -16,6 +16,8 @@ dependencies = [
     "art>=6.1",
     "orjson>=3.9.10",
     "numpy>=1.26.1",
+    "biopython>=1.81",
+    "periodictable>=1.6.1",
 ]
 requires-python = ">=3.10,<3.12"
 readme = "README.md"

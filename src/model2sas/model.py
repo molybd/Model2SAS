@@ -11,6 +11,8 @@ from stl import mesh
 import numpy as np
 import torch
 from torch import Tensor
+import Bio.PDB
+import periodictable as pt
 
 from . import calcfunc
 from .calcfunc import euler_rodrigues_rotate, convert_coord, abi2modarg, modarg2abi
@@ -806,6 +808,60 @@ class MathPart(Part):
         if isinstance(sld, np.ndarray):
             sld = torch.from_numpy(sld).to(torch.float32).to(self.device)
 
+        self.sld = sld
+        self._store_original_real_lattice(x, y, z, sld)
+        return sld
+    
+    
+class PdbPart(Part):
+    def __init__(self, filename: str | None = None, partname: str | None = None, probe: Literal['xray', 'neutron'] = 'xray', wavelength: float = 1.54, is_isolated: bool = True, device: str = 'cpu') -> None:
+        super().__init__(filename=filename, partname=partname, is_isolated=is_isolated, device=device)
+        self.model_type = 'pdb'
+        self.probe = probe
+        self.wavelength = wavelength
+        self.read_pdb_structure()
+        
+    @log
+    def read_pdb_structure(self):
+        pdbparser = Bio.PDB.PDBParser(QUIET=True)   # suppress PDBConstructionWarning
+        self.pdb_structure = pdbparser.get_structure(self.partname, self.filename)
+        f, coord_list, covalent_radius = [], [], []
+        if self.probe == 'neutron':
+            atom_f_func = lambda pt_element: pt_element.neutron.b_c
+        else:
+            atom_f_func = lambda pt_element: pt_element.xray.scattering_factors(wavelength=self.wavelength)[0]
+        for atom in self.pdb_structure.get_atoms():
+            element = atom.element[0].upper() + atom.element[1:].lower()
+            pt_element = pt.elements.symbol(element)
+            f.append(atom_f_func(pt_element))
+            coord_list.append(atom.coord)
+            covalent_radius.append(pt_element.covalent_radius)
+        self.atom_f = torch.tensor(f, dtype=torch.float32)
+        self.atom_coord = torch.from_numpy(np.stack(coord_list, axis=0))
+        self.atom_x, self.atom_y, self.atom_z = self.atom_coord[:,0], self.atom_coord[:,1], self.atom_coord[:,2]
+        self.atom_covalent_radius = torch.tensor(covalent_radius)
+    
+    def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+        """Get boundary of part model. Return 2 points which
+        determine a cuboid fully containing the whole part model.
+
+        Returns:
+            tuple[tuple[float, float, float], tuple[float, float, float]]: min point and max point
+        """
+        bound_min = tuple((self.atom_coord.min(dim=0).values).tolist())
+        bound_max = tuple((self.atom_coord.max(dim=0).values).tolist())
+        self.bound_min, self.bound_max = bound_min, bound_max
+        return bound_min, bound_max
+    
+    @log
+    def gen_real_lattice_sld(self) -> Tensor:
+        x, y, z = self.x, self.y, self.z
+        lattice_min = torch.tensor((x.min(), y.min(), z.min()))
+        index = (self.atom_coord - lattice_min) / self.real_lattice_spacing
+        index = index.round().to(torch.int64)
+        sld = torch.zeros_like(x)
+        sld[index[:,0], index[:,1], index[:,2]] = self.atom_f
+        
         self.sld = sld
         self._store_original_real_lattice(x, y, z, sld)
         return sld
