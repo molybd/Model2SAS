@@ -138,30 +138,25 @@ class Part(Model):
             tuple[Tensor, Tensor, Tensor]: _description_
         """
         bound_min, bound_max = self.get_bound()
-        xmin, ymin, zmin = bound_min
-        xmax, ymax, zmax = bound_max
-        Lmin = min(xmax-xmin, ymax-ymin, zmax-zmin)
-        Lmax = max(xmax-xmin, ymax-ymin, zmax-zmin)
+        L = tuple(map(lambda a, b: a-b, bound_max, bound_min))
+        Lmin, Lmax = min(L), max(L)
         if real_lattice_1d_size is not None:
             spacing = self._get_suggested_spacing(Lmin, Lmax, real_lattice_1d_size=real_lattice_1d_size)
         elif spacing is None:
             spacing = self._get_suggested_spacing(Lmin, Lmax)
-        # print('real spacing: {}'.format(spacing))
-        # ensure equally spacing lattice
-        xmin, ymin, zmin = xmin+spacing/2, ymin+spacing/2, zmin+spacing/2
-        xmax, ymax, zmax = xmax-spacing/2, ymax-spacing/2, zmax-spacing/2
-        xnum = round((xmax-xmin)/spacing)+1
-        xmax = xmin + spacing*(xnum-1)
-        ynum = round((ymax-ymin)/spacing)+1
-        ymax = ymin + spacing*(ynum-1)
-        znum = round((zmax-zmin)/spacing)+1
-        zmax = zmin + spacing*(znum-1)
-
-        x1d = torch.linspace(xmin, xmax, xnum, device=self.device)
-        y1d = torch.linspace(ymin, ymax, ynum, device=self.device)
-        z1d = torch.linspace(zmin, zmax, znum, device=self.device)
+        
+        lattice_min_1d = tuple(map(lambda bmin: bmin-spacing/2, bound_min))
+        num_1d = tuple(map(lambda lmin, bmax: int((bmax-lmin)/spacing)+2, lattice_min_1d, bound_max))
+        lattice_max_1d = tuple(map(lambda lmin, num: lmin+num*spacing, lattice_min_1d, num_1d))
+        x1d, y1d, z1d = tuple(map(
+            lambda lmin, lmax, num: torch.linspace(lmin, lmax, num, device=self.device),
+            lattice_min_1d,
+            lattice_max_1d,
+            num_1d
+        ))
+        
         x, y, z = torch.meshgrid(x1d, y1d, z1d, indexing='ij')
-        self.real_lattice_1d_size = max(xnum, ynum, znum)
+        self.real_lattice_1d_size = max(num_1d)
         self.real_lattice_spacing = spacing
         self.x, self.y, self.z = x, y, z
         return x, y, z
