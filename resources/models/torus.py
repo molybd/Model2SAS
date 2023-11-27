@@ -25,8 +25,8 @@ class MathModelClass:
         self.coord: Literal['car', 'sph', 'cyl']
         """
         self.params = {
-            'R': 100,
-            'r': 50,
+            'R': 30,
+            'r': 15,
             'sld_value': 1,
         }
         self.coord = 'car'  # 'car' or 'sph' or 'cyl'

@@ -26,7 +26,7 @@ class MathModelClass:
         self.coord: Literal['car', 'sph', 'cyl']
         """
         self.params: dict[str, Any] = {
-            'R': 50,
+            'R': 25,
             'sld_value': 1,
         }
         self.coord: Literal['car', 'sph', 'cyl'] = 'sph'

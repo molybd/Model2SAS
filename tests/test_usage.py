@@ -7,17 +7,17 @@ model2sas.utils.set_log_state(True)
 model2sas.utils.add_logger(sink='./local/log.txt', format=model2sas.utils.LOG_FORMAT_STR)
 
 def test_quick():
-    part1 = MathPart(filename=r'resources/models/cylinder.py', device='cpu')
-    # part1.set_params(R=10, H=20, sld_value=1)
-    part1.sample(real_lattice_1d_size=100)
-    plot_model(part1, type='volume', show=True)
+    part1 = MathPart(filename=r'resources/models/torus.py', device='cpu')
+    part1.set_params(R=25, sld_value=1)
+    part1.sample()
+    # plot_model(part1, type='volume', show=True)
     # part1.rotate((1,0,0), torch.pi/5.4)
     # part1.translate(120, 34, -103)
-    # part1.scatter()
+    part1.scatter()
     # plot_model(part1)
-    # q = torch.linspace(0.01, 2, steps=200)
-    # I = part1.measure(q)
-    # plot_1d_sas(q, I, name='cylinder', mode='lines', title='test')
+    q = torch.linspace(0.01, 1, steps=200)
+    I = part1.measure(q)
+    plot_1d_sas(q, I, name='cylinder', mode='lines', title='test')
 
 def test_normal_flow():
     part1 = MathPart(filename=r'resources/exp_models/cylinder_z.py', device='cpu')
@@ -59,7 +59,7 @@ def test_normal_flow():
     plot_surface((*qcoord1, I2d1), (*qcoord2, I2d2))
 
 def test_pdbpart():
-    pdbpart = PdbPart(filename=r'resources/models/1fx8.pdb', probe='neutron')
+    pdbpart = PdbPart(filename=r'resources/models/4hhb.pdb', probe='neutron')
     pdbpart.sample()
     plot_model(pdbpart, type='volume')
     pdbpart.scatter(need_centering=False)
