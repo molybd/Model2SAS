@@ -836,10 +836,10 @@ class PdbPart(Part):
             f.append(atom_f_func(pt_element))
             coord_list.append(atom.coord)
             covalent_radius.append(pt_element.covalent_radius)
-        self.atom_f = torch.tensor(f, dtype=torch.float32)
-        self.atom_coord = torch.from_numpy(np.stack(coord_list, axis=0))
+        self.atom_f = torch.tensor(f, dtype=torch.float32, device=self.device)
+        self.atom_coord = torch.from_numpy(np.stack(coord_list, axis=0)).to(self.device)
         self.atom_x, self.atom_y, self.atom_z = self.atom_coord[:,0], self.atom_coord[:,1], self.atom_coord[:,2]
-        self.atom_covalent_radius = torch.tensor(covalent_radius)
+        self.atom_covalent_radius = torch.tensor(covalent_radius, device=self.device)
     
     def get_bound(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         """Get boundary of part model. Return 2 points which
@@ -856,10 +856,10 @@ class PdbPart(Part):
     @log
     def gen_real_lattice_sld(self) -> Tensor:
         x, y, z = self.x, self.y, self.z
-        lattice_min = torch.tensor((x.min(), y.min(), z.min()))
+        lattice_min = torch.tensor((x.min(), y.min(), z.min()), device=self.device)
         index = (self.atom_coord - lattice_min) / self.real_lattice_spacing
         index = index.round().to(torch.int64)
-        sld = torch.zeros_like(x)
+        sld = torch.zeros_like(x, device=self.device)
         sld[index[:,0], index[:,1], index[:,2]] = self.atom_f
         
         self.sld = sld
