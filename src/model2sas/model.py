@@ -127,6 +127,24 @@ class Part(Model):
         self.real_lattice_spacing = spacing
         self.x, self.y, self.z = x.to(self.device), y.to(self.device), z.to(self.device)
         self.real_lattice_1d_size = max(x.shape)
+        
+    def _get_real_lattice_meshgrid_params(self, bound_min: tuple[float, float, float], bound_max: tuple[float, float, float], spacing: float) -> tuple[tuple[float, float, float], tuple[float, float, float], tuple[int, int, int]]:
+        """Different with StlPart/MathPart anD PdbPart.
+        Default is method compatable with StlPart/MathPart,
+        should be overide if necessary (like PdbPart).
+
+        Args:
+            bound_min (tuple[float, float, float]): from self.get_bound()
+            bound_max (tuple[float, float, float]): from self.get_bound()
+            spacing (float): _description_
+
+        Returns:
+            tuple[float, float, float]: _description_
+        """                
+        lattice_min_1d = tuple(map(lambda bmin: bmin+spacing/2, bound_min))
+        num_1d = tuple(map(lambda lmin, bmax: round((bmax-spacing/2-lmin)/spacing)+1, lattice_min_1d, bound_max))
+        lattice_max_1d = tuple(map(lambda lmin, num: lmin+(num-1)*spacing, lattice_min_1d, num_1d)) # must be num-1 !
+        return lattice_min_1d, lattice_max_1d, num_1d
 
     def gen_real_lattice_meshgrid(self, real_lattice_1d_size: int | None = None, spacing: float | None = None) -> tuple[Tensor, Tensor, Tensor]:
         """Generate equally spaced meshgrid in 3d real space.
@@ -147,9 +165,7 @@ class Part(Model):
         elif spacing is None:
             spacing = self._get_suggested_spacing(Lmin, Lmax)
         
-        lattice_min_1d = tuple(map(lambda bmin: bmin-spacing/2, bound_min))
-        num_1d = tuple(map(lambda lmin, bmax: int((bmax-lmin)/spacing)+2, lattice_min_1d, bound_max))
-        lattice_max_1d = tuple(map(lambda lmin, num: lmin+num*spacing, lattice_min_1d, num_1d))
+        lattice_min_1d, lattice_max_1d, num_1d = self._get_real_lattice_meshgrid_params(bound_min, bound_max, spacing)
         x1d, y1d, z1d = tuple(map(
             lambda lmin, lmax, num: torch.linspace(lmin, lmax, num, device=self.device),
             lattice_min_1d,
@@ -852,6 +868,22 @@ class PdbPart(Part):
         bound_max = tuple((self.atom_coord.max(dim=0).values).tolist())
         self.bound_min, self.bound_max = bound_min, bound_max
         return bound_min, bound_max
+    
+    def _get_real_lattice_meshgrid_params(self, bound_min: tuple[float, float, float], bound_max: tuple[float, float, float], spacing: float) -> tuple[tuple[float, float, float], tuple[float, float, float], tuple[int, int, int]]:
+        """Different with StlPart/MathPart
+
+        Args:
+            bound_min (tuple[float, float, float]): from self.get_bound()
+            bound_max (tuple[float, float, float]): from self.get_bound()
+            spacing (float): _description_
+
+        Returns:
+            tuple[float, float, float]: _description_
+        """        
+        lattice_min_1d = bound_min
+        num_1d = tuple(map(lambda lmin, bmax: int((bmax-lmin)/spacing)+2, lattice_min_1d, bound_max))
+        lattice_max_1d = tuple(map(lambda lmin, num: lmin+(num-1)*spacing, lattice_min_1d, num_1d)) # must be num-1 !
+        return lattice_min_1d, lattice_max_1d, num_1d
     
     @log
     def gen_real_lattice_sld(self) -> Tensor:
